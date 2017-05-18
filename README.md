@@ -1,8 +1,8 @@
 # Racecar
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/racecar`. To experiment with that code, run `bin/console` for an interactive prompt.
+Introducing Racecar, your friendly and easy-to-approach Kafka consumer framework!
 
-TODO: Delete this and the text above, and describe your gem
+Using [ruby-kafka](https://github.com/zendesk/ruby-kafka) directly can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though.
 
 ## Installation
 
@@ -22,7 +22,24 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+Add a file in e.g. `app/consumers/user_ban_consumer.rb`:
+
+```ruby
+class UserBanConsumer < Racecar::Consumer
+  subscribes_to "user_banned"
+
+  def process(message)
+    data = JSON.parse(message.value)
+    user = User.find(data["user_id"])
+    user.banned = true
+    user.save!
+  end
+end
+```
+
+Now run your consumer with `bundle exec racecar UserBanConsumer`.
+
+That's all there is to it.
 
 ## Development
 
