@@ -9,6 +9,12 @@ parser = OptionParser.new do |opts|
   opts.on("-r", "--require LIBRARY", "Require the LIBRARY before starting the consumer") do |lib|
     require lib
   end
+
+  opts.on_tail("--version", "Show Racecar version") do
+    require "racecar/version"
+    puts "Racecar #{Racecar::VERSION}"
+    exit
+  end
 end
 
 parser.parse!(ARGV)
