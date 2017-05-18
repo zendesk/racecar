@@ -1,26 +1,33 @@
 #!/usr/bin/env ruby
 
+require "racecar"
+
 consumer_name = ARGV.first or raise "No consumer specified"
 config_file = "config/racecar.yml"
 
 puts "=> Starting Racecar consumer #{consumer_name}..."
+
+if defined?(Rails)
+  puts "=> Booting Rails application..."
+
+  require_relative '../config/environment'
+
+  Racecar.config.load_file(config_file, Rails.env)
+
+  if Racecar.config.log_to_stdout
+    # Write to STDOUT as well as to the log file.
+    console = ActiveSupport::Logger.new($stdout)
+    console.formatter = Rails.logger.formatter
+    console.level = Rails.logger.level
+    Rails.logger.extend(ActiveSupport::Logger.broadcast(console))
+  end
+
+  Racecar.logger = Rails.logger
+end
+
 puts "=> Wrooooom!"
 puts "=> Ctrl-C to shutdown consumer"
 
-require_relative '../config/environment'
-
-require "racecar"
-
-Racecar.config.load_file(config_file, Rails.env)
-
-if Racecar.config.log_to_stdout
-  # Write to STDOUT as well as to the log file.
-  console = ActiveSupport::Logger.new($stdout)
-  console.formatter = Rails.logger.formatter
-  console.level = Rails.logger.level
-  Rails.logger.extend(ActiveSupport::Logger.broadcast(console))
-end
-
-Racecar.logger = Rails.logger
-
 Racecar.run(consumer_name)
+
+puts "=> Shut down"
