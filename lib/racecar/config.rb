@@ -45,6 +45,7 @@ module Racecar
 
     def initialize
       load(DEFAULT_CONFIG)
+      load_env!
     end
 
     def load_file(path, environment)
@@ -72,6 +73,14 @@ module Racecar
 
     def on_error(&handler)
       @error_handler = handler
+    end
+
+    private
+
+    def load_env!
+      if ENV.key?("RACECAR_BROKERS")
+        @brokers = ENV["RACECAR_BROKERS"].split(",")
+      end
     end
   end
 end
