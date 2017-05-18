@@ -10,7 +10,7 @@ puts "=> Starting Racecar consumer #{consumer_name}..."
 if defined?(Rails)
   puts "=> Booting Rails application..."
 
-  require_relative '../config/environment'
+  require_relative "../config/environment"
 
   Racecar.config.load_file(config_file, Rails.env)
 
