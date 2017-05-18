@@ -1,6 +1,17 @@
 #!/usr/bin/env ruby
 
+require "optparse"
 require "racecar"
+
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: racecar MyConsumer [options]"
+
+  opts.on("-r", "--require LIBRARY", "Require the LIBRARY before starting the consumer") do |lib|
+    require lib
+  end
+end
+
+parser.parse!(ARGV)
 
 consumer_name = ARGV.first or raise "No consumer specified"
 config_file = "config/racecar.yml"
