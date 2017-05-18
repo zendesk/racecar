@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
 
   spec.summary       = "A framework for running Kafka consumers"
   spec.homepage      = "https://github.com/zendesk/racecar"
-  spec.license       = "MIT"
+  spec.license       = "Apache License Version 2.0"
 
   spec.files         = `git ls-files -z`.split("\x0").reject do |f|
     f.match(%r{^(test|spec|features)/})
