@@ -1,3 +1,5 @@
+require "kafka"
+
 module Racecar
   class Runner
     attr_reader :consumer_name, :config, :logger
