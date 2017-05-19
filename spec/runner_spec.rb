@@ -1,12 +1,14 @@
 require "stringio"
 
 class TestConsumer < Racecar::Consumer
-  def self.messages
-    @@messages ||= []
+  attr_reader :messages
+
+  def initialize
+    @messages = []
   end
 
   def process(message)
-    self.class.messages << message
+    @messages << message
   end
 end
 
@@ -45,7 +47,7 @@ end
 describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
   let(:logger) { Logger.new(StringIO.new) }
-  let(:consumer_class) { TestConsumer }
+  let(:processor) { TestConsumer.new }
   let(:kafka) { FakeKafka.new }
 
   before do
@@ -53,12 +55,12 @@ describe Racecar::Runner do
   end
 
   it "processes messages with the specified consumer class" do
-    runner = Racecar::Runner.new(consumer_class, config: config, logger: logger)
+    runner = Racecar::Runner.new(processor, config: config, logger: logger)
 
     kafka.deliver_message("hello world", topic: "greetings")
 
     runner.run
 
-    expect(consumer_class.messages.map(&:value)).to eq ["hello world"]
+    expect(processor.messages.map(&:value)).to eq ["hello world"]
   end
 end

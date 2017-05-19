@@ -2,10 +2,10 @@ require "kafka"
 
 module Racecar
   class Runner
-    attr_reader :consumer_class, :config, :logger
+    attr_reader :processor, :config, :logger
 
-    def initialize(consumer_class, config:, logger:)
-      @consumer_class, @config, @logger = consumer_class, config, logger
+    def initialize(processor, config:, logger:)
+      @processor, @config, @logger = processor, config, logger
     end
 
     def run
@@ -35,11 +35,9 @@ module Racecar
         consumer.subscribe(topic, start_from_beginning: start_from_beginning)
       end
 
-      consumer_object = consumer_class.new
-
       begin
         consumer.each_message(max_wait_time: config.max_wait_time) do |message|
-          consumer_object.process(message)
+          processor.process(message)
         end
       rescue Kafka::ProcessingError => e
         @logger.error "Error processing partition #{e.topic}/#{e.partition} at offset #{e.offset}"

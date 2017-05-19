@@ -17,7 +17,7 @@ module Racecar
     @logger = logger
   end
 
-  def self.run(consumer_name)
-    Runner.new(consumer_name, config: config, logger: logger).run
+  def self.run(processor)
+    Runner.new(processor, config: config, logger: logger).run
   end
 end
