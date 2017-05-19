@@ -2,15 +2,13 @@ require "kafka"
 
 module Racecar
   class Runner
-    attr_reader :consumer_name, :config, :logger
+    attr_reader :consumer_class, :config, :logger
 
-    def initialize(consumer_name, config:, logger:)
-      @consumer_name, @config, @logger = consumer_name, config, logger
+    def initialize(consumer_class, config:, logger:)
+      @consumer_class, @config, @logger = consumer_class, config, logger
     end
 
     def run
-      consumer_class = Kernel.const_get(consumer_name)
-
       kafka = Kafka.new(
         client_id: config.client_id,
         seed_brokers: config.brokers,

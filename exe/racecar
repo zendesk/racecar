@@ -47,6 +47,9 @@ Racecar.config.validate!
 puts "=> Wrooooom!"
 puts "=> Ctrl-C to shutdown consumer"
 
-Racecar.run(consumer_name)
+# Find the consumer class by name.
+consumer_class = Kernel.const_get(consumer_name)
+
+Racecar.run(consumer_class)
 
 puts "=> Shut down"
