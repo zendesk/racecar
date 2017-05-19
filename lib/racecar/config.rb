@@ -13,6 +13,7 @@ module Racecar
       connect_timeout
       socket_timeout
       group_id_prefix
+      group_id
       error_handler
       default_max_wait_time
       log_to_stdout
@@ -45,7 +46,7 @@ module Racecar
       log_to_stdout: false,
     }
 
-    attr_reader(*ALLOWED_KEYS)
+    attr_accessor(*ALLOWED_KEYS)
 
     def initialize
       load(DEFAULT_CONFIG)

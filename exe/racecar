@@ -42,13 +42,23 @@ if defined?(Rails)
   Racecar.logger = Rails.logger
 end
 
+# Find the consumer class by name.
+consumer_class = Kernel.const_get(consumer_name)
+
+Racecar.config.group_id = consumer_class.group_id
+
+Racecar.config.group_id ||= [
+  # Configurable and optional prefix:
+  Racecar.config.group_id_prefix,
+
+  # MyFunnyConsumer => my-funny-consumer
+  consumer_class.name.gsub(/[a-z][A-Z]/) {|str| str[0] << "-" << str[1] }.downcase,
+].compact.join("")
+
 Racecar.config.validate!
 
 puts "=> Wrooooom!"
 puts "=> Ctrl-C to shutdown consumer"
-
-# Find the consumer class by name.
-consumer_class = Kernel.const_get(consumer_name)
 
 Racecar.run(consumer_class)
 

@@ -17,18 +17,8 @@ module Racecar
         socket_timeout: config.socket_timeout,
       )
 
-      group_id = consumer_class.group_id
-
-      group_id ||= [
-        # Configurable and optional prefix:
-        config.group_id_prefix,
-
-        # MyFunnyConsumer => my-funny-consumer
-        consumer_class.name.gsub(/[a-z][A-Z]/) {|str| str[0] << "-" << str[1] }.downcase,
-      ].compact.join("")
-
       consumer = kafka.consumer(
-        group_id: group_id,
+        group_id: config.group_id,
         offset_commit_interval: config.offset_commit_interval,
         offset_commit_threshold: config.offset_commit_threshold,
         heartbeat_interval: config.heartbeat_interval,
