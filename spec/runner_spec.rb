@@ -1,6 +1,8 @@
 require "stringio"
 
-class TestConsumer < Racecar::Consumer
+class TestConsumer
+  extend Racecar::Consumer
+
   attr_reader :messages
 
   def initialize
