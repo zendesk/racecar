@@ -19,26 +19,26 @@ module Racecar
     )
 
     DEFAULT_CONFIG = {
-      "client_id" => "racecar",
-      "group_id_prefix" => nil,
+      client_id: "racecar",
+      group_id_prefix: nil,
 
       # Default is to commit offsets every 10 seconds.
-      "offset_commit_interval" => 10,
+      offset_commit_interval: 10,
 
       # Default is no buffer threshold trigger.
-      "offset_commit_threshold" => 0,
+      offset_commit_threshold: 0,
 
       # Default is to send a heartbeat every 10 seconds.
-      "heartbeat_interval" => 10,
+      heartbeat_interval: 10,
 
       # Default is to not pause partitions on processing errors.
-      "pause_timeout" => 0,
+      pause_timeout: 0,
 
-      "connect_timeout" => nil,
-      "socket_timeout" => nil,
-      "error_handler" => proc {},
-      "default_max_wait_time" => 5,
-      "log_to_stdout" => false,
+      connect_timeout: nil,
+      socket_timeout: nil,
+      error_handler: proc {},
+      default_max_wait_time: 5,
+      log_to_stdout: false,
     }
 
     attr_reader(*ALLOWED_KEYS)
@@ -63,7 +63,7 @@ module Racecar
 
     def load(data)
       data.each do |key, value|
-        unless ALLOWED_KEYS.include?(key)
+        unless ALLOWED_KEYS.include?(key.to_s)
           raise "unknown configuration key `#{key}`"
         end
 

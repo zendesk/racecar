@@ -1,9 +1,13 @@
 require "racecar/config"
 
 describe Racecar::Config do
-  describe "#load" do
-    let(:config) { Racecar::Config.new }
+  let(:config) { Racecar::Config.new }
 
+  it "uses the default config if no explicit value has been set" do
+    expect(config.offset_commit_interval).to eq 10
+  end
+
+  describe "#load" do
     it "sets config variables" do
       data = {
         "client_id" => "fiddle",
@@ -11,7 +15,7 @@ describe Racecar::Config do
 
       config.load(data)
 
-      expect(config.client_id).to eql "fiddle"
+      expect(config.client_id).to eq "fiddle"
     end
 
     it "fails when an unsupported variable is passed" do
