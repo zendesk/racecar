@@ -16,7 +16,7 @@ module Racecar
       group_id
       subscriptions
       error_handler
-      default_max_wait_time
+      max_wait_time
       log_to_stdout
     )
 
@@ -45,7 +45,7 @@ module Racecar
       connect_timeout: nil,
       socket_timeout: nil,
       error_handler: proc {},
-      default_max_wait_time: 5,
+      max_wait_time: 5,
       log_to_stdout: false,
     }
 

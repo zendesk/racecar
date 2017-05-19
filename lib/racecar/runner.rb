@@ -37,12 +37,8 @@ module Racecar
 
       consumer_object = consumer_class.new
 
-      # The maximum time we're willing to wait for new messages to arrive at the broker
-      # when long-polling.
-      max_wait_time = consumer_class.max_wait_time || config.default_max_wait_time
-
       begin
-        consumer.each_message(max_wait_time: max_wait_time) do |message|
+        consumer.each_message(max_wait_time: config.max_wait_time) do |message|
           consumer_object.process(message)
         end
       rescue Kafka::ProcessingError => e
