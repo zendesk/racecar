@@ -55,6 +55,8 @@ Racecar.config.group_id ||= [
   consumer_class.name.gsub(/[a-z][A-Z]/) {|str| str[0] << "-" << str[1] }.downcase,
 ].compact.join("")
 
+Racecar.config.subscriptions = consumer_class.subscriptions
+
 Racecar.config.validate!
 
 puts "=> Wrooooom!"

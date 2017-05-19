@@ -14,6 +14,7 @@ module Racecar
       socket_timeout
       group_id_prefix
       group_id
+      subscriptions
       error_handler
       default_max_wait_time
       log_to_stdout
@@ -26,6 +27,8 @@ module Racecar
     DEFAULT_CONFIG = {
       client_id: "racecar",
       group_id_prefix: nil,
+
+      subscriptions: [],
 
       # Default is to commit offsets every 10 seconds.
       offset_commit_interval: 10,

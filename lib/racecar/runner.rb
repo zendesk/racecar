@@ -28,7 +28,7 @@ module Racecar
       trap("QUIT") { consumer.stop }
       trap("INT") { consumer.stop }
 
-      consumer_class.subscriptions.each do |subscription|
+      config.subscriptions.each do |subscription|
         topic = subscription.topic
         start_from_beginning = subscription.start_from_beginning
 
