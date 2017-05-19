@@ -1,3 +1,4 @@
+require "ostruct"
 require "racecar/config"
 
 describe Racecar::Config do
@@ -24,6 +25,36 @@ describe Racecar::Config do
       }
 
       expect { config.load(data) }.to raise_exception(RuntimeError)
+    end
+  end
+
+  describe "#load_consumer_class" do
+    let(:consumer_class) {
+      OpenStruct.new(group_id: nil, name: "DoStuffConsumer", subscriptions: [])
+    }
+
+    it "sets the group id if one has been explicitly defined" do
+      consumer_class.group_id = "fiddle"
+
+      config.load_consumer_class(consumer_class)
+
+      expect(config.group_id).to eq "fiddle"
+    end
+
+    it "defaults the group id to a dasherized version of the class name with the prefix" do
+      config.group_id_prefix = "my-app."
+
+      config.load_consumer_class(consumer_class)
+
+      expect(config.group_id).to eq "my-app.do-stuff-consumer"
+    end
+
+    it "sets the subscriptions to the ones defined on the consumer class" do
+      consumer_class.subscriptions = ["one", "two"]
+
+      config.load_consumer_class(consumer_class)
+
+      expect(config.subscriptions).to eq ["one", "two"]
     end
   end
 

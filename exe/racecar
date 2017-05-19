@@ -45,18 +45,8 @@ end
 # Find the consumer class by name.
 consumer_class = Kernel.const_get(consumer_name)
 
-Racecar.config.group_id = consumer_class.group_id
-
-Racecar.config.group_id ||= [
-  # Configurable and optional prefix:
-  Racecar.config.group_id_prefix,
-
-  # MyFunnyConsumer => my-funny-consumer
-  consumer_class.name.gsub(/[a-z][A-Z]/) {|str| str[0] << "-" << str[1] }.downcase,
-].compact.join("")
-
-Racecar.config.subscriptions = consumer_class.subscriptions
-Racecar.config.max_wait_time = consumer_class.max_wait_time unless consumer_class.max_wait_time.nil?
+# Load config defined by the consumer class itself.
+Racecar.config.load_consumer_class(consumer_class)
 
 Racecar.config.validate!
 

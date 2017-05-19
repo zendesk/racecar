@@ -87,6 +87,21 @@ module Racecar
       end
     end
 
+    def load_consumer_class(consumer_class)
+      @group_id ||= consumer_class.group_id
+
+      @group_id ||= [
+        # Configurable and optional prefix:
+        group_id_prefix,
+
+        # MyFunnyConsumer => my-funny-consumer
+        consumer_class.name.gsub(/[a-z][A-Z]/) {|str| str[0] << "-" << str[1] }.downcase,
+      ].compact.join("")
+
+      @subscriptions = consumer_class.subscriptions
+      @max_wait_time = consumer_class.max_wait_time
+    end
+
     def on_error(&handler)
       @error_handler = handler
     end
