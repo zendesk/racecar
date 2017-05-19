@@ -74,7 +74,7 @@ module Racecar
 
         # Restart the consumer loop.
         retry
-      rescue StandardError => e
+      rescue Kafka::Error => e
         error = "#{e.class}: #{e.message}\n" + e.backtrace.join("\n")
         @logger.error "Consumer thread crashed: #{error}"
 
