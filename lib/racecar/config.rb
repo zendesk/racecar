@@ -18,6 +18,10 @@ module Racecar
       log_to_stdout
     )
 
+    REQUIRED_KEYS = %w(
+      brokers
+    )
+
     DEFAULT_CONFIG = {
       client_id: "racecar",
       group_id_prefix: nil,
@@ -46,6 +50,14 @@ module Racecar
     def initialize
       load(DEFAULT_CONFIG)
       load_env!
+    end
+
+    def validate!
+      REQUIRED_KEYS.each do |key|
+        if send(key).nil?
+          raise "required configuration key `#{key}` not defined"
+        end
+      end
     end
 
     def load_file(path, environment)

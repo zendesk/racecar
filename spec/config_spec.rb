@@ -26,4 +26,16 @@ describe Racecar::Config do
       expect { config.load(data) }.to raise_exception(RuntimeError)
     end
   end
+
+  describe "#validate!" do
+    it "raises an exception if required variables are not set" do
+      expect {
+        config.validate!
+      }.to raise_exception(RuntimeError, "required configuration key `brokers` not defined")
+
+      config.load(brokers: ["a", "b", "c"])
+
+      expect { config.validate! }.not_to raise_exception
+    end
+  end
 end
