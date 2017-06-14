@@ -88,7 +88,7 @@ module Racecar
     end
 
     def load_consumer_class(consumer_class)
-      @group_id ||= consumer_class.group_id
+      @group_id = consumer_class.group_id || @group_id
 
       @group_id ||= [
         # Configurable and optional prefix:
@@ -99,7 +99,7 @@ module Racecar
       ].compact.join("")
 
       @subscriptions = consumer_class.subscriptions
-      @max_wait_time = consumer_class.max_wait_time
+      @max_wait_time = consumer_class.max_wait_time || @max_wait_time
     end
 
     def on_error(&handler)
