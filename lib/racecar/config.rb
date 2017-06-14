@@ -22,6 +22,7 @@ module Racecar
 
     REQUIRED_KEYS = %w(
       brokers
+      client_id
     )
 
     DEFAULT_CONFIG = {

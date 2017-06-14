@@ -71,14 +71,29 @@ describe Racecar::Config do
   end
 
   describe "#validate!" do
-    it "raises an exception if required variables are not set" do
+    before do
+      config.brokers = ["a"]
+      config.client_id = "x"
+    end
+
+    it "raises an exception if no brokers have been configured" do
+      expect { config.validate! }.not_to raise_exception
+
+      config.brokers = nil
+
       expect {
         config.validate!
       }.to raise_exception(RuntimeError, "required configuration key `brokers` not defined")
+    end
 
-      config.load(brokers: ["a", "b", "c"])
-
+    it "raises an exception if no client id has been configured" do
       expect { config.validate! }.not_to raise_exception
+
+      config.client_id = nil
+
+      expect {
+        config.validate!
+      }.to raise_exception(RuntimeError, "required configuration key `client_id` not defined")
     end
   end
 end
