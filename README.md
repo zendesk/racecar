@@ -25,7 +25,9 @@ Or install it yourself as:
 Add a file in e.g. `app/consumers/user_ban_consumer.rb`:
 
 ```ruby
-class UserBanConsumer < Racecar::Consumer
+class UserBanConsumer
+  extend Racecar::Consumer
+
   subscribes_to "user_banned"
 
   def process(message)
