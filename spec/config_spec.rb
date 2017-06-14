@@ -56,6 +56,18 @@ describe Racecar::Config do
 
       expect(config.subscriptions).to eq ["one", "two"]
     end
+
+    it "doesn't override existing values if the consumer hasn't specified anything" do
+      consumer_class.max_wait_time = nil
+      consumer_class.group_id = nil
+
+      config.max_wait_time = 10
+      config.group_id = "cats"
+      config.load_consumer_class(consumer_class)
+
+      expect(config.max_wait_time).to eq 10
+      expect(config.group_id).to eq "cats"
+    end
   end
 
   describe "#validate!" do
