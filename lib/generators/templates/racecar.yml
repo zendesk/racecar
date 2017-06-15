@@ -1,0 +1,40 @@
+# These config values will be shared by all environments but can be overridden.
+common: &common
+  # The initial list of Kafka brokers that will be contacted in order to
+  # discover the full Kafka cluster.
+  brokers:
+    - kafka1.myapp.com
+    - kafka2.myapp.com
+    - kafka3.myapp.com
+
+  # This allows identifying us in Kafka logs and metrics.
+  client_id: "my-application"
+
+  # Prefix all consumer group ids with this string. For a consumer class
+  # CopyStuffConsumer, the group id would become `my-app.copy-stuff-consumer`.
+  group_id_prefix: "my-app."
+
+  # Commit consumer offsets every 10 seconds.
+  offset_commit_interval: 10
+
+  # Send a consumer group heartbeat every 10 seconds.
+  heartbeat_interval: 10
+
+  # After an exception in consumer processing code, pause the partition from
+  # which the message causing the exception came from for this many seconds.
+  pause_timeout: 60
+
+  # Allow at most this many seconds when trying to connect to a broker.
+  connect_timeout: 30
+
+  # Allow at most this many seconds when trying to read from a socket.
+  socket_timeout: 30
+
+development:
+  <<: *common
+
+test:
+  <<: *common
+
+production:
+  <<: *common
