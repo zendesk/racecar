@@ -20,6 +20,12 @@ Or install it yourself as:
 
     $ gem install racecar
 
+Then execute:
+
+    $ bundle exec rails generate racecar:install
+
+This will add a config file in `config/racecar.yml`.
+
 ## Usage
 
 Racecar is built for simplicity of development and operation. If you need more flexibility, it's quite straightforward to build your own Kafka consumer executables using [ruby-kafka](https://github.com/zendesk/ruby-kafka#consuming-messages-from-kafka) directly.
@@ -49,7 +55,7 @@ end
 
 In order to create your own consumer, run the Rails generator `racecar:consumer`:
 
-    bundle exec rails generate racecar:consumer TapDance
+    $ bundle exec rails generate racecar:consumer TapDance
 
 This will create a file at `app/consumers/tap_dance_consumer.rb` which you can modify to your liking. Add one or more calls to  `subscribes_to` in order to have the consumer subscribe to Kafka topics.
 
@@ -94,7 +100,7 @@ Note that once the consumer has started, it will commit the offsets it has proce
 
 Racecar is first and foremost an executable _consumer runner_. The `racecar` executable takes as argument the name of the consumer class that should be run. Racecar automatically loads your Rails application before starting, and you can load any other library you need by passing the `--require` flag, e.g.
 
-    bundle exec racecar --require dance_moves TapDanceConsumer
+    $ bundle exec racecar --require dance_moves TapDanceConsumer
 
 ### Configuration
 
