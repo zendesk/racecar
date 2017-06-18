@@ -1,0 +1,7 @@
+class <%= class_name %>Consumer < Racecar::Consumer
+  subscribes_to "some-topic"
+
+  def process(message)
+    puts "Received message: #{message.value}"
+  end
+end
