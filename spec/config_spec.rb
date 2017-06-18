@@ -28,6 +28,14 @@ describe Racecar::Config do
     end
   end
 
+  describe "#load_env" do
+    it "loads the brokers from RACECAR_BROKERS" do
+      ENV["RACECAR_BROKERS"] = "hansel,gretel"
+
+      expect(config.brokers).to eq ["hansel", "gretel"]
+    end
+  end
+
   describe "#load_consumer_class" do
     let(:consumer_class) {
       OpenStruct.new(group_id: nil, name: "DoStuffConsumer", subscriptions: [])
