@@ -46,6 +46,18 @@ describe Racecar::Config do
 
       expect(config.offset_commit_interval).to eq 45
     end
+
+    it "sets the offset commit threshold from RACECAR_OFFSET_COMMIT_THRESHOLD" do
+      ENV["RACECAR_OFFSET_COMMIT_THRESHOLD"] = "45"
+
+      expect(config.offset_commit_threshold).to eq 45
+    end
+
+    it "sets the heartbeat interval from RACECAR_HEARTBEAT_INTERVAL" do
+      ENV["RACECAR_HEARTBEAT_INTERVAL"] = "45"
+
+      expect(config.heartbeat_interval).to eq 45
+    end
   end
 
   describe "#load_consumer_class" do

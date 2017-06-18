@@ -1,5 +1,6 @@
 require "erb"
 require "yaml"
+require "racecar/env_loader"
 
 module Racecar
   class Config
@@ -79,13 +80,17 @@ module Racecar
       load(data)
     end
 
+    def set(key, value)
+      unless ALLOWED_KEYS.include?(key.to_s)
+        raise "unknown configuration key `#{key}`"
+      end
+
+      instance_variable_set("@#{key}", value)
+    end
+
     def load(data)
       data.each do |key, value|
-        unless ALLOWED_KEYS.include?(key.to_s)
-          raise "unknown configuration key `#{key}`"
-        end
-
-        instance_variable_set("@#{key}", value)
+        set(key, value)
       end
     end
 
@@ -111,17 +116,19 @@ module Racecar
     private
 
     def load_env!
-      if ENV.key?("RACECAR_BROKERS")
-        @brokers = ENV["RACECAR_BROKERS"].split(",")
-      end
+      loader = EnvLoader.new(ENV, self)
 
-      if ENV.key?("RACECAR_CLIENT_ID")
-        @client_id = ENV["RACECAR_CLIENT_ID"]
-      end
-
-      if ENV.key?("RACECAR_OFFSET_COMMIT_INTERVAL")
-        @offset_commit_interval = Integer(ENV["RACECAR_OFFSET_COMMIT_INTERVAL"])
-      end
+      loader.string_list(:brokers)
+      loader.string(:client_id)
+      loader.string(:group_id_prefix)
+      loader.string(:group_id)
+      loader.integer(:offset_commit_interval)
+      loader.integer(:offset_commit_threshold)
+      loader.integer(:heartbeat_interval)
+      loader.integer(:pause_timeout)
+      loader.integer(:connect_timeout)
+      loader.integer(:socket_timeout)
+      loader.integer(:max_wait_time)
     end
   end
 end
