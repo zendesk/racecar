@@ -108,7 +108,7 @@ Racecar provides a flexible way to configure your consumer in a way that feels a
 
 The possible configuration keys are:
 
-* `brokers` (_required_) – A list of Kafka brokers in the cluster that you're consuming from.
+* `brokers` (_optional_) – A list of Kafka brokers in the cluster that you're consuming from. Defaults to `localhost` on port 9092, the default Kafka port.
 * `client_id` (_optional_) – A string used to identify the client in logs and metrics.
 * `group_id_prefix` (_optional_) – A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon_consumer`.
 * `offset_commit_interval` (_optional_) – How often to save the consumer's position in Kafka.

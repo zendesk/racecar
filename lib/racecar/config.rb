@@ -26,6 +26,7 @@ module Racecar
     )
 
     DEFAULT_CONFIG = {
+      brokers: ["localhost:9092"],
       client_id: "racecar",
       group_id_prefix: nil,
 
