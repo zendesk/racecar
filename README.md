@@ -22,6 +22,10 @@ Or install it yourself as:
 
 ## Usage
 
+Racecar is built for simplicity of development and operation. If you need more flexibility, it's quite straightforward to build your own Kafka consumer executables using [ruby-kafka](https://github.com/zendesk/ruby-kafka#consuming-messages-from-kafka) directly.
+
+### Creating consumers
+
 Add a file in e.g. `app/consumers/user_ban_consumer.rb`:
 
 ```ruby
@@ -39,7 +43,49 @@ end
 
 Now run your consumer with `bundle exec racecar UserBanConsumer`.
 
-That's all there is to it.
+You can optionally add an `initialize` method if you need to do any set-up, e.g.
+
+```ruby
+class PushNotificationConsumer < Racecar::Consumer
+  subscribes_to "notifications"
+  
+  def initialize
+    @push_service = PushService.new # pretend this exists.
+  end
+  
+  def process(message)
+    data = JSON.parse(message.value)
+    
+    @push_service.notify!(
+      recipient: data.fetch("recipient"),
+      notification: data.fetch("notification"),
+    )
+  end
+end
+```
+
+### Running consumers
+
+Racecar is first and foremost an executable consumer _runner_. The `racecar` consumer takes as argument the name of the consumer class that should be run. Racecar automatically loads your Rails application before starting, and you can load any other library you need by passing the `--require x` flag, e.g.
+
+    bundle exec racecar --require dance_moves TapDanceConsumer
+
+### Configuration
+
+Racecar provides a flexible way to configure your consumer in a way that feels at home in a Rails application. If you haven't already, run `bundle exec rails generate racecar:install` in order to generate a config file. You'll get a separate section for each Rails environment, with the common configuration values in a shared `common` section.
+
+The possible configuration keys are:
+
+* `brokers` (_required_) – A list of Kafka brokers in the cluster that you're consuming from.
+* `client_id` (_optional_) – A string used to identify the client in logs and metrics.
+* `group_id_prefix` (_optional_) – A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon_consumer`.
+* `offset_commit_interval` (_optional_) – How often to save the consumer's position in Kafka.
+* `heartbeat_interval` (_optional_) – How often to send a heartbeat message to Kafka.
+* `pause_timeout` (_optional_) – How long to pause a partition for if the consumer raises an exception while processing a message.
+* `connect_timeout` (_optional_) – How long to wait when trying to connect to a Kafka broker.
+* `socket_timeout` (_optional_) – How long to wait when trying to communicate with a Kafka broker.
+
+Note that many of these configuration keys correspond directly with similarly named concepts in [ruby-kafka](https://github.com/zendesk/ruby-kafka) for more details on low-level operations, read that project's documentation.
 
 ## Development
 
