@@ -26,7 +26,7 @@ Racecar is built for simplicity of development and operation. If you need more f
 
 ### Creating consumers
 
-A Racecar consumer is a simple Rails class that inherits from `Racecar::Consume`:
+A Racecar consumer is a simple Rails class that inherits from `Racecar::Consumer`:
 
 ```ruby
 class UserBanConsumer < Racecar::Consumer
