@@ -55,7 +55,9 @@ This will create a file at `app/consumers/tap_dance_consumer.rb` which you can m
 
 Now run your consumer with `bundle exec racecar TapDanceConsumer`.
 
-You can optionally add an `initialize` method if you need to do any set-up, e.g.
+#### Initializing consumers
+
+You can optionally add an `initialize` method if you need to do any set-up work before processing messages, e.g.
 
 ```ruby
 class PushNotificationConsumer < Racecar::Consumer
@@ -75,6 +77,18 @@ class PushNotificationConsumer < Racecar::Consumer
   end
 end
 ```
+
+This is useful to do any one-off work that you wouldn't want to do for each and every message.
+
+#### Setting the starting position
+
+When a consumer is started for the first time, it needs to decide where in each partition to start. By default, it will start at the _beginning_, meaning that all past messages will be processed. If you want to instead start at the _end_ of each partition, change your `subscribes_to` like this:
+
+```ruby
+subscribes_to "some-topic", start_from_beginning: false
+```
+
+Note that once the consumer has started, it will commit the offsets it has processed until and in the future will resume from those.
 
 ### Running consumers
 
