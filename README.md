@@ -26,7 +26,7 @@ Racecar is built for simplicity of development and operation. If you need more f
 
 ### Creating consumers
 
-Add a file in e.g. `app/consumers/user_ban_consumer.rb`:
+A Racecar consumer is a simple Rails class that inherits from `Racecar::Consume`:
 
 ```ruby
 class UserBanConsumer < Racecar::Consumer
@@ -41,7 +41,13 @@ class UserBanConsumer < Racecar::Consumer
 end
 ```
 
-Now run your consumer with `bundle exec racecar UserBanConsumer`.
+In order to create your own consumer, run the Rails generator `racecar:consumer`:
+
+    bundle exec rails generate racecar:consumer TapDance
+
+This will create a file at `app/consumers/tap_dance_consumer.rb` which you can modify to your liking. Add one or more calls to  `subscribes_to` in order to have the consumer subscribe to Kafka topics.
+
+Now run your consumer with `bundle exec racecar TapDanceConsumer`.
 
 You can optionally add an `initialize` method if you need to do any set-up, e.g.
 
