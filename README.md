@@ -72,7 +72,7 @@ end
 
 ### Running consumers
 
-Racecar is first and foremost an executable consumer _runner_. The `racecar` consumer takes as argument the name of the consumer class that should be run. Racecar automatically loads your Rails application before starting, and you can load any other library you need by passing the `--require x` flag, e.g.
+Racecar is first and foremost an executable _consumer runner_. The `racecar` executable takes as argument the name of the consumer class that should be run. Racecar automatically loads your Rails application before starting, and you can load any other library you need by passing the `--require x` flag, e.g.
 
     bundle exec racecar --require dance_moves TapDanceConsumer
 
