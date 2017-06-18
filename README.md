@@ -2,7 +2,7 @@
 
 Introducing Racecar, your friendly and easy-to-approach Kafka consumer framework!
 
-Using [ruby-kafka](https://github.com/zendesk/ruby-kafka) directly can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though. Racecar provides a simple and intuitive way to build and configure Kafka consumers within a Rails application.
+Using [ruby-kafka](https://github.com/zendesk/ruby-kafka) directly can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though. Racecar provides a simple and intuitive way to build and configure Kafka consumers that optionally integrates seemlessly with Rails.
 
 ## Installation
 
@@ -20,7 +20,7 @@ Or install it yourself as:
 
     $ gem install racecar
 
-Then execute:
+Then execute (if you're in a Rails application):
 
     $ bundle exec rails generate racecar:install
 
@@ -60,6 +60,8 @@ In order to create your own consumer, run the Rails generator `racecar:consumer`
 This will create a file at `app/consumers/tap_dance_consumer.rb` which you can modify to your liking. Add one or more calls to  `subscribes_to` in order to have the consumer subscribe to Kafka topics.
 
 Now run your consumer with `bundle exec racecar TapDanceConsumer`.
+
+Note: if you're not using Rails, you'll have to add the file yourself. No-one will judge you for copy-pasting it.
 
 #### Initializing consumers
 
