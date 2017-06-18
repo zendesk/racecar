@@ -29,10 +29,34 @@ describe Racecar::Config do
   end
 
   describe "#load_env" do
-    it "loads the brokers from RACECAR_BROKERS" do
+    it "sets the brokers from RACECAR_BROKERS" do
       ENV["RACECAR_BROKERS"] = "hansel,gretel"
 
       expect(config.brokers).to eq ["hansel", "gretel"]
+    end
+
+    it "sets the client id from RACECAR_CLIENT_ID" do
+      ENV["RACECAR_CLIENT_ID"] = "witch"
+
+      expect(config.client_id).to eq "witch"
+    end
+
+    it "sets the offset commit interval from RACECAR_OFFSET_COMMIT_INTERVAL" do
+      ENV["RACECAR_OFFSET_COMMIT_INTERVAL"] = "45"
+
+      expect(config.offset_commit_interval).to eq 45
+    end
+
+    it "sets the offset commit threshold from RACECAR_OFFSET_COMMIT_THRESHOLD" do
+      ENV["RACECAR_OFFSET_COMMIT_THRESHOLD"] = "45"
+
+      expect(config.offset_commit_threshold).to eq 45
+    end
+
+    it "sets the heartbeat interval from RACECAR_HEARTBEAT_INTERVAL" do
+      ENV["RACECAR_HEARTBEAT_INTERVAL"] = "45"
+
+      expect(config.heartbeat_interval).to eq 45
     end
   end
 
