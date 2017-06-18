@@ -24,6 +24,12 @@ Or install it yourself as:
 
 Racecar is built for simplicity of development and operation. If you need more flexibility, it's quite straightforward to build your own Kafka consumer executables using [ruby-kafka](https://github.com/zendesk/ruby-kafka#consuming-messages-from-kafka) directly.
 
+First, a short introduction to the Kafka consumer concept as well as some basic background on Kafka.
+
+Kafka stores messages in so-called _partitions_ which are grouped into _topics_. Within a partition, each message gets a unique offset.
+
+In Kafka, _consumer groups_ are sets of processes that collaboratively process messages from one or more Kafka topics; they divide up the topic partitions amongst themselves and make sure to reassign the partitions held by any member of the group that happens to crash or otherwise becomes unavailable, thus minimizing the risk of disruption. A consumer in a group is responsible for keeping track of which messages in a partition it has processed – since messages are processed in-order within a single partition, this means keeping track of the _offset_ into the partition that has been processed. Consumers periodically _commit_ the these offsets to the Kafka brokers, making sure that another consumer can resume from those positions if there is a crash.
+
 ### Creating consumers
 
 A Racecar consumer is a simple Rails class that inherits from `Racecar::Consumer`:
@@ -72,7 +78,7 @@ end
 
 ### Running consumers
 
-Racecar is first and foremost an executable _consumer runner_. The `racecar` executable takes as argument the name of the consumer class that should be run. Racecar automatically loads your Rails application before starting, and you can load any other library you need by passing the `--require x` flag, e.g.
+Racecar is first and foremost an executable _consumer runner_. The `racecar` executable takes as argument the name of the consumer class that should be run. Racecar automatically loads your Rails application before starting, and you can load any other library you need by passing the `--require` flag, e.g.
 
     bundle exec racecar --require dance_moves TapDanceConsumer
 
