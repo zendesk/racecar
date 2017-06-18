@@ -114,6 +114,14 @@ module Racecar
       if ENV.key?("RACECAR_BROKERS")
         @brokers = ENV["RACECAR_BROKERS"].split(",")
       end
+
+      if ENV.key?("RACECAR_CLIENT_ID")
+        @client_id = ENV["RACECAR_CLIENT_ID"]
+      end
+
+      if ENV.key?("RACECAR_OFFSET_COMMIT_INTERVAL")
+        @offset_commit_interval = Integer(ENV["RACECAR_OFFSET_COMMIT_INTERVAL"])
+      end
     end
   end
 end
