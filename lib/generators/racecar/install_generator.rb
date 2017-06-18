@@ -4,7 +4,7 @@ module Racecar
       source_root File.expand_path("../../templates", __FILE__)
 
       def create_config_file
-        copy_file "racecar.yml", "config/racecar.yml"
+        template "racecar.yml.erb", "config/racecar.yml"
       end
 
       def create_consumers_directory

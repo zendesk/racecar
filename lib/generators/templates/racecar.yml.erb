@@ -1,6 +1,6 @@
 # These config values will be shared by all environments but can be overridden.
 common: &common
-  client_id: "my-application"
+  client_id: "<%= Rails.application.class.name.split("::").first.underscore %>"
 
 development:
   <<: *common
