@@ -146,4 +146,12 @@ describe Racecar::Config do
       }.to raise_exception(Racecar::ConfigError, "`connect_timeout` must be longer than `max_wait_time`")
     end
   end
+
+  describe "#inspect" do
+    it "returns an easy-to-read list of the configuration keys and values" do
+      config.client_id = "elvis"
+
+      expect(config.inspect.split("\n")).to include %(client_id = "elvis")
+    end
+  end
 end

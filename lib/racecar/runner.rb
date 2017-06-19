@@ -32,6 +32,9 @@ module Racecar
       trap("INT") { consumer.stop }
       trap("TERM") { consumer.stop }
 
+      # Print the consumer config to STDERR on USR1.
+      trap("USR1") { $stderr.puts config.inspect }
+
       config.subscriptions.each do |subscription|
         consumer.subscribe(
           subscription.topic,
