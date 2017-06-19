@@ -24,7 +24,7 @@ describe Racecar::Config do
         "hammer" => "nail",
       }
 
-      expect { config.load(data) }.to raise_exception(RuntimeError)
+      expect { config.load(data) }.to raise_exception(Racecar::ConfigError)
     end
   end
 
@@ -115,7 +115,7 @@ describe Racecar::Config do
 
       expect {
         config.validate!
-      }.to raise_exception(RuntimeError, "required configuration key `brokers` not defined")
+      }.to raise_exception(Racecar::ConfigError, "required configuration key `brokers` not defined")
     end
 
     it "raises an exception if no client id has been configured" do
@@ -125,7 +125,7 @@ describe Racecar::Config do
 
       expect {
         config.validate!
-      }.to raise_exception(RuntimeError, "required configuration key `client_id` not defined")
+      }.to raise_exception(Racecar::ConfigError, "required configuration key `client_id` not defined")
     end
   end
 end
