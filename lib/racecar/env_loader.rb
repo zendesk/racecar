@@ -10,7 +10,13 @@ module Racecar
     end
 
     def integer(name)
-      set(name) {|value| Integer(value) }
+      set(name) do |value|
+        begin
+          Integer(value)
+        rescue ArgumentError
+          raise ConfigError, "#{value.inspect} is not an integer"
+        end
+      end
     end
 
     def string_list(name)

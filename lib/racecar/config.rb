@@ -3,6 +3,9 @@ require "yaml"
 require "racecar/env_loader"
 
 module Racecar
+  class ConfigError < StandardError
+  end
+
   class Config
     ALLOWED_KEYS = %w(
       brokers
@@ -62,7 +65,7 @@ module Racecar
     def validate!
       REQUIRED_KEYS.each do |key|
         if send(key).nil?
-          raise "required configuration key `#{key}` not defined"
+          raise ConfigError, "required configuration key `#{key}` not defined"
         end
       end
     end
@@ -82,7 +85,7 @@ module Racecar
 
     def set(key, value)
       unless ALLOWED_KEYS.include?(key.to_s)
-        raise "unknown configuration key `#{key}`"
+        raise ConfigError, "unknown configuration key `#{key}`"
       end
 
       instance_variable_set("@#{key}", value)
