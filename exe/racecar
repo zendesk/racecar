@@ -3,4 +3,4 @@
 require "racecar"
 require "racecar/cli"
 
-Racecar::Cli.main
+Racecar::Cli.main(ARGV)

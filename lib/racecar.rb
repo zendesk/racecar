@@ -5,6 +5,12 @@ require "racecar/runner"
 require "racecar/config"
 
 module Racecar
+  class Error < StandardError
+  end
+
+  class ConfigError < Error
+  end
+
   def self.config
     @config ||= Config.new
   end

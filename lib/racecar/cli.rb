@@ -2,7 +2,7 @@ require "optparse"
 
 module Racecar
   module Cli
-    def self.main
+    def self.main(args)
       parser = OptionParser.new do |opts|
         opts.banner = "Usage: racecar MyConsumer [options]"
 
@@ -17,9 +17,9 @@ module Racecar
         end
       end
 
-      parser.parse!(ARGV)
+      parser.parse!(args)
 
-      consumer_name = ARGV.first or raise "No consumer specified"
+      consumer_name = args.first or raise Racecar::Error, "no consumer specified"
       config_file = "config/racecar.yml"
 
       puts "=> Starting Racecar consumer #{consumer_name}..."

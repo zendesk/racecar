@@ -3,9 +3,6 @@ require "yaml"
 require "racecar/env_loader"
 
 module Racecar
-  class ConfigError < StandardError
-  end
-
   class Config
     ALLOWED_KEYS = %w(
       brokers
