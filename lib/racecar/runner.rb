@@ -29,10 +29,11 @@ module Racecar
       trap("INT") { consumer.stop }
 
       config.subscriptions.each do |subscription|
-        topic = subscription.topic
-        start_from_beginning = subscription.start_from_beginning
-
-        consumer.subscribe(topic, start_from_beginning: start_from_beginning)
+        consumer.subscribe(
+          subscription.topic,
+          start_from_beginning: subscription.start_from_beginning,
+          max_bytes_per_partition: subscription.max_bytes_per_partition,
+        )
       end
 
       begin
