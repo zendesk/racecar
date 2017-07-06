@@ -1,4 +1,5 @@
 require "optparse"
+require "racecar/config_loader"
 
 module Racecar
   module Cli
@@ -20,31 +21,10 @@ module Racecar
       parser.parse!(args)
 
       consumer_name = args.first or raise Racecar::Error, "no consumer specified"
-      config_file = "config/racecar.yml"
 
       puts "=> Starting Racecar consumer #{consumer_name}..."
 
-      begin
-        require "rails"
-
-        puts "=> Detected Rails, booting application..."
-
-        require "./config/environment"
-
-        Racecar.config.load_file(config_file, Rails.env)
-
-        if Racecar.config.log_to_stdout
-          # Write to STDOUT as well as to the log file.
-          console = ActiveSupport::Logger.new($stdout)
-          console.formatter = Rails.logger.formatter
-          console.level = Rails.logger.level
-          Rails.logger.extend(ActiveSupport::Logger.broadcast(console))
-        end
-
-        Racecar.logger = Rails.logger
-      rescue LoadError
-        # Not a Rails application.
-      end
+      ConfigLoader.load!
 
       # Find the consumer class by name.
       consumer_class = Kernel.const_get(consumer_name)

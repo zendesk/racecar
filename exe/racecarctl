@@ -1,0 +1,6 @@
+#!/usr/bin/env ruby
+
+require "racecar"
+require "racecar/ctl"
+
+Racecar::Ctl.main(ARGV)
