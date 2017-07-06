@@ -127,5 +127,23 @@ describe Racecar::Config do
         config.validate!
       }.to raise_exception(Racecar::ConfigError, "required configuration key `client_id` not defined")
     end
+
+    it "raises an exception if max_wait_time is greater than socket_timeout" do
+      config.socket_timeout = 10
+      config.max_wait_time = 11
+
+      expect {
+        config.validate!
+      }.to raise_exception(Racecar::ConfigError, "`socket_timeout` must be longer than `max_wait_time`")
+    end
+
+    it "raises an exception if max_wait_time is greater than connect_timeout" do
+      config.connect_timeout = 10
+      config.max_wait_time = 11
+
+      expect {
+        config.validate!
+      }.to raise_exception(Racecar::ConfigError, "`connect_timeout` must be longer than `max_wait_time`")
+    end
   end
 end

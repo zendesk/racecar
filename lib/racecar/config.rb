@@ -45,10 +45,21 @@ module Racecar
       # Default is to not pause partitions on processing errors.
       pause_timeout: 0,
 
-      connect_timeout: nil,
-      socket_timeout: nil,
-      error_handler: proc {},
+      # Default is to allow at most 10 seconds when connecting to a broker.
+      connect_timeout: 10,
+
+      # Default is to allow at most 30 seconds when reading or writing to
+      # a broker socket.
+      socket_timeout: 30,
+
+      # Default is to allow the brokers up to 5 seconds before returning
+      # messages.
       max_wait_time: 5,
+
+      # Default is to do nothing on exceptions.
+      error_handler: proc {},
+
+      # Default is to only log to the logger.
       log_to_stdout: false,
     }
 
@@ -64,6 +75,14 @@ module Racecar
         if send(key).nil?
           raise ConfigError, "required configuration key `#{key}` not defined"
         end
+      end
+
+      if socket_timeout <= max_wait_time
+        raise ConfigError, "`socket_timeout` must be longer than `max_wait_time`"
+      end
+
+      if connect_timeout <= max_wait_time
+        raise ConfigError, "`connect_timeout` must be longer than `max_wait_time`"
       end
     end
 
