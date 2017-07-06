@@ -116,8 +116,9 @@ The possible configuration keys are:
 * `offset_commit_interval` (_optional_) – How often to save the consumer's position in Kafka.
 * `heartbeat_interval` (_optional_) – How often to send a heartbeat message to Kafka.
 * `pause_timeout` (_optional_) – How long to pause a partition for if the consumer raises an exception while processing a message.
-* `connect_timeout` (_optional_) – How long to wait when trying to connect to a Kafka broker.
-* `socket_timeout` (_optional_) – How long to wait when trying to communicate with a Kafka broker.
+* `connect_timeout` (_optional_) – How long to wait when trying to connect to a Kafka broker. Default is 10 seconds.
+* `socket_timeout` (_optional_) – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
+* `max_wait_time` (_optional_) – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 5 seconds.
 
 Note that many of these configuration keys correspond directly with similarly named concepts in [ruby-kafka](https://github.com/zendesk/ruby-kafka) for more details on low-level operations, read that project's documentation.
 
