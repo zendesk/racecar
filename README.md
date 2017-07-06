@@ -170,7 +170,7 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/zendes
 
 ## Copyright and license
 
-Copyright 2015 Zendesk
+Copyright 2017 Zendesk
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License.
 
