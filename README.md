@@ -123,6 +123,40 @@ Note that many of these configuration keys correspond directly with similarly na
 
 It's also possible to configure Racecar using environment variables. For any given configuration key, there should be a corresponding environment variable with the prefix `RACECAR_`, in upper case. For instance, in order to configure the client id, set `RACECAR_CLIENT_ID=some-id` in the process in which the Racecar consumer is launched. You can set `brokers` by passing a comma-separated list, e.g. `RACECAR_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092`.
 
+### Testing consumers
+
+Since consumers are merely classes that implement a simple interface, they're dead simple to test.
+
+Here's an example of testing a consumer class using [RSpec](http://rspec.info/) and Rails:
+
+```ruby
+# app/consumers/create_contacts_consumer.rb
+#
+# Creates a Contact whenever an email address is written to the
+# `email-addresses` topic.
+class CreateContactsConsumer < Racecar::Consumer
+  subscribes_to "email-addresses"
+  
+  def process(message)
+    email = message.value
+    
+    Contact.create!(email: email)
+  end
+end
+
+# spec/consumers/create_contacts_consumer_spec.rb
+describe CreateContactsConsumer do
+  it "creates a Contact for each email address in the topic" do
+    message = double("message", value: "john@example.com")
+    consumer = CreateContactsConsumer.new
+    
+    consumer.process(message)
+    
+    expect(Contact.where(email: "john@example.com")).to exist
+  end
+end
+```
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
