@@ -38,6 +38,14 @@ module Racecar
 
       parser.parse!(args)
 
+      if message.topic.nil?
+        raise Racecar::Error, "no topic specified"
+      end
+
+      if message.value.nil?
+        raise Racecar::Error, "no message value specified"
+      end
+
       ConfigLoader.load!
 
       Racecar.config.validate!
