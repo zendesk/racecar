@@ -120,6 +120,13 @@ The possible configuration keys are:
 * `socket_timeout` (_optional_) – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
 * `max_wait_time` (_optional_) – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 5 seconds.
 
+| Name / ENV var | Default | Description |
+| ---------------|---------|-------------|
+| `brokers` / `RACECAR_BROKERS` | `["localhost:9092"]` | A list of Kafka brokers in the cluster that you're consuming from. |
+| `client_id` / `RACECAR_CLIENT_ID` | `racecar` | A string used to identify the client in logs and metrics. |
+| `group_id_prefix` / `RACECAR_GROUP_ID_PREFIX` | `nil` | A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon_consumer`. |
+| `offset_commit_interval` / `RACECAR_OFFSET_COMMIT_INTERVAL` | `10` | How often to save the consumer's position in Kafka. |
+
 Note that many of these configuration keys correspond directly with similarly named concepts in [ruby-kafka](https://github.com/zendesk/ruby-kafka) for more details on low-level operations, read that project's documentation.
 
 It's also possible to configure Racecar using environment variables. For any given configuration key, there should be a corresponding environment variable with the prefix `RACECAR_`, in upper case. For instance, in order to configure the client id, set `RACECAR_CLIENT_ID=some-id` in the process in which the Racecar consumer is launched. You can set `brokers` by passing a comma-separated list, e.g. `RACECAR_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092`.
