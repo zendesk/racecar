@@ -24,9 +24,10 @@ module Racecar
         heartbeat_interval: config.heartbeat_interval,
       )
 
-      # Stop the consumer on SIGINT and SIGQUIT.
+      # Stop the consumer on SIGINT, SIGQUIT or SIGTERM.
       trap("QUIT") { consumer.stop }
       trap("INT") { consumer.stop }
+      trap("TERM") { consumer.stop }
 
       config.subscriptions.each do |subscription|
         consumer.subscribe(
