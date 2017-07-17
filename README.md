@@ -112,6 +112,7 @@ The possible configuration keys are:
 
 * `brokers` (_optional_) – A list of Kafka brokers in the cluster that you're consuming from. Defaults to `localhost` on port 9092, the default Kafka port.
 * `client_id` (_optional_) – A string used to identify the client in logs and metrics.
+* `group_id` (_optional_) – The group id to use for a given group of consumers. Note that this _must_ be different for each consumer class. If left blank a group id is generated based on the consumer class name.
 * `group_id_prefix` (_optional_) – A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon_consumer`.
 * `offset_commit_interval` (_optional_) – How often to save the consumer's position in Kafka.
 * `heartbeat_interval` (_optional_) – How often to send a heartbeat message to Kafka.
