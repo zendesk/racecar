@@ -110,19 +110,19 @@ Racecar provides a flexible way to configure your consumer in a way that feels a
 
 The possible configuration keys are:
 
-* `brokers` (_optional_) – A list of Kafka brokers in the cluster that you're consuming from. Defaults to `localhost` on port 9092, the default Kafka port.
-* `client_id` (_optional_) – A string used to identify the client in logs and metrics.
-* `group_id` (_optional_) – The group id to use for a given group of consumers. Note that this _must_ be different for each consumer class. If left blank a group id is generated based on the consumer class name.
-* `group_id_prefix` (_optional_) – A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon_consumer`.
-* `offset_commit_interval` (_optional_) – How often to save the consumer's position in Kafka.
-* `heartbeat_interval` (_optional_) – How often to send a heartbeat message to Kafka.
-* `pause_timeout` (_optional_) – How long to pause a partition for if the consumer raises an exception while processing a message.
-* `connect_timeout` (_optional_) – How long to wait when trying to connect to a Kafka broker. Default is 10 seconds.
-* `socket_timeout` (_optional_) – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
-* `max_wait_time` (_optional_) – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 5 seconds.
-* `ssl_ca_cert` (_optional_) – A valid SSL certificate authority, as a string.
-* `ssl_client_cert` (_optional_) – A valid SSL client certificate, as a string.
-* `ssl_client_cert_key` (_optional_) – A valid SSL client certificate key, as a string.
+* `brokers` – A list of Kafka brokers in the cluster that you're consuming from. Defaults to `localhost` on port 9092, the default Kafka port.
+* `client_id` – A string used to identify the client in logs and metrics.
+* `group_id` – The group id to use for a given group of consumers. Note that this _must_ be different for each consumer class. If left blank a group id is generated based on the consumer class name.
+* `group_id_prefix` – A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon_consumer`.
+* `offset_commit_interval` – How often to save the consumer's position in Kafka.
+* `heartbeat_interval` – How often to send a heartbeat message to Kafka.
+* `pause_timeout` – How long to pause a partition for if the consumer raises an exception while processing a message.
+* `connect_timeout` – How long to wait when trying to connect to a Kafka broker. Default is 10 seconds.
+* `socket_timeout` – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
+* `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 5 seconds.
+* `ssl_ca_cert` – A valid SSL certificate authority, as a string.
+* `ssl_client_cert` – A valid SSL client certificate, as a string.
+* `ssl_client_cert_key` – A valid SSL client certificate key, as a string.
 
 **Note:** many of these configuration keys correspond directly to similarly named concepts in [ruby-kafka](https://github.com/zendesk/ruby-kafka); for more details on low-level operations, read that project's documentation.
 
