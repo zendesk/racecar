@@ -19,6 +19,9 @@ module Racecar
       error_handler
       max_wait_time
       log_to_stdout
+      ssl_ca_cert
+      ssl_client_cert
+      ssl_client_cert_key
     )
 
     REQUIRED_KEYS = %w(

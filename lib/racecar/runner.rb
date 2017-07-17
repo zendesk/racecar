@@ -15,6 +15,9 @@ module Racecar
         logger: logger,
         connect_timeout: config.connect_timeout,
         socket_timeout: config.socket_timeout,
+        ssl_ca_cert: config.ssl_ca_cert,
+        ssl_client_cert: config.ssl_client_cert,
+        ssl_client_cert_key: config.ssl_client_cert_key,
       )
 
       consumer = kafka.consumer(

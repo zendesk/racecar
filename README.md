@@ -119,6 +119,9 @@ The possible configuration keys are:
 * `connect_timeout` (_optional_) – How long to wait when trying to connect to a Kafka broker. Default is 10 seconds.
 * `socket_timeout` (_optional_) – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
 * `max_wait_time` (_optional_) – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 5 seconds.
+* `ssl_ca_cert` (_optional_) – A valid SSL certificate authority, as a string.
+* `ssl_client_cert` (_optional_) – A valid SSL client certificate, as a string.
+* `ssl_client_cert_key` (_optional_) – A valid SSL client certificate key, as a string.
 
 Note that many of these configuration keys correspond directly with similarly named concepts in [ruby-kafka](https://github.com/zendesk/ruby-kafka) for more details on low-level operations, read that project's documentation.
 
