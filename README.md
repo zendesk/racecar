@@ -123,7 +123,7 @@ The possible configuration keys are:
 * `ssl_client_cert` (_optional_) – A valid SSL client certificate, as a string.
 * `ssl_client_cert_key` (_optional_) – A valid SSL client certificate key, as a string.
 
-Note that many of these configuration keys correspond directly with similarly named concepts in [ruby-kafka](https://github.com/zendesk/ruby-kafka) for more details on low-level operations, read that project's documentation.
+**Note:** many of these configuration keys correspond directly to similarly named concepts in [ruby-kafka](https://github.com/zendesk/ruby-kafka); for more details on low-level operations, read that project's documentation.
 
 It's also possible to configure Racecar using environment variables. For any given configuration key, there should be a corresponding environment variable with the prefix `RACECAR_`, in upper case. For instance, in order to configure the client id, set `RACECAR_CLIENT_ID=some-id` in the process in which the Racecar consumer is launched. You can set `brokers` by passing a comma-separated list, e.g. `RACECAR_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092`.
 
