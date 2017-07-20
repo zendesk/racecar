@@ -108,25 +108,32 @@ Racecar is first and foremost an executable _consumer runner_. The `racecar` exe
 
 Racecar provides a flexible way to configure your consumer in a way that feels at home in a Rails application. If you haven't already, run `bundle exec rails generate racecar:install` in order to generate a config file. You'll get a separate section for each Rails environment, with the common configuration values in a shared `common` section.
 
-The possible configuration keys are:
+**Note:** many of these configuration keys correspond directly to similarly named concepts in [ruby-kafka](https://github.com/zendesk/ruby-kafka); for more details on low-level operations, read that project's documentation.
+
+It's also possible to configure Racecar using environment variables. For any given configuration key, there should be a corresponding environment variable with the prefix `RACECAR_`, in upper case. For instance, in order to configure the client id, set `RACECAR_CLIENT_ID=some-id` in the process in which the Racecar consumer is launched. You can set `brokers` by passing a comma-separated list, e.g. `RACECAR_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092`.
+
+#### Basic configuration
 
 * `brokers` – A list of Kafka brokers in the cluster that you're consuming from. Defaults to `localhost` on port 9092, the default Kafka port.
 * `client_id` – A string used to identify the client in logs and metrics.
 * `group_id` – The group id to use for a given group of consumers. Note that this _must_ be different for each consumer class. If left blank a group id is generated based on the consumer class name.
 * `group_id_prefix` – A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon_consumer`.
+
+#### Timeouts & intervals
+
 * `offset_commit_interval` – How often to save the consumer's position in Kafka.
 * `heartbeat_interval` – How often to send a heartbeat message to Kafka.
 * `pause_timeout` – How long to pause a partition for if the consumer raises an exception while processing a message.
 * `connect_timeout` – How long to wait when trying to connect to a Kafka broker. Default is 10 seconds.
 * `socket_timeout` – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
 * `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 5 seconds.
+
+#### Authentication & authorization
+
 * `ssl_ca_cert` – A valid SSL certificate authority, as a string.
 * `ssl_client_cert` – A valid SSL client certificate, as a string.
 * `ssl_client_cert_key` – A valid SSL client certificate key, as a string.
 
-**Note:** many of these configuration keys correspond directly to similarly named concepts in [ruby-kafka](https://github.com/zendesk/ruby-kafka); for more details on low-level operations, read that project's documentation.
-
-It's also possible to configure Racecar using environment variables. For any given configuration key, there should be a corresponding environment variable with the prefix `RACECAR_`, in upper case. For instance, in order to configure the client id, set `RACECAR_CLIENT_ID=some-id` in the process in which the Racecar consumer is launched. You can set `brokers` by passing a comma-separated list, e.g. `RACECAR_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092`.
 
 ### Testing consumers
 
