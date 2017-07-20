@@ -119,9 +119,17 @@ It's also possible to configure Racecar using environment variables. For any giv
 * `group_id` – The group id to use for a given group of consumers. Note that this _must_ be different for each consumer class. If left blank a group id is generated based on the consumer class name.
 * `group_id_prefix` – A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon_consumer`.
 
+#### Consumer checkpointing
+
+The consumers will checkpoint their positions from time to time in order to be able to recover from failures. This is called _committing offsets_, since it's done by tracking the offset reached in each partition being processed, and committing those offset numbers to the Kafka offset storage API. If you can tolerate more double-processing after a failure, you can increase the interval between commits in order to better performance. You can also do the opposite if you prefer less chance of double-processing.
+
+* `offset_commit_interval` – How often to save the consumer's position in Kafka. Default is every 10 seconds.
+* `offset_commit_threshold` – How many messages to process before forcing a checkpoint. Default is 0, which means there's no limit. Setting this to e.g. 100 makes the consumer stop every 100 messages to checkpoint its position.
+
 #### Timeouts & intervals
 
-* `offset_commit_interval` – How often to save the consumer's position in Kafka.
+All timeouts are defined in number of seconds.
+
 * `heartbeat_interval` – How often to send a heartbeat message to Kafka.
 * `pause_timeout` – How long to pause a partition for if the consumer raises an exception while processing a message.
 * `connect_timeout` – How long to wait when trying to connect to a Kafka broker. Default is 10 seconds.
