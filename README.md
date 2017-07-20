@@ -136,11 +136,27 @@ All timeouts are defined in number of seconds.
 * `socket_timeout` – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
 * `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 5 seconds.
 
-#### Authentication & authorization
+#### SSL encryption, authentication & authorization
 
 * `ssl_ca_cert` – A valid SSL certificate authority, as a string.
+* `ssl_ca_cert_file_path` - The path to a valid SSL certificate authority file.
 * `ssl_client_cert` – A valid SSL client certificate, as a string.
 * `ssl_client_cert_key` – A valid SSL client certificate key, as a string.
+
+#### SASL encryption, authentication & authorization
+
+Racecar has support for using SASL to authenticate clients using either the GSSAPI or PLAIN mechanism.
+
+If using GSSAPI:
+
+* `sasl_gssapi_principal` – The GSSAPI principal
+* `sasl_gssapi_keytab` – Optional GSSAPI keytab.
+
+If using PLAIN:
+
+* `sasl_plain_authzid` – The authorization identity to use.
+* `sasl_plain_username` – The username used to authenticate.
+* `sasl_plain_password` – The password used to authenticate.
 
 
 ### Testing consumers

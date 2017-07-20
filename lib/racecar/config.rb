@@ -7,8 +7,10 @@ module Racecar
     ALLOWED_KEYS = %w(
       brokers
       client_id
+
       offset_commit_interval
       offset_commit_threshold
+
       heartbeat_interval
       pause_timeout
       connect_timeout
@@ -16,12 +18,21 @@ module Racecar
       group_id_prefix
       group_id
       subscriptions
-      error_handler
       max_wait_time
+
+      error_handler
       log_to_stdout
+
       ssl_ca_cert
+      ssl_ca_cert_file_path
       ssl_client_cert
       ssl_client_cert_key
+
+      sasl_gssapi_principal
+      sasl_gssapi_keytab
+      sasl_plain_authzid
+      sasl_plain_username
+      sasl_plain_password
     )
 
     REQUIRED_KEYS = %w(
