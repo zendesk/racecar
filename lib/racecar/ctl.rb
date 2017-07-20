@@ -1,5 +1,5 @@
 require "optparse"
-require "racecar/config_loader"
+require "racecar/rails_config_file_loader"
 
 module Racecar
   class Ctl
@@ -46,7 +46,7 @@ module Racecar
         raise Racecar::Error, "no message value specified"
       end
 
-      ConfigLoader.load!
+      RailsConfigFileLoader.load!
 
       Racecar.config.validate!
 

@@ -1,5 +1,5 @@
 module Racecar
-  module ConfigLoader
+  module RailsConfigFileLoader
     def self.load!
       config_file = "config/racecar.yml"
 

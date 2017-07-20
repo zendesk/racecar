@@ -1,5 +1,5 @@
 require "optparse"
-require "racecar/config_loader"
+require "racecar/rails_config_file_loader"
 
 module Racecar
   module Cli
@@ -24,7 +24,7 @@ module Racecar
 
       puts "=> Starting Racecar consumer #{consumer_name}..."
 
-      ConfigLoader.load!
+      RailsConfigFileLoader.load!
 
       # Find the consumer class by name.
       consumer_class = Kernel.const_get(consumer_name)
