@@ -53,7 +53,7 @@ module Racecar
             processor.process_batch(batch)
           end
         else
-          raise NotImplementedError, "Consumer class must implement process or process_match method", caller
+          raise NotImplementedError, "Consumer class must implement process or process_batch method", caller
         end
       rescue Kafka::ProcessingError => e
         @logger.error "Error processing partition #{e.topic}/#{e.partition} at offset #{e.offset}"
