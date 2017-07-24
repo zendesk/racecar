@@ -44,8 +44,16 @@ module Racecar
       end
 
       begin
-        consumer.each_message(max_wait_time: config.max_wait_time) do |message|
-          processor.process(message)
+        if processor.respond_to?(:process)
+          consumer.each_message(max_wait_time: config.max_wait_time) do |message|
+            processor.process(message)
+          end
+        elsif processor.respond_to?(:process_batch)
+          consumer.each_batch(max_wait_time: config.max_wait_time) do |batch|
+            processor.process_batch(batch)
+          end
+        else
+          raise NotImplementedError, "Consumer class must implement process or process_match method", caller
         end
       rescue Kafka::ProcessingError => e
         @logger.error "Error processing partition #{e.topic}/#{e.partition} at offset #{e.offset}"
