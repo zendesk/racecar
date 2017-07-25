@@ -162,6 +162,8 @@ module Racecar
       loader.integer(:connect_timeout)
       loader.integer(:socket_timeout)
       loader.integer(:max_wait_time)
+
+      loader.validate!
     end
   end
 end
