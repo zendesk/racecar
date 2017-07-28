@@ -104,6 +104,8 @@ Racecar is first and foremost an executable _consumer runner_. The `racecar` exe
 
     $ bundle exec racecar --require dance_moves TapDanceConsumer
 
+The first time you execute `racecar` with a consumer class a _consumer group_ will be created with a named derived from the class name (this can be configured). If you start `racecar` with the same consumer class argument multiple times, the processes will join the existing group – even if you start them on other machines. You will typically want to have at least two consumers in your groups, preferably on separate nodes, in order to deal with failures.
+
 ### Configuration
 
 Racecar provides a flexible way to configure your consumer in a way that feels at home in a Rails application. If you haven't already, run `bundle exec rails generate racecar:install` in order to generate a config file. You'll get a separate section for each Rails environment, with the common configuration values in a shared `common` section.
@@ -192,6 +194,22 @@ describe CreateContactsConsumer do
   end
 end
 ```
+
+
+### Deploying consumers
+
+If you're already deploying your Rails application using e.g. [Capistrano](http://capistranorb.com/), all you need to do to run your Racecar consumers in production is to have some _process supervisor_ wrap the processes and managing them for you.
+
+[Foreman](https://ddollar.github.io/foreman/) is a very straightford tool for interfacing with several process supervisor systems. You define your process types in a Procfile, e.g.
+
+```
+racecar-process-payments: bundle exec racecar ProcessPaymentsConsumer
+racecar-resize-images: bundle exec racecar ResizeImagesConsumer
+```
+
+If you've ever used Heroku you'll recognize the format – indeed, deploying to Heroku should just work if you add Racecar invocations to your Procfile.
+
+With Foreman, you can easily run these processes locally by executing `foreman run`; in production you'll want to _export_ to another process management format such as Upstart or Runit. [capistrano-foreman](https://github.com/hyperoslo/capistrano-foreman) allows you to do this with Capistrano.
 
 
 ### Operations
