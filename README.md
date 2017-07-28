@@ -11,7 +11,7 @@ Using [ruby-kafka](https://github.com/zendesk/ruby-kafka) directly can be a chal
     1. [Creating consumers](#creating-consumers)
     2. [Running consumers](#running-consumers)
     3. [Configuration](#configuration)
-    4. [Testinging consumers](#testing-consumers)
+    4. [Testing consumers](#testing-consumers)
     5. [Deploying consumers](#deploying-consumers)
     6. [Operations](#operations)
 3. [Development](#development)
