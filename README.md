@@ -4,6 +4,21 @@ Introducing Racecar, your friendly and easy-to-approach Kafka consumer framework
 
 Using [ruby-kafka](https://github.com/zendesk/ruby-kafka) directly can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though. Racecar provides a simple and intuitive way to build and configure Kafka consumers that optionally integrates seemlessly with Rails.
 
+## Table of content
+
+1. [Installation](#installation)
+2. [Usage](#usage)
+    1. [Creating consumers](#creating-consumers)
+    2. [Running consumers](#running-consumers)
+    3. [Configuration](#configuration)
+    4. [Testinging consumers](#testing-consumers)
+    5. [Deploying consumers](#deploying-consumers)
+    6. [Operations](#operations)
+3. [Development](#development)
+4. [Contributing](#contributing)
+5. [Copyright and license](#copyright-and-license)
+
+
 ## Installation
 
 Add this line to your application's Gemfile:
