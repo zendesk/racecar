@@ -104,7 +104,7 @@ Racecar is first and foremost an executable _consumer runner_. The `racecar` exe
 
     $ bundle exec racecar --require dance_moves TapDanceConsumer
 
-The first time you execute `racecar` with a consumer class a _consumer group_ will be created with a named derived from the class name (this can be configured). If you start `racecar` with the same consumer class argument multiple times, the processes will join the existing group – even if you start them on other machines. You will typically want to have at least two consumers in your groups, preferably on separate nodes, in order to deal with failures.
+The first time you execute `racecar` with a consumer class a _consumer group_ will be created with a group id derived from the class name (this can be configured). If you start `racecar` with the same consumer class argument multiple times, the processes will join the existing group – even if you start them on other nodes. You will typically want to have at least two consumers in each of your groups – preferably on separate nodes – in order to deal with failures.
 
 ### Configuration
 
@@ -198,7 +198,7 @@ end
 
 ### Deploying consumers
 
-If you're already deploying your Rails application using e.g. [Capistrano](http://capistranorb.com/), all you need to do to run your Racecar consumers in production is to have some _process supervisor_ wrap the processes and managing them for you.
+If you're already deploying your Rails application using e.g. [Capistrano](http://capistranorb.com/), all you need to do to run your Racecar consumers in production is to have some _process supervisor_ start the processes and manage them for you.
 
 [Foreman](https://ddollar.github.io/foreman/) is a very straightford tool for interfacing with several process supervisor systems. You define your process types in a Procfile, e.g.
 
