@@ -34,10 +34,10 @@ class TestBatchConsumer < Racecar::Consumer
     self
   end
 
-  def process_batch(messages)
-    @messages += messages
+  def process_batch(batch)
+    @messages += batch.messages
 
-    messages.each do |message|
+    batch.messages.each do |message|
       processor = @processor_queue.shift || proc {}
       processor.call(message)
     end
@@ -64,9 +64,16 @@ class FakeConsumer
 
   def each_batch(*options, &block)
     begin
-      block.call(@kafka.messages)
+      batch = Kafka::FetchedBatch.new(
+        topic:                 @kafka.messages.first.topic,
+        partition:             @kafka.messages.first.partition,
+        messages:              @kafka.messages,
+        highwater_mark_offset: @kafka.messages.first.offset
+      )
+
+      block.call(batch)
     rescue StandardError => e
-      raise Kafka::ProcessingError.new(@kafka.messages.first.topic, @kafka.messages.first.partition, @kafka.messages.first.offset)
+      raise Kafka::ProcessingError.new(batch.topic, batch.partition, batch.highwater_mark_offset)
     end
   end
 
