@@ -65,10 +65,10 @@ class FakeConsumer
   def each_batch(*options, &block)
     begin
       batch = Kafka::FetchedBatch.new(
-        topic:                 @kafka.messages.first.topic,
-        partition:             @kafka.messages.first.partition,
-        messages:              @kafka.messages,
-        highwater_mark_offset: @kafka.messages.first.offset
+        topic: @kafka.messages.first.topic,
+        partition: @kafka.messages.first.partition,
+        messages: @kafka.messages,
+        highwater_mark_offset: @kafka.messages.first.offset,
       )
 
       block.call(batch)
@@ -114,25 +114,15 @@ end
 describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
   let(:logger) { Logger.new(StringIO.new) }
-  let(:processor) { TestConsumer.new }
-  let(:batch_processor) { TestBatchConsumer.new }
-  let(:nil_processor) { TestNilConsumer.new }
   let(:kafka) { FakeKafka.new }
   let(:runner) { Racecar::Runner.new(processor, config: config, logger: logger) }
-  let(:batch_runner) { Racecar::Runner.new(batch_processor, config: config, logger: logger) }
-  let(:nil_runner) { Racecar::Runner.new(nil_processor, config: config, logger: logger) }
 
   before do
     allow(Kafka).to receive(:new) { kafka }
   end
 
-  context "single message processor" do
-    it "calls `process` method" do
-      expect(processor).to receive(:process)
-
-      kafka.deliver_message("hello world", topic: "greetings")
-      runner.run
-    end
+  context "with a consumer class with a #process method" do
+    let(:processor) { TestConsumer.new }
 
     it "processes messages with the specified consumer class" do
       kafka.deliver_message("hello world", topic: "greetings")
@@ -173,33 +163,28 @@ describe Racecar::Runner do
     end
   end
 
-  context "batch message processor" do
-    it "calls `process_batch` method" do
-      expect(batch_processor).to receive(:process_batch)
-
-      kafka.deliver_message("hello world", topic: "greetings")
-      batch_runner.run
-    end
+  context "with a consumer class with a #process_batch method" do
+    let(:processor) { TestBatchConsumer.new }
 
     it "processes messages with the specified consumer class" do
       kafka.deliver_message("hello world", topic: "greetings")
 
-      batch_runner.run
+      runner.run
 
-      expect(batch_processor.messages.map(&:value)).to eq ["hello world"]
+      expect(processor.messages.map(&:value)).to eq ["hello world"]
     end
 
     context "when the processing code raises an exception" do
       it "pauses the partition if `pause_timeout` is > 0" do
         config.pause_timeout = 10
 
-        batch_processor
+        processor
           .on_message {|message| raise "OMG COOKIES!" }
           .on_message {}
 
         kafka.deliver_message("hello world", topic: "greetings")
 
-        batch_runner.run
+        runner.run
 
         expect(kafka.paused?("greetings", 0)).to eq true
       end
@@ -207,24 +192,26 @@ describe Racecar::Runner do
       it "does not pause the partition if `pause_timeout` is 0" do
         config.pause_timeout = 0
 
-        batch_processor
+        processor
           .on_message {|message| raise "OMG COOKIES!" }
           .on_message {}
 
         kafka.deliver_message("hello world", topic: "greetings")
 
-        batch_runner.run
+        runner.run
 
         expect(kafka.paused?("greetings", 0)).to eq false
       end
     end
   end
 
-  context "invalid message processor" do
+  context "with a consumer class with neither a #process or a #process_batch method" do
+    let(:processor) { TestNilConsumer.new }
+
     it "raises NotImplementedError" do
       kafka.deliver_message("hello world", topic: "greetings")
 
-      expect { nil_runner.run }.to raise_error(NotImplementedError)
+      expect { runner.run }.to raise_error(NotImplementedError)
     end
   end
 end
