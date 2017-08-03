@@ -113,6 +113,34 @@ subscribes_to "some-topic", start_from_beginning: false
 
 Note that once the consumer has started, it will commit the offsets it has processed until and in the future will resume from those.
 
+#### Processing messages in batches
+
+If you want to process whole _batches_ of messages at a time, simply rename your `#process` method to `#process_batch`. The method will now be called with a "batch" object rather than a message:
+
+```ruby
+class ArchiveEventsConsumer < Racecar::Consumer
+  subscribes_to "events"
+
+  def process_batch(batch)
+    file_name = [
+      batch.topic, # the topic this batch of messages came from.
+      batch.partition, # the partition this batch of messages came from.
+      batch.first_offset, # offset of the first message in the batch.
+      batch.last_offset, # offset of the last message in the batch.
+    ].join("-")
+
+    File.open(file_name, "w") do |file|
+      # the messages in the batch.
+      batch.messages.each do |message|
+        file << message.value
+      end
+    end
+  end
+end
+```
+
+An important detail is that, if an exception is raised while processing a batch, the _whole batch_ is re-processed.
+
 ### Running consumers
 
 Racecar is first and foremost an executable _consumer runner_. The `racecar` executable takes as argument the name of the consumer class that should be run. Racecar automatically loads your Rails application before starting, and you can load any other library you need by passing the `--require` flag, e.g.
