@@ -16,9 +16,35 @@ class TestConsumer < Racecar::Consumer
   def process(message)
     @messages << message
 
-    processor = @processor_queue.shift || proc {} 
+    processor = @processor_queue.shift || proc {}
     processor.call(message)
   end
+end
+
+class TestBatchConsumer < Racecar::Consumer
+  attr_reader :messages
+
+  def initialize
+    @messages = []
+    @processor_queue = []
+  end
+
+  def on_message(&block)
+    @processor_queue << block
+    self
+  end
+
+  def process_batch(batch)
+    @messages += batch.messages
+
+    batch.messages.each do |message|
+      processor = @processor_queue.shift || proc {}
+      processor.call(message)
+    end
+  end
+end
+
+class TestNilConsumer < Racecar::Consumer
 end
 
 class FakeConsumer
@@ -33,6 +59,21 @@ class FakeConsumer
       rescue StandardError => e
         raise Kafka::ProcessingError.new(message.topic, message.partition, message.offset)
       end
+    end
+  end
+
+  def each_batch(*options, &block)
+    begin
+      batch = Kafka::FetchedBatch.new(
+        topic:                 @kafka.messages.first.topic,
+        partition:             @kafka.messages.first.partition,
+        messages:              @kafka.messages,
+        highwater_mark_offset: @kafka.messages.first.offset
+      )
+
+      block.call(batch)
+    rescue StandardError => e
+      raise Kafka::ProcessingError.new(batch.topic, batch.partition, batch.highwater_mark_offset)
     end
   end
 
@@ -74,48 +115,116 @@ describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
   let(:logger) { Logger.new(StringIO.new) }
   let(:processor) { TestConsumer.new }
+  let(:batch_processor) { TestBatchConsumer.new }
+  let(:nil_processor) { TestNilConsumer.new }
   let(:kafka) { FakeKafka.new }
   let(:runner) { Racecar::Runner.new(processor, config: config, logger: logger) }
+  let(:batch_runner) { Racecar::Runner.new(batch_processor, config: config, logger: logger) }
+  let(:nil_runner) { Racecar::Runner.new(nil_processor, config: config, logger: logger) }
 
   before do
     allow(Kafka).to receive(:new) { kafka }
   end
 
-  it "processes messages with the specified consumer class" do
-    kafka.deliver_message("hello world", topic: "greetings")
-
-    runner.run
-
-    expect(processor.messages.map(&:value)).to eq ["hello world"]
-  end
-
-  context "when the processing code raises an exception" do
-    it "pauses the partition if `pause_timeout` is > 0" do
-      config.pause_timeout = 10
-
-      processor
-        .on_message {|message| raise "OMG COOKIES!" }
-        .on_message {}
+  context "single message processor" do
+    it "calls `process` method" do
+      expect(processor).to receive(:process)
 
       kafka.deliver_message("hello world", topic: "greetings")
-
       runner.run
-
-      expect(kafka.paused?("greetings", 0)).to eq true
     end
 
-    it "does not pause the partition if `pause_timeout` is 0" do
-      config.pause_timeout = 0
-
-      processor
-        .on_message {|message| raise "OMG COOKIES!" }
-        .on_message {}
-
+    it "processes messages with the specified consumer class" do
       kafka.deliver_message("hello world", topic: "greetings")
 
       runner.run
 
-      expect(kafka.paused?("greetings", 0)).to eq false
+      expect(processor.messages.map(&:value)).to eq ["hello world"]
+    end
+
+    context "when the processing code raises an exception" do
+      it "pauses the partition if `pause_timeout` is > 0" do
+        config.pause_timeout = 10
+
+        processor
+          .on_message {|message| raise "OMG COOKIES!" }
+          .on_message {}
+
+        kafka.deliver_message("hello world", topic: "greetings")
+
+        runner.run
+
+        expect(kafka.paused?("greetings", 0)).to eq true
+      end
+
+      it "does not pause the partition if `pause_timeout` is 0" do
+        config.pause_timeout = 0
+
+        processor
+          .on_message {|message| raise "OMG COOKIES!" }
+          .on_message {}
+
+        kafka.deliver_message("hello world", topic: "greetings")
+
+        runner.run
+
+        expect(kafka.paused?("greetings", 0)).to eq false
+      end
+    end
+  end
+
+  context "batch message processor" do
+    it "calls `process_batch` method" do
+      expect(batch_processor).to receive(:process_batch)
+
+      kafka.deliver_message("hello world", topic: "greetings")
+      batch_runner.run
+    end
+
+    it "processes messages with the specified consumer class" do
+      kafka.deliver_message("hello world", topic: "greetings")
+
+      batch_runner.run
+
+      expect(batch_processor.messages.map(&:value)).to eq ["hello world"]
+    end
+
+    context "when the processing code raises an exception" do
+      it "pauses the partition if `pause_timeout` is > 0" do
+        config.pause_timeout = 10
+
+        batch_processor
+          .on_message {|message| raise "OMG COOKIES!" }
+          .on_message {}
+
+        kafka.deliver_message("hello world", topic: "greetings")
+
+        batch_runner.run
+
+        expect(kafka.paused?("greetings", 0)).to eq true
+      end
+
+      it "does not pause the partition if `pause_timeout` is 0" do
+        config.pause_timeout = 0
+
+        batch_processor
+          .on_message {|message| raise "OMG COOKIES!" }
+          .on_message {}
+
+        kafka.deliver_message("hello world", topic: "greetings")
+
+        batch_runner.run
+
+        expect(kafka.paused?("greetings", 0)).to eq false
+      end
+    end
+  end
+
+  context "invalid message processor" do
+    it "raises NotImplementedError" do
+      kafka.deliver_message("hello world", topic: "greetings")
+
+      expect { nil_runner.run }.to raise_error(NotImplementedError)
     end
   end
 end
