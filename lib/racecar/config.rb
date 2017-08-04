@@ -21,7 +21,7 @@ module Racecar
       max_wait_time
 
       error_handler
-      log_to_stdout
+      logfile
 
       ssl_ca_cert
       ssl_ca_cert_file_path
@@ -43,7 +43,6 @@ module Racecar
     DEFAULT_CONFIG = {
       brokers: ["localhost:9092"],
       client_id: "racecar",
-      group_id_prefix: nil,
 
       subscriptions: [],
 
@@ -72,9 +71,6 @@ module Racecar
 
       # Default is to do nothing on exceptions.
       error_handler: proc {},
-
-      # Default is to only log to the logger.
-      log_to_stdout: false,
     }
 
     attr_accessor(*ALLOWED_KEYS)

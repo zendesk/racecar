@@ -255,6 +255,13 @@ If you've ever used Heroku you'll recognize the format – indeed, deploying to 
 With Foreman, you can easily run these processes locally by executing `foreman run`; in production you'll want to _export_ to another process management format such as Upstart or Runit. [capistrano-foreman](https://github.com/hyperoslo/capistrano-foreman) allows you to do this with Capistrano.
 
 
+### Logging
+
+By default, Racecar will log to `STDOUT`. If you're using Rails, your application code will use whatever logger you've configured there.
+
+In order to make Racecar log its own operations to a log file, set the `logfile` configuration variable or pass `--log filename.log` to the `racecar` command.
+
+
 ### Operations
 
 In order to gracefully shut down a Racecar consumer process, send it the `SIGTERM` signal. Most process supervisors such as Runit and Kubernetes send this signal when shutting down a process, so using those systems will make things easier.
