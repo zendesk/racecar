@@ -12,15 +12,14 @@ module Racecar
 
         Racecar.config.load_file(config_file, Rails.env)
 
-        if Racecar.config.log_to_stdout
-          # Write to STDOUT as well as to the log file.
+        # In development, write Rails logs to STDOUT. This mirrors what e.g.
+        # Unicorn does.
+        if Rails.env.development?
           console = ActiveSupport::Logger.new($stdout)
           console.formatter = Rails.logger.formatter
           console.level = Rails.logger.level
           Rails.logger.extend(ActiveSupport::Logger.broadcast(console))
         end
-
-        Racecar.logger = Rails.logger
       rescue LoadError
         # Not a Rails application.
       end
