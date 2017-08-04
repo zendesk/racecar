@@ -60,7 +60,7 @@ module Racecar
 
       kafka.deliver_message(message.value, key: message.key, topic: message.topic)
 
-      puts "=> Delivered message to Kafka cluster"
+      $stderr.puts "=> Delivered message to Kafka cluster"
     end
   end
 end
