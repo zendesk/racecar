@@ -6,7 +6,7 @@ module Racecar
       begin
         require "rails"
 
-        puts "=> Detected Rails, booting application..."
+        $stderr.puts "=> Detected Rails, booting application..."
 
         require "./config/environment"
 

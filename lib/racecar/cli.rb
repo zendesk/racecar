@@ -18,7 +18,7 @@ module Racecar
 
         opts.on_tail("--version", "Show Racecar version") do
           require "racecar/version"
-          puts "Racecar #{Racecar::VERSION}"
+          $stderr.puts "Racecar #{Racecar::VERSION}"
           exit
         end
       end
@@ -27,7 +27,7 @@ module Racecar
 
       consumer_name = args.first or raise Racecar::Error, "no consumer specified"
 
-      puts "=> Starting Racecar consumer #{consumer_name}..."
+      $stderr.puts "=> Starting Racecar consumer #{consumer_name}..."
 
       RailsConfigFileLoader.load!
 
@@ -40,18 +40,18 @@ module Racecar
       Racecar.config.validate!
 
       if Racecar.config.logfile
-        puts "=> Logging to #{Racecar.config.logfile}"
+        $stderr.puts "=> Logging to #{Racecar.config.logfile}"
         Racecar.logger = Logger.new(Racecar.config.logfile)
       end
 
-      puts "=> Wrooooom!"
-      puts "=> Ctrl-C to shutdown consumer"
+      $stderr.puts "=> Wrooooom!"
+      $stderr.puts "=> Ctrl-C to shutdown consumer"
 
       processor = consumer_class.new
 
       Racecar.run(processor)
 
-      puts "=> Shut down"
+      $stderr.puts "=> Shut down"
     end
   end
 end
