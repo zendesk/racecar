@@ -1,4 +1,5 @@
 require "optparse"
+require "logger"
 require "racecar/rails_config_file_loader"
 
 module Racecar
@@ -9,6 +10,10 @@ module Racecar
 
         opts.on("-r", "--require LIBRARY", "Require the LIBRARY before starting the consumer") do |lib|
           require lib
+        end
+
+        opts.on("-l", "--log LOGFILE", "Log to the specified file") do |logfile|
+          Racecar.config.logfile = logfile
         end
 
         opts.on_tail("--version", "Show Racecar version") do
@@ -33,6 +38,11 @@ module Racecar
       Racecar.config.load_consumer_class(consumer_class)
 
       Racecar.config.validate!
+
+      if Racecar.config.logfile
+        puts "=> Logging to #{Racecar.config.logfile}"
+        Racecar.logger = Logger.new(Racecar.config.logfile)
+      end
 
       puts "=> Wrooooom!"
       puts "=> Ctrl-C to shutdown consumer"
