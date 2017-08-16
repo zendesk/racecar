@@ -21,6 +21,11 @@ class TestConsumer < Racecar::Consumer
   end
 end
 
+class TestStopConsumer < TestConsumer
+  def stop; end
+  def process(message); end
+end
+
 class TestBatchConsumer < Racecar::Consumer
   attr_reader :messages
 
@@ -81,6 +86,8 @@ class FakeConsumer
     @kafka.paused_partitions[topic] ||= {}
     @kafka.paused_partitions[topic][partition] = true
   end
+
+  def stop; end
 end
 
 class FakeKafka
@@ -212,6 +219,42 @@ describe Racecar::Runner do
       kafka.deliver_message("hello world", topic: "greetings")
 
       expect { runner.run }.to raise_error(NotImplementedError)
+    end
+  end
+
+  context "#stop" do
+    let(:processor) { TestStopConsumer.new }
+
+    before :each do
+      @signal_handler = Signal.trap("TERM", "SYSTEM_DEFAULT")
+    end
+
+    after :each do
+      Signal.trap("TERM", @signal_handler)
+    end
+
+    context "given consumer class with #stop method" do
+      it "calls consumers class #stop method" do
+        pid = fork do
+          expect(processor).to receive(:stop)
+          expect(kafka).to receive(:stop)
+
+          runner.run
+
+          Process.kill("TERM", Process.pid)
+        end
+      end
+    end
+
+    it "calls kafka #stop method" do
+      pid = fork do
+        expect(processor).to receive(:stop)
+        expect(kafka).to receive(:stop)
+
+        runner.run
+
+        Process.kill("TERM", Process.pid)
+      end
     end
   end
 end
