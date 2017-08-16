@@ -2,10 +2,15 @@ require "kafka"
 
 module Racecar
   class Runner
-    attr_reader :processor, :config, :logger
+    attr_reader :processor, :config, :logger, :consumer
 
     def initialize(processor, config:, logger:)
       @processor, @config, @logger = processor, config, logger
+    end
+
+    def stop
+      processor.stop if processor.respond_to?(:stop)
+      consumer.stop
     end
 
     def run
@@ -20,7 +25,7 @@ module Racecar
         ssl_client_cert_key: config.ssl_client_cert_key,
       )
 
-      consumer = kafka.consumer(
+      @consumer = kafka.consumer(
         group_id: config.group_id,
         offset_commit_interval: config.offset_commit_interval,
         offset_commit_threshold: config.offset_commit_threshold,
@@ -28,9 +33,9 @@ module Racecar
       )
 
       # Stop the consumer on SIGINT, SIGQUIT or SIGTERM.
-      trap("QUIT") { consumer.stop }
-      trap("INT") { consumer.stop }
-      trap("TERM") { consumer.stop }
+      trap("QUIT") { stop }
+      trap("INT") { stop }
+      trap("TERM") { stop }
 
       # Print the consumer config to STDERR on USR1.
       trap("USR1") { $stderr.puts config.inspect }
