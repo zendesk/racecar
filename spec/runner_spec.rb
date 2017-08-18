@@ -6,6 +6,7 @@ class TestConsumer < Racecar::Consumer
   def initialize
     @messages = []
     @processor_queue = []
+    @torn_down = false
   end
 
   def on_message(&block)
@@ -18,6 +19,14 @@ class TestConsumer < Racecar::Consumer
 
     processor = @processor_queue.shift || proc {}
     processor.call(message)
+  end
+
+  def teardown
+    @torn_down = true
+  end
+
+  def torn_down?
+    @torn_down
   end
 end
 
@@ -217,37 +226,13 @@ describe Racecar::Runner do
     end
   end
 
-  context "#teardown" do
+  context "#stop" do
     let(:processor) { TestConsumer.new }
 
-    before :each do
-      @signal_handler = Signal.trap("TERM", "SYSTEM_DEFAULT")
-    end
+    it "allows the processor to tear down resources" do
+      runner.stop
 
-    after :each do
-      Signal.trap("TERM", @signal_handler)
-    end
-
-    context "given consumer class with #teardown method" do
-      it "calls consumers class #teardown method" do
-        pid = fork do
-          expect(processor).to receive(:teardown)
-
-          runner.run
-
-          Process.kill("TERM", Process.pid)
-        end
-      end
-    end
-
-    it "calls kafka #stop method" do
-      pid = fork do
-        expect(kafka).to receive(:stop)
-
-        runner.run
-
-        Process.kill("TERM", Process.pid)
-      end
+      expect(processor.torn_down?).to eq true
     end
   end
 end
