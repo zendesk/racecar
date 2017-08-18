@@ -142,29 +142,27 @@ end
 
 An important detail is that, if an exception is raised while processing a batch, the _whole batch_ is re-processed.
 
-#### Teardown
+#### Tearing down resources when stopping
 
-When a consumer is stopped with `QUIT`, `INT`, or `TERM` signal, consumer's `teardown` method is called.
+When a Racecar consumer shuts down, it gets the opportunity to tear down any resources held by the consumer instance. For example, it may make sense to close any open files or network connections. Doing so is simple: just implement a `#teardown` method in your consumer class and it will be called during the shutdown procedure.
 
 ```ruby
-class ConsumerWithTeardown < Racecar::Consumer
+class ArchiveConsumer < Racecar::Consumer
   subscribes_to "events"
 
   def initialize
-    @my_connection = MyConnection.new
+    @file = File.open("archive", "a")
   end
 
   def process(message)
-    puts message.value
+    @file << message.value
   end
 
   def teardown
-    @my_connection.close
+    @file.close
   end
 end
 ```
-
-This is useful for ie. closing connections or invoking some additional logic for consumers (like storing state to a file).
 
 ### Running consumers
 
