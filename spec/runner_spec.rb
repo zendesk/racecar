@@ -21,11 +21,6 @@ class TestConsumer < Racecar::Consumer
   end
 end
 
-class TestStopConsumer < TestConsumer
-  def stop; end
-  def process(message); end
-end
-
 class TestBatchConsumer < Racecar::Consumer
   attr_reader :messages
 
@@ -222,8 +217,8 @@ describe Racecar::Runner do
     end
   end
 
-  context "#stop" do
-    let(:processor) { TestStopConsumer.new }
+  context "#teardown" do
+    let(:processor) { TestConsumer.new }
 
     before :each do
       @signal_handler = Signal.trap("TERM", "SYSTEM_DEFAULT")
@@ -233,11 +228,10 @@ describe Racecar::Runner do
       Signal.trap("TERM", @signal_handler)
     end
 
-    context "given consumer class with #stop method" do
-      it "calls consumers class #stop method" do
+    context "given consumer class with #teardown method" do
+      it "calls consumers class #teardown method" do
         pid = fork do
-          expect(processor).to receive(:stop)
-          expect(kafka).to receive(:stop)
+          expect(processor).to receive(:teardown)
 
           runner.run
 
@@ -248,7 +242,6 @@ describe Racecar::Runner do
 
     it "calls kafka #stop method" do
       pid = fork do
-        expect(processor).to receive(:stop)
         expect(kafka).to receive(:stop)
 
         runner.run

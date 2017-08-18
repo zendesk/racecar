@@ -8,8 +8,8 @@ module Racecar
       @processor, @config, @logger = processor, config, logger
     end
 
-    def stop
-      processor.stop if processor.respond_to?(:stop)
+    def teardown
+      processor.teardown
       consumer.stop
     end
 
@@ -33,9 +33,9 @@ module Racecar
       )
 
       # Stop the consumer on SIGINT, SIGQUIT or SIGTERM.
-      trap("QUIT") { stop }
-      trap("INT") { stop }
-      trap("TERM") { stop }
+      trap("QUIT") { teardown }
+      trap("INT") { teardown }
+      trap("TERM") { teardown }
 
       # Print the consumer config to STDERR on USR1.
       trap("USR1") { $stderr.puts config.inspect }

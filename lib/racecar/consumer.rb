@@ -22,5 +22,7 @@ module Racecar
         end
       end
     end
+
+    def teardown; end
   end
 end
