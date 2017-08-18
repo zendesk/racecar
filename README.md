@@ -142,6 +142,30 @@ end
 
 An important detail is that, if an exception is raised while processing a batch, the _whole batch_ is re-processed.
 
+#### Teardown
+
+When a consumer is stopped with `QUIT`, `INT`, or `TERM` signal, consumer's `teardown` method is called.
+
+```ruby
+class ConsumerWithTeardown < Racecar::Consumer
+  subscribes_to "events"
+
+  def initialize
+    @my_connection = MyConnection.new
+  end
+
+  def process(message)
+    puts message.value
+  end
+
+  def teardown
+    @my_connection.close
+  end
+end
+```
+
+This is useful for ie. closing connections or invoking some additional logic for consumers (like storing state to a file).
+
 ### Running consumers
 
 Racecar is first and foremost an executable _consumer runner_. The `racecar` executable takes as argument the name of the consumer class that should be run. Racecar automatically loads your Rails application before starting, and you can load any other library you need by passing the `--require` flag, e.g.
