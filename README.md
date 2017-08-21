@@ -13,8 +13,9 @@ Using [ruby-kafka](https://github.com/zendesk/ruby-kafka) directly can be a chal
     3. [Configuration](#configuration)
     4. [Testing consumers](#testing-consumers)
     5. [Deploying consumers](#deploying-consumers)
-    6. [Logging](#logging)
-    7. [Operations](#operations)
+    6. [Handling errors](#handling-errors)
+    7. [Logging](#logging)
+    8. [Operations](#operations)
 3. [Development](#development)
 4. [Contributing](#contributing)
 5. [Copyright and license](#copyright-and-license)
@@ -276,6 +277,44 @@ racecar-resize-images: bundle exec racecar ResizeImagesConsumer
 If you've ever used Heroku you'll recognize the format – indeed, deploying to Heroku should just work if you add Racecar invocations to your Procfile.
 
 With Foreman, you can easily run these processes locally by executing `foreman run`; in production you'll want to _export_ to another process management format such as Upstart or Runit. [capistrano-foreman](https://github.com/hyperoslo/capistrano-foreman) allows you to do this with Capistrano.
+
+
+### Handling errors
+
+When processing messages from a Kafka topic, your code may encounter an error and raise an exception. The cause is typically on of two things:
+
+1. The message being processed is somehow malformed or doesn't conform with the assumptions made by the processing code.
+2. You're using some external resource such as a database or a network API that is temporarily unavailable.
+
+In the first case, you'll need to either skip the message or deploy a new version of your consumer that can correctly handle the message that caused the error. In order to skip a message, handle the relevant exception in your `#process` method:
+
+```ruby
+def process(message)
+  data = JSON.parse(message.value)
+  # ...
+rescue JSON::ParserError => e
+  puts "Failed to process message in #{message.topic}/#{message.partition} at offset #{message.offset}: #{e}"
+  # It's probably a good idea to report the exception to an exception tracker service.
+end
+```
+
+Tracking these errors in an exception tracker or some other monitoring system is highly recommended.
+
+If, on the other hand, the exception was cause by a temporary network or database problem, you will probably want to retry processing of the message after some time has passed. By default, if an exception is raised by the `#process` method, the consumer will pause all processing of the message's partition for some number of seconds, configured by setting the `pause_timeout` configuration variable. This allows the consumer to continue processing messages from other partitions that may not be impacted by the problem while still making sure to not drop the original message.
+
+In addition to retrying the processing of messages, Racecar also allows defining an _error handler_ callback that is invoked whenever an exception is raised by your `#process` method. This allows you to track and report errors to a monitoring system:
+
+```ruby
+Racecar.config.on_error do |exception, info|
+  MyErrorTracker.report(exception, {
+    topic: info[:topic],
+    partition: info[:partition],
+    offset: info[:offset],
+  })
+end
+```
+
+It is highly recommended that you set up an error handler.
 
 
 ### Logging
