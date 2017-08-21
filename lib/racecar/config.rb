@@ -55,8 +55,8 @@ module Racecar
       # Default is to send a heartbeat every 10 seconds.
       heartbeat_interval: 10,
 
-      # Default is to not pause partitions on processing errors.
-      pause_timeout: 0,
+      # Default is to pause partitions for 10 seconds on processing errors.
+      pause_timeout: 10,
 
       # Default is to allow at most 10 seconds when connecting to a broker.
       connect_timeout: 10,
