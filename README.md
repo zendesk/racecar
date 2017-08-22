@@ -199,6 +199,7 @@ The consumers will checkpoint their positions from time to time in order to be a
 
 All timeouts are defined in number of seconds.
 
+* `session_timeout` – The idle timeout after which a consumer is kicked out of the group. Consumers must send heartbeats with at least this frequency.
 * `heartbeat_interval` – How often to send a heartbeat message to Kafka.
 * `pause_timeout` – How long to pause a partition for if the consumer raises an exception while processing a message. Default is to pause for 10 seconds. Set this to zero in order to disable automatic pausing of partitions.
 * `connect_timeout` – How long to wait when trying to connect to a Kafka broker. Default is 10 seconds.

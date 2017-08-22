@@ -29,6 +29,7 @@ module Racecar
         group_id: config.group_id,
         offset_commit_interval: config.offset_commit_interval,
         offset_commit_threshold: config.offset_commit_threshold,
+        session_timeout: config.session_timeout,
         heartbeat_interval: config.heartbeat_interval,
       )
 

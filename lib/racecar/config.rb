@@ -11,6 +11,7 @@ module Racecar
       offset_commit_interval
       offset_commit_threshold
 
+      session_timeout
       heartbeat_interval
       pause_timeout
       connect_timeout
@@ -57,6 +58,9 @@ module Racecar
 
       # Default is to pause partitions for 10 seconds on processing errors.
       pause_timeout: 10,
+
+      # Default is to kick consumers out of a group after 30 seconds without activity.
+      session_timeout: 30,
 
       # Default is to allow at most 10 seconds when connecting to a broker.
       connect_timeout: 10,
