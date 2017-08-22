@@ -2,7 +2,7 @@
 
 Introducing Racecar, your friendly and easy-to-approach Kafka consumer framework!
 
-Using [ruby-kafka](https://github.com/zendesk/ruby-kafka) directly can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though. Racecar provides a simple and intuitive way to build and configure Kafka consumers that optionally integrates seemlessly with Rails.
+Using [ruby-kafka](https://github.com/zendesk/ruby-kafka) directly can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though. Racecar provides a simple and intuitive way to build and configure Kafka consumers that optionally integrates seamlessly with Rails.
 
 ## Table of content
 
@@ -87,14 +87,14 @@ You can optionally add an `initialize` method if you need to do any set-up work 
 ```ruby
 class PushNotificationConsumer < Racecar::Consumer
   subscribes_to "notifications"
-  
+
   def initialize
     @push_service = PushService.new # pretend this exists.
   end
-  
+
   def process(message)
     data = JSON.parse(message.value)
-    
+
     @push_service.notify!(
       recipient: data.fetch("recipient"),
       notification: data.fetch("notification"),
@@ -242,10 +242,10 @@ Here's an example of testing a consumer class using [RSpec](http://rspec.info/) 
 # `email-addresses` topic.
 class CreateContactsConsumer < Racecar::Consumer
   subscribes_to "email-addresses"
-  
+
   def process(message)
     email = message.value
-    
+
     Contact.create!(email: email)
   end
 end
@@ -255,9 +255,9 @@ describe CreateContactsConsumer do
   it "creates a Contact for each email address in the topic" do
     message = double("message", value: "john@example.com")
     consumer = CreateContactsConsumer.new
-    
+
     consumer.process(message)
-    
+
     expect(Contact.where(email: "john@example.com")).to exist
   end
 end
