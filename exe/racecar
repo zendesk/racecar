@@ -5,4 +5,10 @@ require "racecar/cli"
 
 $LOAD_PATH.unshift(Dir.pwd)
 
-Racecar::Cli.main(ARGV)
+begin
+  Racecar::Cli.main(ARGV)
+rescue
+  exit(1)
+else
+  exit(0)
+end
