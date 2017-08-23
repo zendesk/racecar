@@ -80,6 +80,8 @@ module Racecar
 
         # Restart the consumer loop.
         retry
+      rescue Kafka::InvalidSessionTimeout
+        raise ConfigError, "`session_timeout` is set either too high or too low"
       rescue Kafka::Error => e
         error = "#{e.class}: #{e.message}\n" + e.backtrace.join("\n")
         @logger.error "Consumer thread crashed: #{error}"
