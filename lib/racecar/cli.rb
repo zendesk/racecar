@@ -50,8 +50,10 @@ module Racecar
       processor = consumer_class.new
 
       Racecar.run(processor)
+    rescue => e
+      $stderr.puts "=> Crashed: #{e}"
 
-      $stderr.puts "=> Shut down"
+      raise
     end
   end
 end

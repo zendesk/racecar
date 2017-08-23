@@ -85,9 +85,11 @@ module Racecar
         @logger.error "Consumer thread crashed: #{error}"
 
         config.error_handler.call(e)
-      end
 
-      @logger.info "Gracefully shutting down"
+        raise
+      else
+        @logger.info "Gracefully shutting down"
+      end
     end
   end
 end
