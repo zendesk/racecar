@@ -167,6 +167,7 @@ module Racecar
       loader.string(:group_id)
       loader.integer(:offset_commit_interval)
       loader.integer(:offset_commit_threshold)
+      loader.integer(:session_timeout)
       loader.integer(:heartbeat_interval)
       loader.integer(:pause_timeout)
       loader.integer(:connect_timeout)
