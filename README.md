@@ -18,7 +18,8 @@ Using [ruby-kafka](https://github.com/zendesk/ruby-kafka) directly can be a chal
     8. [Operations](#operations)
 3. [Development](#development)
 4. [Contributing](#contributing)
-5. [Copyright and license](#copyright-and-license)
+5. [Support and Discussion](#support-and-discussion)
+6. [Copyright and license](#copyright-and-license)
 
 
 ## Installation
@@ -334,13 +335,20 @@ In order to introspect the configuration of a consumer process, send it the `SIG
 
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+After checking out the repo, run `bin/setup` to install dependencies. Then, run `rspec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/zendesk/racecar.
+Bug reports and pull requests are welcome on [GitHub](https://github.com/zendesk/racecar). Feel free to [join our Slack team](https://ruby-kafka-slack.herokuapp.com/) and ask how best to contribute!
+
+
+## Support and Discussion
+
+If you've discovered a bug, please file a [Github issue](https://github.com/zendesk/racecar/issues/new), and make sure to include all the relevant information, including the version of Racecar, ruby-kafka, and Kafka that you're using.
+
+If you have other questions, or would like to discuss best practises, how to contribute to the project, or any other ruby-kafka related topic, [join our Slack team](https://ruby-kafka-slack.herokuapp.com/)!
+
 
 ## Copyright and license
 
