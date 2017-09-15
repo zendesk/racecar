@@ -10,8 +10,6 @@ module Racecar
     desc "A string used to identify the client in logs and metrics"
     string :client_id, default: "racecar"
 
-    list :subscriptions, default: []
-
     desc "How frequently to commit offset positions"
     integer :offset_commit_interval, default: 10
 
@@ -75,9 +73,12 @@ module Racecar
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
+    attr_accessor :subscriptions
+
     def initialize(env: ENV)
       super(env: env)
       @error_handler = proc {}
+      @subscriptions = []
     end
 
     def inspect
