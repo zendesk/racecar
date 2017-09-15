@@ -220,7 +220,7 @@ Racecar has support for using SASL to authenticate clients using either the GSSA
 
 If using GSSAPI:
 
-* `sasl_gssapi_principal` – The GSSAPI principal
+* `sasl_gssapi_principal` – The GSSAPI principal.
 * `sasl_gssapi_keytab` – Optional GSSAPI keytab.
 
 If using PLAIN:
