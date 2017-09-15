@@ -16,9 +16,27 @@ module Racecar
           Racecar.config.logfile = logfile
         end
 
+        Racecar::Config.variables.each do |variable|
+          opt_name = "--" << variable.name.to_s.gsub("_", "-") << " VALUE"
+          desc = variable.description || "N/A"
+
+          if variable.default
+            desc << " (default: #{variable.default.inspect})"
+          end
+
+          opts.on(opt_name, desc) do |value|
+            Racecar.config.decode(variable.name, value)
+          end
+        end
+
         opts.on_tail("--version", "Show Racecar version") do
           require "racecar/version"
           $stderr.puts "Racecar #{Racecar::VERSION}"
+          exit
+        end
+
+        opts.on_tail("-h", "--help", "Show this message") do
+          puts opts
           exit
         end
       end
