@@ -7,6 +7,8 @@ require "racecar/daemon"
 module Racecar
   module Cli
     def self.main(args)
+      config = Racecar.config
+
       parser = OptionParser.new do |opts|
         opts.banner = "Usage: racecar MyConsumer [options]"
 
@@ -15,7 +17,7 @@ module Racecar
         end
 
         opts.on("-l", "--log LOGFILE", "Log to the specified file") do |logfile|
-          Racecar.config.logfile = logfile
+          config.logfile = logfile
         end
 
         Racecar::Config.variables.each do |variable|
@@ -31,10 +33,10 @@ module Racecar
           opts.on(opt_name, desc) do |value|
             if variable.boolean?
               # Boolean switches are automatically mapped to true/false.
-              Racecar.config.set(variable.name, value)
+              config.set(variable.name, value)
             else
               # Other CLI params need to be decoded into values of the correct type.
-              Racecar.config.decode(variable.name, value)
+              config.decode(variable.name, value)
             end
           end
         end
@@ -63,19 +65,19 @@ module Racecar
       consumer_class = Kernel.const_get(consumer_name)
 
       # Load config defined by the consumer class itself.
-      Racecar.config.load_consumer_class(consumer_class)
+      config.load_consumer_class(consumer_class)
 
-      Racecar.config.validate!
+      config.validate!
 
-      if Racecar.config.logfile
-        $stderr.puts "=> Logging to #{Racecar.config.logfile}"
-        Racecar.logger = Logger.new(Racecar.config.logfile)
+      if config.logfile
+        $stderr.puts "=> Logging to #{config.logfile}"
+        Racecar.logger = Logger.new(config.logfile)
       end
 
       $stderr.puts "=> Wrooooom!"
 
-      if Racecar.config.daemonize
-        daemon = Daemon.new(File.expand_path(Racecar.config.pidfile))
+      if config.daemonize
+        daemon = Daemon.new(File.expand_path(config.pidfile))
 
         daemon.check_pid
 
@@ -84,10 +86,10 @@ module Racecar
 
         daemon.suppress_input
 
-        if Racecar.config.logfile.nil?
+        if config.logfile.nil?
           daemon.suppress_output
         else
-          daemon.redirect_output(Racecar.config.logfile)
+          daemon.redirect_output(config.logfile)
         end
 
         daemon.daemonize!
