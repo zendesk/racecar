@@ -174,6 +174,7 @@ Racecar is first and foremost an executable _consumer runner_. The `racecar` exe
 
 The first time you execute `racecar` with a consumer class a _consumer group_ will be created with a group id derived from the class name (this can be configured). If you start `racecar` with the same consumer class argument multiple times, the processes will join the existing group – even if you start them on other nodes. You will typically want to have at least two consumers in each of your groups – preferably on separate nodes – in order to deal with failures.
 
+
 ### Configuration
 
 Racecar provides a flexible way to configure your consumer in a way that feels at home in a Rails application. If you haven't already, run `bundle exec rails generate racecar:install` in order to generate a config file. You'll get a separate section for each Rails environment, with the common configuration values in a shared `common` section.
@@ -279,6 +280,23 @@ racecar-resize-images: bundle exec racecar ResizeImagesConsumer
 If you've ever used Heroku you'll recognize the format – indeed, deploying to Heroku should just work if you add Racecar invocations to your Procfile.
 
 With Foreman, you can easily run these processes locally by executing `foreman run`; in production you'll want to _export_ to another process management format such as Upstart or Runit. [capistrano-foreman](https://github.com/hyperoslo/capistrano-foreman) allows you to do this with Capistrano.
+
+
+#### Running consumers in the background
+
+While it is recommended that you use a process supervisor to manage the Racecar consumer processes, it is possible to _daemonize_ the Racecar processes themselves if that is more to your liking. Note that this support is currently in alpha, as it hasn't been tested extensively in production settings.
+
+In order to daemonize Racecar, simply pass in `--daemonize` when executing the command:
+
+    $ bundle exec racecar --daemonize ResizeImagesConsumer
+
+This will start the consumer process in the background. A file containing the process id (the "pidfile") will be created, with the file name being constructed from the consumer class name. If you want to specify the name of the pidfile yourself, pass in `--pidfile=some-file.pid`.
+
+Since the process is daemonized, you need to know the process id (PID) in order to be able to stop it. Use the `racecarctl` command to do this:
+
+    $ bundle exec racecarctl stop --pidfile=some-file.pid
+
+Again, the recommended approach is to manage the processes using process managers. Only do this if you have to.
 
 
 ### Handling errors
