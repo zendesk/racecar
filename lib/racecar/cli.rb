@@ -35,6 +35,10 @@ module Racecar
         Racecar.logger = Logger.new(config.logfile)
       end
 
+      if config.datadog_enabled
+        configure_datadog
+      end
+
       $stderr.puts "=> Wrooooom!"
 
       if config.daemonize
@@ -122,6 +126,16 @@ module Racecar
           exit
         end
       end
+    end
+
+    def configure_datadog
+      require "kafka/datadog"
+
+      datadog = Kafka::Datadog
+      datadog.host = config.datadog_host if config.datadog_host.present?
+      datadog.port = config.datadog_port if config.datadog_port.present?
+      datadog.namespace = config.datadog_namespace if config.datadog_namespace.present?
+      datadog.tags = config.datadog_tags if config.datadog_tags.present?
     end
   end
 end
