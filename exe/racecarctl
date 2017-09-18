@@ -7,6 +7,5 @@ begin
   Racecar::Ctl.main(ARGV)
 rescue Racecar::Error => e
   $stderr.puts "Error: #{e.message}"
-  $stderr.puts "Run `racecarctl produce -h` to see valid options"
   exit 1
 end

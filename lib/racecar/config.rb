@@ -70,6 +70,12 @@ module Racecar
     desc "The password used to authenticate"
     string :sasl_plain_password
 
+    desc "The file in which to store the Racecar process' PID when daemonized"
+    string :pidfile
+
+    desc "Run the Racecar process in the background as a daemon"
+    boolean :daemonize, default: false
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
@@ -115,6 +121,7 @@ module Racecar
 
       self.subscriptions = consumer_class.subscriptions
       self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time
+      self.pidfile ||= "#{group_id}.pid"
     end
 
     def on_error(&handler)

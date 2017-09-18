@@ -1,19 +1,62 @@
 require "optparse"
 require "racecar/rails_config_file_loader"
+require "racecar/daemon"
 
 module Racecar
   class Ctl
     ProduceMessage = Struct.new(:value, :key, :topic)
 
     def self.main(args)
-      command = args.shift or raise Racecar::Error, "no command specified"
+      command = args.shift
 
-      ctl = new
-
-      if ctl.respond_to?(command)
-        ctl.send(command, args)
+      if command.nil?
+        puts "No command specified. Commands:"
+        puts " - status"
+        puts " - stop"
+        puts " - produce"
       else
-        raise Racecar::Error, "invalid command: #{command}"
+        ctl = new(command)
+
+        if ctl.respond_to?(command)
+          ctl.send(command, args)
+        else
+          raise Racecar::Error, "invalid command: #{command}"
+        end
+      end
+    end
+
+    def initialize(command)
+      @command = command
+    end
+
+    def status(args)
+      parse_options!(args)
+
+      pidfile = Racecar.config.pidfile
+      daemon = Daemon.new(pidfile)
+
+      if daemon.running?
+        puts "running (PID = #{daemon.pid})"
+      else
+        puts daemon.pid_status
+      end
+    end
+
+    def stop(args)
+      parse_options!(args)
+
+      pidfile = Racecar.config.pidfile
+      daemon = Daemon.new(pidfile)
+
+      if daemon.running?
+        daemon.stop!
+        while daemon.running?
+          puts "Waiting for Racecar process to stop..."
+          sleep 5
+        end
+        puts "Racecar stopped"
+      else
+        puts "Racecar is not currently running"
       end
     end
 
@@ -61,6 +104,20 @@ module Racecar
       kafka.deliver_message(message.value, key: message.key, topic: message.topic)
 
       $stderr.puts "=> Delivered message to Kafka cluster"
+    end
+
+    private
+
+    def parse_options!(args)
+      parser = OptionParser.new do |opts|
+        opts.banner = "Usage: racecarctl #{@command} [options]"
+
+        opts.on("--pidfile PATH", "Use the PID stored in the specified file") do |path|
+          Racecar.config.pidfile = File.expand_path(path)
+        end
+      end
+
+      parser.parse!(args)
     end
   end
 end

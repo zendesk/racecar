@@ -1,6 +1,8 @@
 require "optparse"
 require "logger"
+require "fileutils"
 require "racecar/rails_config_file_loader"
+require "racecar/daemon"
 
 module Racecar
   module Cli
@@ -17,7 +19,9 @@ module Racecar
         end
 
         Racecar::Config.variables.each do |variable|
-          opt_name = "--" << variable.name.to_s.gsub("_", "-") << " VALUE"
+          opt_name = "--" << variable.name.to_s.gsub("_", "-")
+          opt_name << " VALUE" unless variable.boolean?
+
           desc = variable.description || "N/A"
 
           if variable.default
@@ -25,7 +29,13 @@ module Racecar
           end
 
           opts.on(opt_name, desc) do |value|
-            Racecar.config.decode(variable.name, value)
+            if variable.boolean?
+              # Boolean switches are automatically mapped to true/false.
+              Racecar.config.set(variable.name, value)
+            else
+              # Other CLI params need to be decoded into values of the correct type.
+              Racecar.config.decode(variable.name, value)
+            end
           end
         end
 
@@ -63,7 +73,28 @@ module Racecar
       end
 
       $stderr.puts "=> Wrooooom!"
-      $stderr.puts "=> Ctrl-C to shutdown consumer"
+
+      if Racecar.config.daemonize
+        daemon = Daemon.new(File.expand_path(Racecar.config.pidfile))
+
+        daemon.check_pid
+
+        $stderr.puts "=> Starting background process"
+        $stderr.puts "=> Writing PID to #{daemon.pidfile}"
+
+        daemon.suppress_input
+
+        if Racecar.config.logfile.nil?
+          daemon.suppress_output
+        else
+          daemon.redirect_output(Racecar.config.logfile)
+        end
+
+        daemon.daemonize!
+        daemon.write_pid
+      else
+        $stderr.puts "=> Ctrl-C to shutdown consumer"
+      end
 
       processor = consumer_class.new
 
