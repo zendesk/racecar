@@ -82,17 +82,17 @@ module Racecar
       OptionParser.new do |opts|
         opts.banner = "Usage: racecar MyConsumer [options]"
 
-        opts.on("-r", "--require LIBRARY", "Require the LIBRARY before starting the consumer") do |lib|
+        opts.on("-r", "--require STRING", "Require a library before starting the consumer") do |lib|
           require lib
         end
 
-        opts.on("-l", "--log LOGFILE", "Log to the specified file") do |logfile|
+        opts.on("-l", "--log STRING", "Log to the specified file") do |logfile|
           config.logfile = logfile
         end
 
         Racecar::Config.variables.each do |variable|
           opt_name = "--" << variable.name.to_s.gsub("_", "-")
-          opt_name << " VALUE" unless variable.boolean?
+          opt_name << " #{variable.type.upcase}" unless variable.boolean?
 
           desc = variable.description || "N/A"
 
