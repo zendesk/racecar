@@ -76,6 +76,21 @@ module Racecar
     desc "Run the Racecar process in the background as a daemon"
     boolean :daemonize, default: false
 
+    desc "Enable Datadog metrics"
+    boolean :datadog_enabled, default: false
+
+    desc "The host running the Datadog agent"
+    string :datadog_host
+
+    desc "The port of the Datadog agent"
+    integer :datadog_port
+
+    desc "The namespace to use for Datadog metrics"
+    string :datadog_namespace
+
+    desc "Tags that should always be set on Datadog metrics"
+    list :datadog_tags
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
