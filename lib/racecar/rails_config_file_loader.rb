@@ -14,7 +14,9 @@ module Racecar
 
         require "./config/environment"
 
-        Racecar.config.load_file(config_file, Rails.env)
+        if (Rails.root + config_file).readable?
+          Racecar.config.load_file(config_file, Rails.env)
+        end
 
         # In development, write Rails logs to STDOUT. This mirrors what e.g.
         # Unicorn does.
