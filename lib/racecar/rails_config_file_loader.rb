@@ -5,7 +5,11 @@ module Racecar
 
       begin
         require "rails"
+      rescue LoadError
+        # Not a Rails application.
+      end
 
+      if defined?(Rails)
         $stderr.puts "=> Detected Rails, booting application..."
 
         require "./config/environment"
@@ -20,8 +24,6 @@ module Racecar
           console.level = Rails.logger.level
           Rails.logger.extend(ActiveSupport::Logger.broadcast(console))
         end
-      rescue LoadError
-        # Not a Rails application.
       end
     end
   end
