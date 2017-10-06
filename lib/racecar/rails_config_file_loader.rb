@@ -5,12 +5,18 @@ module Racecar
 
       begin
         require "rails"
+      rescue LoadError
+        # Not a Rails application.
+      end
 
+      if defined?(Rails)
         $stderr.puts "=> Detected Rails, booting application..."
 
         require "./config/environment"
 
-        Racecar.config.load_file(config_file, Rails.env)
+        if (Rails.root + config_file).readable?
+          Racecar.config.load_file(config_file, Rails.env)
+        end
 
         # In development, write Rails logs to STDOUT. This mirrors what e.g.
         # Unicorn does.
@@ -20,8 +26,6 @@ module Racecar
           console.level = Rails.logger.level
           Rails.logger.extend(ActiveSupport::Logger.broadcast(console))
         end
-      rescue LoadError
-        # Not a Rails application.
       end
     end
   end
