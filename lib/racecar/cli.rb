@@ -11,10 +11,13 @@ module Racecar
     end
 
     def initialize(args)
-      @config = Racecar.config
       @parser = build_parser
       @parser.parse!(args)
       @consumer_name = args.first or raise Racecar::Error, "no consumer specified"
+    end
+
+    def config
+      Racecar.config
     end
 
     def run
@@ -60,7 +63,7 @@ module Racecar
 
     private
 
-    attr_reader :config, :consumer_name
+    attr_reader :consumer_name
 
     def daemonize!
       daemon = Daemon.new(File.expand_path(config.pidfile))
