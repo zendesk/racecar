@@ -56,13 +56,11 @@ module Racecar
 
       processor = consumer_class.new
 
-      begin
-        Racecar.run(processor)
-      rescue => e
-        $stderr.puts "=> Crashed: #{e}"
+      Racecar.run(processor)
+    rescue => e
+      $stderr.puts "=> Crashed: #{e}\n#{e.backtrace.join("\n")}"
 
-        raise
-      end
+      raise
     end
 
     private
