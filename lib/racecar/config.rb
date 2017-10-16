@@ -2,7 +2,7 @@ require "king_konf"
 
 module Racecar
   class Config < KingKonf::Config
-    prefix :racecar
+    env_prefix :racecar
 
     desc "A list of Kafka brokers in the cluster that you're consuming from"
     list :brokers, default: ["localhost:9092"]
