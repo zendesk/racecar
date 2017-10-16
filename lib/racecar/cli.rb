@@ -38,6 +38,10 @@ module Racecar
         Racecar.logger = Logger.new(config.logfile)
       end
 
+      if config.log_level
+        Racecar.logger.level = config.log_level
+      end
+
       if config.datadog_enabled
         configure_datadog
       end

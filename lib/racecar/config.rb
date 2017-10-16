@@ -43,6 +43,9 @@ module Racecar
     desc "A filename that log messages should be written to"
     string :logfile
 
+    desc "The log level for the Racecar logs"
+    string :log_level
+
     desc "A valid SSL certificate authority"
     string :ssl_ca_cert
 
