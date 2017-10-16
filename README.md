@@ -1,8 +1,8 @@
 # Racecar
 
-Introducing Racecar, your friendly and easy-to-approach Kafka consumer framework!
+Racecar is a friendly and easy-to-approach Kafka consumer framework. It allows you to write small applications that process messages stored in Kafka topics while optionally integrating with your Rails models.
 
-Using [ruby-kafka](https://github.com/zendesk/ruby-kafka) directly can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though. Racecar provides a simple and intuitive way to build and configure Kafka consumers that optionally integrates seamlessly with Rails.
+The framework is based on [ruby-kafka](https://github.com/zendesk/ruby-kafka), which, when used directly, can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though. Racecar provides a simple and intuitive way to build and configure Kafka consumers.
 
 ## Table of content
 
