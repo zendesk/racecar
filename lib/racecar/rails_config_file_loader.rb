@@ -20,7 +20,7 @@ module Racecar
 
         # In development, write Rails logs to STDOUT. This mirrors what e.g.
         # Unicorn does.
-        if Rails.env.development?
+        if Rails.env.development? && defined?(ActiveSupport::Logger)
           console = ActiveSupport::Logger.new($stdout)
           console.formatter = Rails.logger.formatter
           console.level = Rails.logger.level
