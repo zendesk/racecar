@@ -15,6 +15,10 @@ module Racecar
     @config ||= Config.new
   end
 
+  def self.configure
+    yield config
+  end
+
   def self.logger
     @logger ||= Logger.new(STDOUT)
   end
