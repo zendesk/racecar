@@ -25,6 +25,10 @@ module Racecar
 
       RailsConfigFileLoader.load!
 
+      if File.exist?("config/racecar.rb")
+        require "config/racecar"
+      end
+
       # Find the consumer class by name.
       consumer_class = Kernel.const_get(consumer_name)
 
