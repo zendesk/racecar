@@ -62,7 +62,7 @@ module Racecar
 
       Racecar.run(processor)
     rescue => e
-      $stderr.puts "=> Crashed: #{e}\n#{e.backtrace.join("\n")}"
+      $stderr.puts "=> Crashed: #{e.class}: #{e}\n#{e.backtrace.join("\n")}"
 
       raise
     end
