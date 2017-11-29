@@ -43,7 +43,7 @@ module Racecar
       end
 
       if config.log_level
-        Racecar.logger.level = config.log_level
+        Racecar.logger.level = Object.const_get("Logger::#{config.log_level.upcase}")
       end
 
       if config.datadog_enabled
