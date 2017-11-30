@@ -4,8 +4,9 @@ module Racecar
   class Runner
     attr_reader :processor, :config, :logger, :consumer
 
-    def initialize(processor, config:, logger:)
+    def initialize(processor, config:, logger:, instrumenter: NullInstrumenter)
       @processor, @config, @logger = processor, config, logger
+      @instrumenter = instrumenter
     end
 
     def stop
@@ -52,11 +53,37 @@ module Racecar
       begin
         if processor.respond_to?(:process)
           consumer.each_message(max_wait_time: config.max_wait_time) do |message|
-            processor.process(message)
+            payload = {
+              consumer_class: processor.to_s,
+              topic: message.topic,
+              partition: message.partition,
+              offset: message.offset,
+            }
+
+            # Allow subscribers to receive a notification *before* we process the
+            # message.
+            @instrumenter.instrument("start_process_message.racecar", payload)
+
+            @instrumenter.instrument("process_message.racecar", payload) do
+              processor.process(message)
+            end
           end
         elsif processor.respond_to?(:process_batch)
           consumer.each_batch(max_wait_time: config.max_wait_time) do |batch|
-            processor.process_batch(batch)
+            payload = {
+              consumer_class: processor.to_s,
+              topic: batch.topic,
+              partition: batch.partition,
+              first_offset: batch.first_offset,
+            }
+
+            # Allow subscribers to receive a notification *before* we process the
+            # message.
+            @instrumenter.instrument("start_process_batch.racecar", payload)
+
+            @instrumenter.instrument("process_batch.racecar", payload) do
+              processor.process_batch(batch)
+            end
           end
         else
           raise NotImplementedError, "Consumer class must implement process or process_batch method"

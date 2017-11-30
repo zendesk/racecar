@@ -5,6 +5,13 @@ require "racecar/runner"
 require "racecar/config"
 
 module Racecar
+  # Ignores all instrumentation events.
+  class NullInstrumenter
+    def self.instrument(*)
+      yield if block_given?
+    end
+  end
+
   class Error < StandardError
   end
 
@@ -27,7 +34,15 @@ module Racecar
     @logger = logger
   end
 
+  def self.instrumenter
+    ActiveSupport::Notifications
+  rescue NameError
+    logger.warn "ActiveSupport::Notifications not available, instrumentation is disabled"
+
+    NullInstrumenter
+  end
+
   def self.run(processor)
-    Runner.new(processor, config: config, logger: logger).run
+    Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter).run
   end
 end
