@@ -35,8 +35,10 @@ module Racecar
   end
 
   def self.instrumenter
+    require "active_support/notifications"
+
     ActiveSupport::Notifications
-  rescue NameError
+  rescue LoadError
     logger.warn "ActiveSupport::Notifications not available, instrumentation is disabled"
 
     NullInstrumenter
