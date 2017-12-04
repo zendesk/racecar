@@ -24,6 +24,8 @@ module Racecar
         ssl_ca_cert: config.ssl_ca_cert,
         ssl_client_cert: config.ssl_client_cert,
         ssl_client_cert_key: config.ssl_client_cert_key,
+        sasl_plain_username: config.sasl_plain_username,
+        sasl_plain_password: config.sasl_plain_password,
       )
 
       @consumer = kafka.consumer(
