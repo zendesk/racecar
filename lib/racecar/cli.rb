@@ -141,10 +141,15 @@ module Racecar
       require "kafka/datadog"
 
       datadog = Kafka::Datadog
-      datadog.host = config.datadog_host if config.datadog_host.present?
-      datadog.port = config.datadog_port if config.datadog_port.present?
-      datadog.namespace = config.datadog_namespace if config.datadog_namespace.present?
-      datadog.tags = config.datadog_tags if config.datadog_tags.present?
+
+      if config.statsd.present?
+        datadog.statsd = config.statsd
+      else
+        datadog.host = config.datadog_host if config.datadog_host.present?
+        datadog.port = config.datadog_port if config.datadog_port.present?
+        datadog.namespace = config.datadog_namespace if config.datadog_namespace.present?
+        datadog.tags = config.datadog_tags if config.datadog_tags.present?
+      end
     end
   end
 end
