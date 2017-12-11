@@ -54,7 +54,7 @@ module Racecar
         if processor.respond_to?(:process)
           consumer.each_message(max_wait_time: config.max_wait_time) do |message|
             payload = {
-              consumer_class: processor.to_s,
+              consumer_class: processor.class.to_s,
               topic: message.topic,
               partition: message.partition,
               offset: message.offset,
@@ -71,7 +71,7 @@ module Racecar
         elsif processor.respond_to?(:process_batch)
           consumer.each_batch(max_wait_time: config.max_wait_time) do |batch|
             payload = {
-              consumer_class: processor.to_s,
+              consumer_class: processor.class.to_s,
               topic: batch.topic,
               partition: batch.partition,
               first_offset: batch.first_offset,
