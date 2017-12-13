@@ -122,11 +122,16 @@ class FakeKafka
   end
 end
 
+FakeInstrumenter = Class.new(Racecar::NullInstrumenter)
+
 describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
   let(:logger) { Logger.new(StringIO.new) }
   let(:kafka) { FakeKafka.new }
-  let(:runner) { Racecar::Runner.new(processor, config: config, logger: logger) }
+  let(:instrumenter) { FakeInstrumenter }
+  let(:runner) do
+    Racecar::Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter)
+  end
 
   before do
     allow(Kafka).to receive(:new) { kafka }
@@ -141,6 +146,22 @@ describe Racecar::Runner do
       runner.run
 
       expect(processor.messages.map(&:value)).to eq ["hello world"]
+    end
+
+    it "sends instrumentation signals" do
+      kafka.deliver_message("hello world", topic: "greetings")
+
+      payload = a_hash_including(
+        :partition,
+        :offset,
+        consumer_class: "TestConsumer",
+        topic: "greetings"
+      )
+
+      expect(instrumenter).to receive(:instrument).with("start_process_message.racecar", payload)
+      expect(instrumenter).to receive(:instrument).with("process_message.racecar", payload)
+
+      runner.run
     end
 
     context "when the processing code raises an exception" do
@@ -183,6 +204,22 @@ describe Racecar::Runner do
       runner.run
 
       expect(processor.messages.map(&:value)).to eq ["hello world"]
+    end
+
+    it "sends instrumentation signals" do
+      kafka.deliver_message("hello world", topic: "greetings")
+
+      payload = a_hash_including(
+        :partition,
+        :first_offset,
+        consumer_class: "TestBatchConsumer",
+        topic: "greetings"
+      )
+
+      expect(instrumenter).to receive(:instrument).with("start_process_batch.racecar", payload)
+      expect(instrumenter).to receive(:instrument).with("process_batch.racecar", payload)
+
+      runner.run
     end
 
     context "when the processing code raises an exception" do
