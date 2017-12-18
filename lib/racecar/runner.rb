@@ -77,6 +77,7 @@ module Racecar
               topic: batch.topic,
               partition: batch.partition,
               first_offset: batch.first_offset,
+              message_count: batch.messages.count,
             }
 
             # Allow subscribers to receive a notification *before* we process the
