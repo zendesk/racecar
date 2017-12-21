@@ -145,5 +145,7 @@ module Racecar
     def on_error(&handler)
       @error_handler = handler
     end
+
+    attr_accessor :statsd
   end
 end
