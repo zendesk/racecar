@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## racecar v0.3.5
+
 * Instrument using ActiveSupport::Notifications (#43).
 * Add support for SASL.
 
