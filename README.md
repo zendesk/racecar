@@ -183,6 +183,15 @@ Racecar provides a flexible way to configure your consumer in a way that feels a
 
 It's also possible to configure Racecar using environment variables. For any given configuration key, there should be a corresponding environment variable with the prefix `RACECAR_`, in upper case. For instance, in order to configure the client id, set `RACECAR_CLIENT_ID=some-id` in the process in which the Racecar consumer is launched. You can set `brokers` by passing a comma-separated list, e.g. `RACECAR_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092`.
 
+Finally, you can configure Racecar directly in Ruby. The file `config/racecar.rb` will be automatically loaded if it exists; in it, you can configure Racecar using a simple API:
+
+```ruby
+Racecar.configure do |config|
+  # Each config variable can be set using a writer attribute.
+  config.brokers = ServiceDiscovery.find("kafka-brokers")
+end
+```
+
 #### Basic configuration
 
 * `brokers` – A list of Kafka brokers in the cluster that you're consuming from. Defaults to `localhost` on port 9092, the default Kafka port.
