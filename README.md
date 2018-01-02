@@ -144,6 +144,38 @@ end
 
 An important detail is that, if an exception is raised while processing a batch, the _whole batch_ is re-processed.
 
+#### Producing responses
+
+A common use case is to process messages from one topic, and then "respond" to another topic, such as when transforming
+data or logging the result of the processed message.
+
+Use the optional `responds_with:` option to specify a topic to produce messages to. The return value from the 
+`#process` or `#process_batch` method will be the message produced. If the return value is `nil`, no message
+will be produced.
+
+The `response_partition_key:` may be used to specify a partition key or a method pointer (symbol). When using a method,
+the message or batch will be passed to the method and it's return used as the partition key for the message produced.
+
+```ruby
+class AddUserIdConsumer < Racecar::Consumer
+  subscribes_to "visitors", responds_with: "visitors_user_id", response_partition_key: :transformed_partition_key
+  
+  def process(message)
+    data = JSON.parse(message.value)
+    user = User.find_by(email: data['email'])]
+    return unless user
+    
+    data['user_id'] = user.id
+    @partition_key = user.account_id
+    data.to_json
+  end
+  
+  def transformed_partition_key
+    @partition_key
+  end
+end
+```
+
 #### Tearing down resources when stopping
 
 When a Racecar consumer shuts down, it gets the opportunity to tear down any resources held by the consumer instance. For example, it may make sense to close any open files or network connections. Doing so is simple: just implement a `#teardown` method in your consumer class and it will be called during the shutdown procedure.

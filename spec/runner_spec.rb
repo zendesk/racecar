@@ -20,7 +20,9 @@ class TestConsumer < Racecar::Consumer
     processor = @processor_queue.shift || proc {}
     processor.call(message)
 
-    'message_processing_result'
+    @response_partition = 'foo_partition_key'
+
+    'message_processing_result' if message.value
   end
 
   def teardown
@@ -39,8 +41,8 @@ end
 class TestConsumerWithResponderPartition < TestConsumer
   subscribes_to 'greetings', responds_with: 'aloha', response_partition_key: :response_partition
 
-  def response_partition(message)
-    "partition_#{message.value}"
+  def response_partition
+    @response_partition
   end
 end
 
@@ -71,14 +73,6 @@ end
 
 class TestBatchConsumerWithResponder < TestBatchConsumer
   subscribes_to 'greetings', responds_with: 'aloha', response_partition_key: 'response_partition'
-end
-
-class TestBatchConsumerWithResponderPartition < TestBatchConsumer
-  subscribes_to 'greetings', responds_with: 'aloha', response_partition_key: :response_partition
-
-  def response_partition(batch)
-    "partition_#{batch.messages.first.value}"
-  end
 end
 
 class TestNilConsumer < Racecar::Consumer
@@ -212,6 +206,17 @@ describe Racecar::Runner do
           partition_key: 'response_partition'
         )
       end
+
+      context '#process has nil return' do
+        it 'does not produce a response' do
+          kafka.deliver_message(nil, topic: "greetings")
+
+          runner.run
+
+          expect(processor.messages.map(&:value)).to eq [nil]
+          expect(DeliveryBoy).not_to have_received(:deliver)
+        end
+      end
     end
 
     context "with a responder configured for the topic and a partition key generation method" do
@@ -226,7 +231,7 @@ describe Racecar::Runner do
         expect(DeliveryBoy).to have_received(:deliver).with(
           'message_processing_result',
           topic: 'aloha',
-          partition_key: 'partition_hello world'
+          partition_key: 'foo_partition_key'
         )
       end
     end
@@ -303,23 +308,6 @@ describe Racecar::Runner do
           'batch_processing_result',
           topic: 'aloha',
           partition_key: 'response_partition'
-        )
-      end
-    end
-
-    context "with a responder configured for the topic and a partition key generation method" do
-      let(:processor) { TestBatchConsumerWithResponderPartition.new }
-
-      it "processes messages with the specified consumer class" do
-        kafka.deliver_message("hello world", topic: "greetings")
-
-        runner.run
-
-        expect(processor.messages.map(&:value)).to eq ["hello world"]
-        expect(DeliveryBoy).to have_received(:deliver).with(
-          'batch_processing_result',
-          topic: 'aloha',
-          partition_key: 'partition_hello world'
         )
       end
     end

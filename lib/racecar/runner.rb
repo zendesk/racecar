@@ -69,7 +69,7 @@ module Racecar
             @instrumenter.instrument("start_process_message.racecar", payload)
 
             @instrumenter.instrument("process_message.racecar", payload) do
-              process(:process, message)
+              process_and_respond(:process, message)
             end
           end
         elsif processor.respond_to?(:process_batch)
@@ -87,7 +87,7 @@ module Racecar
             @instrumenter.instrument("start_process_batch.racecar", payload)
 
             @instrumenter.instrument("process_batch.racecar", payload) do
-              process(:process_batch, batch)
+              process_and_respond(:process_batch, batch)
             end
           end
         else
@@ -136,22 +136,22 @@ module Racecar
       end
     end
 
-    def process(process_method, message_or_batch)
+    def process_and_respond(process_method, message_or_batch)
       responder = responders[message_or_batch.topic]
-      if responder
-        partition_key = if responder[:partition_key].is_a?(Symbol)
-                          processor.send(responder[:partition_key], message_or_batch)
-                        else
-                          responder[:partition_key]
-                        end
-        Racecar::Producer.produce(
-          responder[:topic],
-          processor.send(process_method, message_or_batch),
-          partition_key: partition_key
-        )
-      else
-        processor.send(process_method, message_or_batch)
-      end
+      return processor.send(process_method, message_or_batch) unless responder
+
+      response = processor.send(process_method, message_or_batch)
+      return if response.nil?
+      partition_key = if responder[:partition_key].is_a?(Symbol)
+                        processor.send(responder[:partition_key])
+                      else
+                        responder[:partition_key]
+                      end
+      Racecar::Producer.produce(
+        responder[:topic],
+        response,
+        partition_key: partition_key
+      )
     end
   end
 end
