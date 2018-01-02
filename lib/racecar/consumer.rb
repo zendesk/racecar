@@ -20,7 +20,7 @@ module Racecar
       # responds_with           - optional topic to which the return value of the #process or #process_batch method
       #                           is produced
       # response_partition_key  - optional string or method pointer (symbol) to use as the partition key for messages
-      #                           produced, message or batch will be passed to method
+      #                           produced
       def subscribes_to(*topics, start_from_beginning: true, max_bytes_per_partition: 1048576, responds_with: nil,
                         response_partition_key: nil)
         topics.each do |topic|
