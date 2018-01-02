@@ -10,12 +10,13 @@ The framework is based on [ruby-kafka](https://github.com/zendesk/ruby-kafka), w
 2. [Usage](#usage)
     1. [Creating consumers](#creating-consumers)
     2. [Running consumers](#running-consumers)
-    3. [Configuration](#configuration)
-    4. [Testing consumers](#testing-consumers)
-    5. [Deploying consumers](#deploying-consumers)
-    6. [Handling errors](#handling-errors)
-    7. [Logging](#logging)
-    8. [Operations](#operations)
+    3. [Producing messages](#producing-messages)
+    4. [Configuration](#configuration)
+    5. [Testing consumers](#testing-consumers)
+    6. [Deploying consumers](#deploying-consumers)
+    7. [Handling errors](#handling-errors)
+    8. [Logging](#logging)
+    9. [Operations](#operations)
 3. [Development](#development)
 4. [Contributing](#contributing)
 5. [Support and Discussion](#support-and-discussion)
@@ -174,6 +175,31 @@ Racecar is first and foremost an executable _consumer runner_. The `racecar` exe
 
 The first time you execute `racecar` with a consumer class a _consumer group_ will be created with a group id derived from the class name (this can be configured). If you start `racecar` with the same consumer class argument multiple times, the processes will join the existing group – even if you start them on other nodes. You will typically want to have at least two consumers in each of your groups – preferably on separate nodes – in order to deal with failures.
 
+### Producing messages
+
+**WARNING:** This is an alpha feature, and could cause weird and unpredictable errors. Use with caution.
+
+Consumers can produce messages themselves, allowing for powerful stream processing applications that transform and filter message streams. The API for this is simple:
+
+```ruby
+class GeoCodingConsumer < Racecar::Consumer
+  subscribes_to "pageviews"
+
+  def process(message)
+    pageview = JSON.parse(message.value)
+    ip_address = pageview.fetch("ip_address")
+
+    country = GeoCode.country(ip_address)
+
+    # Enrich the original message:
+    pageview["country"] = country
+
+    # The `produce` method enqueues a message to be delivered after #process
+    # returns. It won't actually deliver the message.
+    produce(JSON.dump(pageview), topic: "pageviews-with-country")
+  end
+end
+```
 
 ### Configuration
 
