@@ -23,6 +23,16 @@ module Racecar
       end
     end
 
+    def configure(producer:)
+      @_producer = producer
+    end
+
     def teardown; end
+
+    protected
+
+    def produce(value, topic:)
+      @_producer.produce(value, topic: topic)
+    end
   end
 end
