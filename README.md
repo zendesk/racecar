@@ -153,8 +153,8 @@ Use the optional `responds_with:` option to specify a topic to produce messages 
 `#process` or `#process_batch` method will be the message produced. If the return value is `nil`, no message
 will be produced.
 
-The `response_partition_key:` may be used to specify a partition key or a method pointer (symbol). When using a method,
-the message or batch will be passed to the method and it's return used as the partition key for the message produced.
+`response_partition_key:` may be used to specify a partition key or a method pointer (symbol) to determine the
+partition key used when producing the response.
 
 ```ruby
 class AddUserIdConsumer < Racecar::Consumer
