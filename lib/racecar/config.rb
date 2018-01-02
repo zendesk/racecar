@@ -94,6 +94,9 @@ module Racecar
     desc "Tags that should always be set on Datadog metrics"
     list :datadog_tags
 
+    desc "Configure DeliveryBoy with Racecar's settings"
+    boolean :configure_delivery_boy, default: true
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
@@ -144,6 +147,18 @@ module Racecar
 
     def on_error(&handler)
       @error_handler = handler
+    end
+
+    def configure_delivery_boy!
+      return unless configure_delivery_boy
+      # Configure DeliveryBoy with same configuration as Racecar
+      DeliveryBoy.configure do |config|
+        self.class.variables.each do |variable|
+          name = variable.name
+          value = send(name)
+          config.send("#{name}=", value) if config.respond_to?(name) && !value.nil?
+        end
+      end
     end
   end
 end

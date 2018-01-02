@@ -2,11 +2,12 @@ require "kafka"
 
 module Racecar
   class Runner
-    attr_reader :processor, :config, :logger, :consumer
+    attr_reader :processor, :config, :logger, :consumer, :responders
 
     def initialize(processor, config:, logger:, instrumenter: NullInstrumenter)
       @processor, @config, @logger = processor, config, logger
       @instrumenter = instrumenter
+      @responders = responders_from_subscriptions
     end
 
     def stop
@@ -68,7 +69,7 @@ module Racecar
             @instrumenter.instrument("start_process_message.racecar", payload)
 
             @instrumenter.instrument("process_message.racecar", payload) do
-              processor.process(message)
+              process_and_respond(:process, message)
             end
           end
         elsif processor.respond_to?(:process_batch)
@@ -86,7 +87,7 @@ module Racecar
             @instrumenter.instrument("start_process_batch.racecar", payload)
 
             @instrumenter.instrument("process_batch.racecar", payload) do
-              processor.process_batch(batch)
+              process_and_respond(:process_batch, batch)
             end
           end
         else
@@ -123,6 +124,34 @@ module Racecar
       else
         @logger.info "Gracefully shutting down"
       end
+    end
+
+    def responders_from_subscriptions
+      config.subscriptions.each_with_object({}) do |subscription, hash|
+        next unless subscription.responds_with
+        hash[subscription.topic] = {
+          topic: subscription.responds_with,
+          partition_key: subscription.response_partition_key
+        }
+      end
+    end
+
+    def process_and_respond(process_method, message_or_batch)
+      responder = responders[message_or_batch.topic]
+      return processor.send(process_method, message_or_batch) unless responder
+
+      response = processor.send(process_method, message_or_batch)
+      return if response.nil?
+      partition_key = if responder[:partition_key].is_a?(Symbol)
+                        processor.send(responder[:partition_key])
+                      else
+                        responder[:partition_key]
+                      end
+      Racecar::Producer.produce(
+        responder[:topic],
+        response,
+        partition_key: partition_key
+      )
     end
   end
 end

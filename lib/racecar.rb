@@ -1,6 +1,7 @@
 require "logger"
-
+require "delivery_boy"
 require "racecar/consumer"
+require "racecar/producer"
 require "racecar/runner"
 require "racecar/config"
 
@@ -24,6 +25,8 @@ module Racecar
 
   def self.configure
     yield config
+    config.configure_delivery_boy!
+    config
   end
 
   def self.logger

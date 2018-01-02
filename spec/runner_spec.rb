@@ -19,6 +19,10 @@ class TestConsumer < Racecar::Consumer
 
     processor = @processor_queue.shift || proc {}
     processor.call(message)
+
+    @response_partition = 'foo_partition_key'
+
+    'message_processing_result' if message.value
   end
 
   def teardown
@@ -27,6 +31,18 @@ class TestConsumer < Racecar::Consumer
 
   def torn_down?
     @torn_down
+  end
+end
+
+class TestConsumerWithResponder < TestConsumer
+  subscribes_to 'greetings', responds_with: 'aloha', response_partition_key: 'response_partition'
+end
+
+class TestConsumerWithResponderPartition < TestConsumer
+  subscribes_to 'greetings', responds_with: 'aloha', response_partition_key: :response_partition
+
+  def response_partition
+    @response_partition
   end
 end
 
@@ -50,7 +66,13 @@ class TestBatchConsumer < Racecar::Consumer
       processor = @processor_queue.shift || proc {}
       processor.call(message)
     end
+
+    'batch_processing_result'
   end
+end
+
+class TestBatchConsumerWithResponder < TestBatchConsumer
+  subscribes_to 'greetings', responds_with: 'aloha', response_partition_key: 'response_partition'
 end
 
 class TestNilConsumer < Racecar::Consumer
@@ -92,6 +114,8 @@ class FakeConsumer
   end
 
   def stop; end
+
+  def subscribe(topic, options); end
 end
 
 class FakeKafka
@@ -134,7 +158,9 @@ describe Racecar::Runner do
   end
 
   before do
+    config.load_consumer_class(processor.class)
     allow(Kafka).to receive(:new) { kafka }
+    allow(DeliveryBoy).to receive(:deliver)
   end
 
   context "with a consumer class with a #process method" do
@@ -146,6 +172,7 @@ describe Racecar::Runner do
       runner.run
 
       expect(processor.messages.map(&:value)).to eq ["hello world"]
+      expect(DeliveryBoy).not_to have_received(:deliver)
     end
 
     it "sends instrumentation signals" do
@@ -162,6 +189,51 @@ describe Racecar::Runner do
       expect(instrumenter).to receive(:instrument).with("process_message.racecar", payload)
 
       runner.run
+    end
+
+    context "with a responder configured for the topic" do
+      let(:processor) { TestConsumerWithResponder.new }
+
+      it "processes messages with the specified consumer class" do
+        kafka.deliver_message("hello world", topic: "greetings")
+
+        runner.run
+
+        expect(processor.messages.map(&:value)).to eq ["hello world"]
+        expect(DeliveryBoy).to have_received(:deliver).with(
+          'message_processing_result',
+          topic: 'aloha',
+          partition_key: 'response_partition'
+        )
+      end
+
+      context '#process has nil return' do
+        it 'does not produce a response' do
+          kafka.deliver_message(nil, topic: "greetings")
+
+          runner.run
+
+          expect(processor.messages.map(&:value)).to eq [nil]
+          expect(DeliveryBoy).not_to have_received(:deliver)
+        end
+      end
+    end
+
+    context "with a responder configured for the topic and a partition key generation method" do
+      let(:processor) { TestConsumerWithResponderPartition.new }
+
+      it "processes messages with the specified consumer class" do
+        kafka.deliver_message("hello world", topic: "greetings")
+
+        runner.run
+
+        expect(processor.messages.map(&:value)).to eq ["hello world"]
+        expect(DeliveryBoy).to have_received(:deliver).with(
+          'message_processing_result',
+          topic: 'aloha',
+          partition_key: 'foo_partition_key'
+        )
+      end
     end
 
     context "when the processing code raises an exception" do
@@ -204,6 +276,7 @@ describe Racecar::Runner do
       runner.run
 
       expect(processor.messages.map(&:value)).to eq ["hello world"]
+      expect(DeliveryBoy).not_to have_received(:deliver)
     end
 
     it "sends instrumentation signals" do
@@ -220,6 +293,23 @@ describe Racecar::Runner do
       expect(instrumenter).to receive(:instrument).with("process_batch.racecar", payload)
 
       runner.run
+    end
+
+    context "with a responder configured for the topic" do
+      let(:processor) { TestBatchConsumerWithResponder.new }
+
+      it "processes messages with the specified consumer class" do
+        kafka.deliver_message("hello world", topic: "greetings")
+
+        runner.run
+
+        expect(processor.messages.map(&:value)).to eq ["hello world"]
+        expect(DeliveryBoy).to have_received(:deliver).with(
+          'batch_processing_result',
+          topic: 'aloha',
+          partition_key: 'response_partition'
+        )
+      end
     end
 
     context "when the processing code raises an exception" do
