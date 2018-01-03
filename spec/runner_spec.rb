@@ -1,6 +1,8 @@
 require "stringio"
 
 class TestConsumer < Racecar::Consumer
+  subscribes_to "greetings"
+
   attr_reader :messages
 
   def initialize
@@ -31,6 +33,8 @@ class TestConsumer < Racecar::Consumer
 end
 
 class TestBatchConsumer < Racecar::Consumer
+  subscribes_to "greetings"
+
   attr_reader :messages
 
   def initialize
@@ -53,16 +57,34 @@ class TestBatchConsumer < Racecar::Consumer
   end
 end
 
+class TestProducingConsumer < Racecar::Consumer
+  subscribes_to "numbers"
+
+  def process(message)
+    value = Integer(message.value) * 2
+
+    produce value, topic: "doubled"
+  end
+end
+
 class TestNilConsumer < Racecar::Consumer
+  subscribes_to "greetings"
 end
 
 class FakeConsumer
   def initialize(kafka)
     @kafka = kafka
+    @topics = []
+  end
+
+  def subscribe(topic, **)
+    @topics << topic
   end
 
   def each_message(*options, &block)
     @kafka.messages.each do |message|
+      next unless @topics.include?(message.topic)
+
       begin
         block.call(message)
       rescue StandardError => e
@@ -94,6 +116,23 @@ class FakeConsumer
   def stop; end
 end
 
+class FakeProducer
+  def initialize(kafka)
+    @kafka = kafka
+    @buffer = []
+  end
+
+  def produce(value, **options)
+    @buffer << [value, options]
+  end
+
+  def deliver_messages
+    @buffer.each do |value, **options|
+      @kafka.deliver_message(value.to_s, **options)
+    end
+  end
+end
+
 class FakeKafka
   attr_reader :messages, :paused_partitions
 
@@ -117,8 +156,16 @@ class FakeKafka
     )
   end
 
+  def messages_in(topic)
+    messages.select {|message| message.topic == topic }
+  end
+
   def consumer(*options)
     FakeConsumer.new(self)
+  end
+
+  def producer
+    FakeProducer.new(self)
   end
 end
 
@@ -129,12 +176,15 @@ describe Racecar::Runner do
   let(:logger) { Logger.new(StringIO.new) }
   let(:kafka) { FakeKafka.new }
   let(:instrumenter) { FakeInstrumenter }
+
   let(:runner) do
     Racecar::Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter)
   end
 
   before do
     allow(Kafka).to receive(:new) { kafka }
+
+    config.load_consumer_class(processor.class)
   end
 
   context "with a consumer class with a #process method" do
@@ -260,6 +310,18 @@ describe Racecar::Runner do
       kafka.deliver_message("hello world", topic: "greetings")
 
       expect { runner.run }.to raise_error(NotImplementedError)
+    end
+  end
+
+  context "with a consumer that produces messages" do
+    let(:processor) { TestProducingConsumer.new }
+
+    it "delivers the messages to Kafka" do
+      kafka.deliver_message("2", topic: "numbers")
+
+      runner.run
+
+      expect(kafka.messages_in("doubled").map(&:value)).to eq ["4"]
     end
   end
 

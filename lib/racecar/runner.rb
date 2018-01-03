@@ -53,6 +53,10 @@ module Racecar
         )
       end
 
+      # Configure the consumer with a producer so it can produce messages.
+      producer = kafka.producer
+      processor.configure(producer: producer)
+
       begin
         if processor.respond_to?(:process)
           consumer.each_message(max_wait_time: config.max_wait_time) do |message|
@@ -69,6 +73,7 @@ module Racecar
 
             @instrumenter.instrument("process_message.racecar", payload) do
               processor.process(message)
+              producer.deliver_messages
             end
           end
         elsif processor.respond_to?(:process_batch)
@@ -87,6 +92,7 @@ module Racecar
 
             @instrumenter.instrument("process_batch.racecar", payload) do
               processor.process_batch(batch)
+              producer.deliver_messages
             end
           end
         else
