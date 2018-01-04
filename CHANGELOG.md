@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## racecar v0.3.6
+
+* Allow producing messages (alpha).
+
 ## racecar v0.3.5
 
 * Instrument using ActiveSupport::Notifications (#43).
