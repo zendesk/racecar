@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## racecar v0.3.7
+
+* Allow setting the key and/or partition key when producing messages.
+
 ## racecar v0.3.6
 
 * Allow producing messages (alpha).
