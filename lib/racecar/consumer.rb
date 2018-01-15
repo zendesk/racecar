@@ -31,8 +31,8 @@ module Racecar
 
     protected
 
-    def produce(value, topic:)
-      @_producer.produce(value, topic: topic)
+    def produce(value, **options)
+      @_producer.produce(value, **options)
     end
   end
 end
