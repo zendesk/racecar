@@ -134,6 +134,8 @@ class FakeProducer
 end
 
 class FakeKafka
+  FakeMessage = Struct.new(:value, :key, :topic, :partition, :offset)
+
   attr_reader :messages, :paused_partitions
 
   def initialize(*options)
@@ -147,13 +149,7 @@ class FakeKafka
   end
 
   def deliver_message(value, topic:)
-    @messages << Kafka::FetchedMessage.new(
-      value: value,
-      topic: topic,
-      key: nil,
-      partition: 0,
-      offset: 0,
-    )
+    @messages << FakeMessage.new(value, nil, topic, 0, 0)
   end
 
   def messages_in(topic)
