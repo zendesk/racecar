@@ -19,6 +19,9 @@ module Racecar
     desc "How often to send a heartbeat message to Kafka"
     float :heartbeat_interval, default: 10
 
+    desc "How long committed offsets will be retained."
+    integer :offset_retention_time
+
     desc "How long to pause a partition for if the consumer raises an exception while processing a message"
     float :pause_timeout, default: 10
 
@@ -139,6 +142,7 @@ module Racecar
 
       self.subscriptions = consumer_class.subscriptions
       self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time
+      self.offset_retention_time = consumer_class.offset_retention_time || self.offset_retention_time
       self.pidfile ||= "#{group_id}.pid"
     end
 
