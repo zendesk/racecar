@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Change the default `max_wait_time` to 1 second.
+
 ## racecar v0.3.7
 
 * Allow setting the key and/or partition key when producing messages.
