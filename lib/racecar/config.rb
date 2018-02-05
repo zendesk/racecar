@@ -32,7 +32,7 @@ module Racecar
     float :socket_timeout, default: 30
 
     desc "How long to allow the Kafka brokers to wait before returning messages"
-    float :max_wait_time, default: 5
+    float :max_wait_time, default: 1
 
     desc "A prefix used when generating consumer group names"
     string :group_id_prefix

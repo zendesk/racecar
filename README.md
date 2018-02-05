@@ -241,7 +241,7 @@ All timeouts are defined in number of seconds.
 * `pause_timeout` – How long to pause a partition for if the consumer raises an exception while processing a message. Default is to pause for 10 seconds. Set this to zero in order to disable automatic pausing of partitions.
 * `connect_timeout` – How long to wait when trying to connect to a Kafka broker. Default is 10 seconds.
 * `socket_timeout` – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
-* `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 5 seconds.
+* `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 1 second.
 
 #### SSL encryption, authentication & authorization
 
