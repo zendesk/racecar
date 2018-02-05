@@ -57,7 +57,7 @@ In Kafka, _consumer groups_ are sets of processes that collaboratively process m
 
 ### Creating consumers
 
-A Racecar consumer is a simple Rails class that inherits from `Racecar::Consumer`:
+A Racecar consumer is a simple Ruby class that inherits from `Racecar::Consumer`:
 
 ```ruby
 class UserBanConsumer < Racecar::Consumer
