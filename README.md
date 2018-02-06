@@ -231,6 +231,7 @@ The consumers will checkpoint their positions from time to time in order to be a
 
 * `offset_commit_interval` – How often to save the consumer's position in Kafka. Default is every 10 seconds.
 * `offset_commit_threshold` – How many messages to process before forcing a checkpoint. Default is 0, which means there's no limit. Setting this to e.g. 100 makes the consumer stop every 100 messages to checkpoint its position.
+* `offset_retention_time` - How long committed offsets will be retained. Defaults to the broker setting.
 
 #### Timeouts & intervals
 

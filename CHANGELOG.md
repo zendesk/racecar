@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Change the default `max_wait_time` to 1 second.
+* Allow setting the `offset_retention_time` for consumers.
 
 ## racecar v0.3.7
 

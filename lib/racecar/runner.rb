@@ -35,6 +35,7 @@ module Racecar
         offset_commit_threshold: config.offset_commit_threshold,
         session_timeout: config.session_timeout,
         heartbeat_interval: config.heartbeat_interval,
+        offset_retention_time: config.offset_retention_time,
       )
 
       # Stop the consumer on SIGINT, SIGQUIT or SIGTERM.

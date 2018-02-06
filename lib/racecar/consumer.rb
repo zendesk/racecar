@@ -5,6 +5,7 @@ module Racecar
     class << self
       attr_accessor :max_wait_time
       attr_accessor :group_id
+      attr_accessor :offset_retention_time
 
       def subscriptions
         @subscriptions ||= []

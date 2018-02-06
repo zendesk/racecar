@@ -61,6 +61,14 @@ describe Racecar::Config do
       expect(config.group_id).to eq "my-app.do-stuff-consumer"
     end
 
+    it "sets the offset_retention_time if one has been explicitly defined" do
+      consumer_class.offset_retention_time = 86400
+
+      config.load_consumer_class(consumer_class)
+
+      expect(config.offset_retention_time).to eq 86400
+    end
+
     it "sets the subscriptions to the ones defined on the consumer class" do
       consumer_class.subscriptions = ["one", "two"]
 
@@ -72,13 +80,16 @@ describe Racecar::Config do
     it "doesn't override existing values if the consumer hasn't specified anything" do
       consumer_class.max_wait_time = nil
       consumer_class.group_id = nil
+      consumer_class.offset_retention_time = nil
 
       config.max_wait_time = 10
       config.group_id = "cats"
+      config.offset_retention_time = 43200
       config.load_consumer_class(consumer_class)
 
       expect(config.max_wait_time).to eq 10
       expect(config.group_id).to eq "cats"
+      expect(config.offset_retention_time).to eq 43200
     end
   end
 
