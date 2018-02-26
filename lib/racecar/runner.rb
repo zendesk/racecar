@@ -108,6 +108,11 @@ module Racecar
           # left off.
           @logger.warn "Pausing partition #{e.topic}/#{e.partition} for #{config.pause_timeout} seconds"
           consumer.pause(e.topic, e.partition, timeout: config.pause_timeout)
+        elsif config.pause_timeout == -1
+          # A pause timeout of -1 means indefinite pausing, which in ruby-kafka is done by passing nil as
+          # the timeout.
+          @logger.warn "Pausing partition #{e.topic}/#{e.partition} indefinitely, or until the process is restarted"
+          consumer.pause(e.topic, e.partition, timeout: nil)
         end
 
         config.error_handler.call(e.cause, {

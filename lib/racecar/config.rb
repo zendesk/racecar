@@ -22,7 +22,7 @@ module Racecar
     desc "How long committed offsets will be retained."
     integer :offset_retention_time
 
-    desc "How long to pause a partition for if the consumer raises an exception while processing a message"
+    desc "How long to pause a partition for if the consumer raises an exception while processing a message -- set to -1 to pause indefinitely"
     float :pause_timeout, default: 10
 
     desc "The idle timeout after which a consumer is kicked out of the group"
