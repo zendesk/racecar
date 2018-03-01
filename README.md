@@ -266,6 +266,16 @@ If using PLAIN:
 * `sasl_plain_username` – The username used to authenticate.
 * `sasl_plain_password` – The password used to authenticate.
 
+#### Datadog monitoring
+
+Racecar supports configuring ruby-kafka's [Datadog](https://www.datadoghq.com/) monitoring integration. If you're running a normal Datadog agent on your host, you just need to set `datadog_enabled` to `true`, as the rest of the settings come with sane defaults.
+
+* `datadog_enabled` – Whether Datadog monitoring is enabled (defaults to `false`).
+* `datadog_host` – The host running the Datadog agent.
+* `datadog_port` – The port of the Datadog agent.
+* `datadog_namespace` – The namespace to use for Datadog metrics.
+* `datadog_tags` – Tags that should always be set on Datadog metrics.
+
 
 ### Testing consumers
 
