@@ -76,6 +76,15 @@ module Racecar
     desc "The password used to authenticate"
     string :sasl_plain_password
 
+    desc "The username used to authenticate"
+    string :sasl_scram_username
+
+    desc "The password used to authenticate"
+    string :sasl_scram_password
+
+    desc "The SCRAM mechanism to use, either `sha256` or `sha512`"
+    string :sasl_scram_mechanism
+
     desc "The file in which to store the Racecar process' PID when daemonized"
     string :pidfile
 
