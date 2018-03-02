@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Require Kafka 0.10 or higher.
+
 ## racecar v0.3.8
 
 * Change the default `max_wait_time` to 1 second.
