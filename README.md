@@ -268,6 +268,12 @@ If using PLAIN:
 * `sasl_plain_username` – The username used to authenticate.
 * `sasl_plain_password` – The password used to authenticate.
 
+If using SCRAM:
+
+* `sasl_scram_username` – The username used to authenticate.
+* `sasl_scram_password` – The password used to authenticate.
+* `sasl_scram_mechanism` – The SCRAM mechanism to use, either `sha256` or `sha512`.
+
 #### Datadog monitoring
 
 Racecar supports configuring ruby-kafka's [Datadog](https://www.datadoghq.com/) monitoring integration. If you're running a normal Datadog agent on your host, you just need to set `datadog_enabled` to `true`, as the rest of the settings come with sane defaults.
