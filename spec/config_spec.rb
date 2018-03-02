@@ -8,6 +8,17 @@ describe Racecar::Config do
     expect(config.offset_commit_interval).to eq 10
   end
 
+  it "requires `sasl_scram_mechanism` to be a valid mechanism" do
+    expect {
+      config.sasl_scram_mechanism = "sha256"
+      config.sasl_scram_mechanism = "sha512"
+    }.not_to raise_exception
+
+    expect {
+      config.sasl_scram_mechanism = "banana"
+    }.to raise_exception(KingKonf::ConfigError)
+  end
+
   describe "#load_env" do
     it "sets the brokers from RACECAR_BROKERS" do
       ENV["RACECAR_BROKERS"] = "hansel,gretel"

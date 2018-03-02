@@ -83,7 +83,7 @@ module Racecar
     string :sasl_scram_password
 
     desc "The SCRAM mechanism to use, either `sha256` or `sha512`"
-    string :sasl_scram_mechanism
+    string :sasl_scram_mechanism, allowed_values: ["sha256", "sha512"]
 
     desc "The file in which to store the Racecar process' PID when daemonized"
     string :pidfile
