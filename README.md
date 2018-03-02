@@ -4,6 +4,8 @@ Racecar is a friendly and easy-to-approach Kafka consumer framework. It allows y
 
 The framework is based on [ruby-kafka](https://github.com/zendesk/ruby-kafka), which, when used directly, can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though. Racecar provides a simple and intuitive way to build and configure Kafka consumers.
 
+**NOTE:** Racecar requires Kafka 0.10 or higher.
+
 ## Table of content
 
 1. [Installation](#installation)
