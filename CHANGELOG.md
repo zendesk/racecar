@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Require Kafka 0.10 or higher.
+* Support configuring SASL SCRAM authentication (#65).
 
 ## racecar v0.3.8
 
