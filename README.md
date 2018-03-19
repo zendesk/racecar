@@ -322,6 +322,8 @@ end
 
 ### Deploying consumers
 
+#### Process supervisors
+
 If you're already deploying your Rails application using e.g. [Capistrano](http://capistranorb.com/), all you need to do to run your Racecar consumers in production is to have some _process supervisor_ start the processes and manage them for you.
 
 [Foreman](https://ddollar.github.io/foreman/) is a very straightford tool for interfacing with several process supervisor systems. You define your process types in a Procfile, e.g.
@@ -334,6 +336,41 @@ racecar-resize-images: bundle exec racecar ResizeImagesConsumer
 If you've ever used Heroku you'll recognize the format – indeed, deploying to Heroku should just work if you add Racecar invocations to your Procfile.
 
 With Foreman, you can easily run these processes locally by executing `foreman run`; in production you'll want to _export_ to another process management format such as Upstart or Runit. [capistrano-foreman](https://github.com/hyperoslo/capistrano-foreman) allows you to do this with Capistrano.
+
+
+#### Kubernetes
+
+If you're deploying your applications to [Kubernetes], you need to take care to configure Racecar deployments such that application upgrades do not cause instability. Kafka consumer groups take time to stabilize after a member is added or removed, so it is best to upgrade from one version to another by first stopping all Kubernetes pods running the old version, then spinning up new pods.
+
+Here's an example of a Deployment configuration of a Racecar consumer:
+
+```yml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: create-contacts-deployment
+  labels:
+    app: create-contacts
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: create-contacts
+  template:
+    metadata:
+      labels:
+        app: create-contacts
+    spec:
+      containers:
+      - image: create-contacts:v5
+        name: consumer
+        env:
+          - name: RACECAR_BROKERS
+            value: kafka1,kafka2,kafka3
+```
+
+This Deployment will manage 3 Racecar consumer processes running inside Docker containers.
 
 
 #### Running consumers in the background
