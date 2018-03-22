@@ -74,10 +74,6 @@ module Racecar
               offset: message.offset,
             }
 
-            # Allow subscribers to receive a notification *before* we process the
-            # message.
-            @instrumenter.instrument("start_process_message.racecar", payload)
-
             @instrumenter.instrument("process_message.racecar", payload) do
               processor.process(message)
               producer.deliver_messages
@@ -92,10 +88,6 @@ module Racecar
               first_offset: batch.first_offset,
               message_count: batch.messages.count,
             }
-
-            # Allow subscribers to receive a notification *before* we process the
-            # message.
-            @instrumenter.instrument("start_process_batch.racecar", payload)
 
             @instrumenter.instrument("process_batch.racecar", payload) do
               processor.process_batch(batch)
