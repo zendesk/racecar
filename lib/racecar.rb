@@ -27,11 +27,11 @@ module Racecar
   end
 
   def self.logger
-    @logger ||= Logger.new(STDOUT)
+    config.logger
   end
 
   def self.logger=(logger)
-    @logger = logger
+    config.logger = logger
   end
 
   def self.instrumenter

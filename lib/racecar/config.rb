@@ -109,12 +109,13 @@ module Racecar
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
-    attr_accessor :subscriptions
+    attr_accessor :subscriptions, :logger
 
     def initialize(env: ENV)
       super(env: env)
       @error_handler = proc {}
       @subscriptions = []
+      @logger = Logger.new(STDOUT)
     end
 
     def inspect
