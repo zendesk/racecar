@@ -33,9 +33,9 @@ describe Racecar::Config do
     end
 
     it "sets the offset commit interval from RACECAR_OFFSET_COMMIT_INTERVAL" do
-      ENV["RACECAR_OFFSET_COMMIT_INTERVAL"] = "45"
+      ENV["RACECAR_OFFSET_COMMIT_INTERVAL"] = "0.1"
 
-      expect(config.offset_commit_interval).to eq 45
+      expect(config.offset_commit_interval).to eq 0.1
     end
 
     it "sets the offset commit threshold from RACECAR_OFFSET_COMMIT_THRESHOLD" do
@@ -45,7 +45,7 @@ describe Racecar::Config do
     end
 
     it "sets the heartbeat interval from RACECAR_HEARTBEAT_INTERVAL" do
-      ENV["RACECAR_HEARTBEAT_INTERVAL"] = "45"
+      ENV["RACECAR_HEARTBEAT_INTERVAL"] = "45s"
 
       expect(config.heartbeat_interval).to eq 45
     end

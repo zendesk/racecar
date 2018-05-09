@@ -11,31 +11,31 @@ module Racecar
     string :client_id, default: "racecar"
 
     desc "How frequently to commit offset positions"
-    float :offset_commit_interval, default: 10
+    duration :offset_commit_interval, default: 10
 
     desc "How many messages to process before forcing a checkpoint"
     integer :offset_commit_threshold, default: 0
 
     desc "How often to send a heartbeat message to Kafka"
-    float :heartbeat_interval, default: 10
+    duration :heartbeat_interval, default: "10s"
 
     desc "How long committed offsets will be retained."
-    integer :offset_retention_time
+    duration :offset_retention_time
 
     desc "How long to pause a partition for if the consumer raises an exception while processing a message -- set to -1 to pause indefinitely"
-    float :pause_timeout, default: 10
+    duration :pause_timeout, default: "10s"
 
     desc "The idle timeout after which a consumer is kicked out of the group"
-    float :session_timeout, default: 30
+    duration :session_timeout, default: "30s"
 
     desc "How long to wait when trying to connect to a Kafka broker"
-    float :connect_timeout, default: 10
+    duration :connect_timeout, default: "10s"
 
     desc "How long to wait when trying to communicate with a Kafka broker"
-    float :socket_timeout, default: 30
+    duration :socket_timeout, default: "30s"
 
     desc "How long to allow the Kafka brokers to wait before returning messages"
-    float :max_wait_time, default: 1
+    duration :max_wait_time, default: "1s"
 
     desc "A prefix used when generating consumer group names"
     string :group_id_prefix
