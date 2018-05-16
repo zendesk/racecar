@@ -32,6 +32,12 @@ describe Racecar::Config do
       expect(config.client_id).to eq "witch"
     end
 
+    it "sets the pause timeout from RACECAR_PAUSE_TIMEOUT" do
+      ENV["RACECAR_PAUSE_TIMEOUT"] = "-1"
+
+      expect(config.offset_commit_interval).to eq -1
+    end
+
     it "sets the offset commit interval from RACECAR_OFFSET_COMMIT_INTERVAL" do
       ENV["RACECAR_OFFSET_COMMIT_INTERVAL"] = "0.1"
 
