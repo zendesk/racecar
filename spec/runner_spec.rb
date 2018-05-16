@@ -204,7 +204,6 @@ describe Racecar::Runner do
         topic: "greetings"
       )
 
-      expect(instrumenter).to receive(:instrument).with("start_process_message.racecar", payload)
       expect(instrumenter).to receive(:instrument).with("process_message.racecar", payload)
 
       runner.run
@@ -262,7 +261,6 @@ describe Racecar::Runner do
         topic: "greetings"
       )
 
-      expect(instrumenter).to receive(:instrument).with("start_process_batch.racecar", payload)
       expect(instrumenter).to receive(:instrument).with("process_batch.racecar", payload)
 
       runner.run
