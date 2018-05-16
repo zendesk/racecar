@@ -58,7 +58,10 @@ module Racecar
       end
 
       # Configure the consumer with a producer so it can produce messages.
-      producer = kafka.producer
+      producer = kafka.producer(
+        compression_codec: config.producer_compression_codec,
+      )
+
       processor.configure(producer: producer)
 
       begin

@@ -160,7 +160,7 @@ class FakeKafka
     FakeConsumer.new(self)
   end
 
-  def producer
+  def producer(*)
     FakeProducer.new(self)
   end
 end
