@@ -91,6 +91,9 @@ module Racecar
     desc "Run the Racecar process in the background as a daemon"
     boolean :daemonize, default: false
 
+    desc "The codec used to compress messages with"
+    symbol :producer_compression_codec
+
     desc "Enable Datadog metrics"
     boolean :datadog_enabled, default: false
 
