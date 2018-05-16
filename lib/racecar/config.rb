@@ -25,6 +25,12 @@ module Racecar
     desc "How long to pause a partition for if the consumer raises an exception while processing a message -- set to -1 to pause indefinitely"
     float :pause_timeout, default: 10
 
+    desc "When `pause_timeout` and `pause_with_exponential_backoff` are configured, this sets an upper limit on the pause duration"
+    float :max_pause_timeout, default: nil
+
+    desc "Whether to exponentially increase the pause timeout on successive errors -- the timeout is doubled each time"
+    boolean :pause_with_exponential_backoff, default: false
+
     desc "The idle timeout after which a consumer is kicked out of the group"
     float :session_timeout, default: 30
 

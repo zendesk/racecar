@@ -113,7 +113,13 @@ module Racecar
           # The partition is automatically resumed after the specified timeout, and will continue where we
           # left off.
           @logger.warn "Pausing partition #{e.topic}/#{e.partition} for #{config.pause_timeout} seconds"
-          consumer.pause(e.topic, e.partition, timeout: config.pause_timeout)
+          consumer.pause(
+            e.topic,
+            e.partition,
+            timeout: config.pause_timeout,
+            max_timeout: config.max_pause_timeout,
+            exponential_backoff: config.pause_with_exponential_backoff?,
+          )
         elsif config.pause_timeout == -1
           # A pause timeout of -1 means indefinite pausing, which in ruby-kafka is done by passing nil as
           # the timeout.
