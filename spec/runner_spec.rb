@@ -108,7 +108,7 @@ class FakeConsumer
     end
   end
 
-  def pause(topic, partition, timeout:)
+  def pause(topic, partition, timeout:, max_timeout: nil, exponential_backoff: false)
     @kafka.paused_partitions[topic] ||= {}
     @kafka.paused_partitions[topic][partition] = true
   end
