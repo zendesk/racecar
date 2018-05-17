@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## racecar v0.4.1
+
+* Allow configuring the producer (#77).
+* Add support for configuring exponential pause backoff (#76).
+
 ## racecar v0.4.0
 
 * Require Kafka 0.10 or higher.
