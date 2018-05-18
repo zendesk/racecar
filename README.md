@@ -274,6 +274,12 @@ If using SCRAM:
 * `sasl_scram_password` – The password used to authenticate.
 * `sasl_scram_mechanism` – The SCRAM mechanism to use, either `sha256` or `sha512`.
 
+#### Producing messages
+
+These settings are related to consumers that _produce messages to Kafka_.
+
+* `producer_compression_codec` – If defined, Racecar will compress messages before writing them to Kafka. The codec needs to be one of `gzip`, `lz4`, or `snappy`, either as a Symbol or a String.
+
 #### Datadog monitoring
 
 Racecar supports configuring ruby-kafka's [Datadog](https://www.datadoghq.com/) monitoring integration. If you're running a normal Datadog agent on your host, you just need to set `datadog_enabled` to `true`, as the rest of the settings come with sane defaults.
