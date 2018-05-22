@@ -30,6 +30,7 @@ module Racecar
         sasl_scram_username: config.sasl_scram_username,
         sasl_scram_password: config.sasl_scram_password,
         sasl_scram_mechanism: config.sasl_scram_mechanism,
+        ssl_ca_certs_from_system: config.ssl_ca_certs_from_system
       )
 
       @consumer = kafka.consumer(
