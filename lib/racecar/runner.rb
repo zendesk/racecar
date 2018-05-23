@@ -10,15 +10,11 @@ module Racecar
     end
 
     def stop
-      procline! "stopping"
-
       processor.teardown
       consumer.stop unless consumer.nil?
     end
 
     def run
-      procline! "starting"
-
       kafka = Kafka.new(
         client_id: config.client_id,
         seed_brokers: config.brokers,
@@ -70,8 +66,6 @@ module Racecar
       processor.configure(producer: producer)
 
       begin
-        procline! "processing"
-
         if processor.respond_to?(:process)
           consumer.each_message(max_wait_time: config.max_wait_time) do |message|
             payload = {
@@ -144,16 +138,8 @@ module Racecar
 
         raise
       else
-        procline! "graceful-shutdown"
-
         @logger.info "Gracefully shutting down"
       end
-    end
-
-    private
-
-    def procline!(status)
-      $0 = "racecar #{processor.class} (#{status})"
     end
   end
 end
