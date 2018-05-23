@@ -3,6 +3,7 @@ require "logger"
 require "fileutils"
 require "racecar/rails_config_file_loader"
 require "racecar/daemon"
+require "racecar/procline_subscriber"
 
 module Racecar
   class Cli
@@ -22,6 +23,8 @@ module Racecar
 
     def run
       $stderr.puts "=> Starting Racecar consumer #{consumer_name}..."
+
+      ProclineSubscriber.setup!
 
       RailsConfigFileLoader.load!
 
