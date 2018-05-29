@@ -137,6 +137,15 @@ describe Racecar::Config do
         config.validate!
       }.to raise_exception(Racecar::ConfigError, "`connect_timeout` must be longer than `max_wait_time`")
     end
+
+    it "raises an exception if max_pause_timeout is set but pause_with_exponential_backoff is disabled" do
+      config.max_pause_timeout = 30
+      config.pause_with_exponential_backoff = false
+
+      expect {
+        config.validate!
+      }.to raise_exception(Racecar::ConfigError, "`max_pause_timeout` only makes sense when `pause_with_exponential_backoff` is enabled")
+    end
   end
 
   describe "#inspect" do
