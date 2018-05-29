@@ -149,6 +149,10 @@ module Racecar
       if connect_timeout <= max_wait_time
         raise ConfigError, "`connect_timeout` must be longer than `max_wait_time`"
       end
+
+      if max_pause_timeout && !pause_with_exponential_backoff?
+        raise ConfigError, "`max_pause_timeout` only makes sense when `pause_with_exponential_backoff` is enabled"
+      end
     end
 
     def load_consumer_class(consumer_class)
