@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## racecar v0.4.2
+
+* Allow configuring `max_bytes` and `max_fetch_queue_size`.
+
 ## racecar v0.4.1
 
 * Allow configuring the producer (#77).
