@@ -30,7 +30,7 @@ module Racecar
         sasl_scram_username: config.sasl_scram_username,
         sasl_scram_password: config.sasl_scram_password,
         sasl_scram_mechanism: config.sasl_scram_mechanism,
-        ssl_ca_certs_from_system: config.ssl_ca_certs_from_system
+        ssl_ca_certs_from_system: config.ssl_ca_certs_from_system,
       )
 
       @consumer = kafka.consumer(
@@ -40,6 +40,7 @@ module Racecar
         session_timeout: config.session_timeout,
         heartbeat_interval: config.heartbeat_interval,
         offset_retention_time: config.offset_retention_time,
+        fetcher_max_queue_size: config.max_fetch_queue_size,
       )
 
       # Stop the consumer on SIGINT, SIGQUIT or SIGTERM.

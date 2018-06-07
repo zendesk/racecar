@@ -22,6 +22,9 @@ module Racecar
     desc "How long committed offsets will be retained."
     integer :offset_retention_time
 
+    desc "The maximum number of fetch responses to keep queued before processing"
+    integer :max_fetch_queue_size, default: 10
+
     desc "How long to pause a partition for if the consumer raises an exception while processing a message -- set to -1 to pause indefinitely"
     float :pause_timeout, default: 10
 
