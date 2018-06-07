@@ -246,6 +246,17 @@ All timeouts are defined in number of seconds.
 * `socket_timeout` – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
 * `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 1 second.
 
+#### Memory & network usage
+
+Kafka is _really_ good at throwing data at consumers, so you may want to tune these variables in order to avoid ballooning your process' memory or saturating your network capacity.
+
+Racecar uses ruby-kafka under the hood, which fetches messages from the Kafka brokers in a background thread. This thread pushes fetch responses, possible containing messages from many partitions, into a queue that is read by the processing thread (AKA your code). The main way to control the fetcher thread is to control the size of those responses and the size of the queue.
+
+* `max_bytes` — The maximum size of message sets returned from a single fetch request.
+* `max_fetch_queue_size` — The maximum number of fetch responses to keep in the queue.
+
+The memory usage limit is roughly estimated as `max_bytes * max_fetch_queue_size`, plus whatever your application uses.
+
 #### SSL encryption, authentication & authorization
 
 * `ssl_ca_cert` – A valid SSL certificate authority, as a string.
