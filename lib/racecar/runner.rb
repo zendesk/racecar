@@ -67,7 +67,7 @@ module Racecar
 
       begin
         if processor.respond_to?(:process)
-          consumer.each_message(max_wait_time: config.max_wait_time) do |message|
+          consumer.each_message(max_wait_time: config.max_wait_time, max_bytes: config.max_bytes) do |message|
             payload = {
               consumer_class: processor.class.to_s,
               topic: message.topic,
@@ -81,7 +81,7 @@ module Racecar
             end
           end
         elsif processor.respond_to?(:process_batch)
-          consumer.each_batch(max_wait_time: config.max_wait_time) do |batch|
+          consumer.each_batch(max_wait_time: config.max_wait_time, max_bytes: config.max_bytes) do |batch|
             payload = {
               consumer_class: processor.class.to_s,
               topic: batch.topic,
