@@ -253,7 +253,7 @@ Kafka is _really_ good at throwing data at consumers, so you may want to tune th
 Racecar uses ruby-kafka under the hood, which fetches messages from the Kafka brokers in a background thread. This thread pushes fetch responses, possible containing messages from many partitions, into a queue that is read by the processing thread (AKA your code). The main way to control the fetcher thread is to control the size of those responses and the size of the queue.
 
 * `max_bytes` — The maximum size of message sets returned from a single fetch request.
-* `max_fetch_queue_size` — The maximum number of fetch responses to keep in the queue.
+* `max_fetch_queue_size` — The maximum number of fetch responses to keep in the queue. Once reached, the fetcher will back off until the queue gets back down under to limit.
 
 The memory usage limit is roughly estimated as `max_bytes * max_fetch_queue_size`, plus whatever your application uses.
 
