@@ -372,7 +372,7 @@ Again, the recommended approach is to manage the processes using process manager
 
 ### Handling errors
 
-When processing messages from a Kafka topic, your code may encounter an error and raise an exception. The cause is typically on of two things:
+When processing messages from a Kafka topic, your code may encounter an error and raise an exception. The cause is typically one of two things:
 
 1. The message being processed is somehow malformed or doesn't conform with the assumptions made by the processing code.
 2. You're using some external resource such as a database or a network API that is temporarily unavailable.
