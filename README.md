@@ -229,8 +229,8 @@ end
 
 #### Logging
 
-* `logfile` – A filename that log messages should be written to.
-* `log_level` – The log level for the Racecar logs, one of `debug`, `info`, `warn`, or `error`.
+* `logfile` – A filename that log messages should be written to. Default is `nil`, which means logs will be written to standard output.
+* `log_level` – The log level for the Racecar logs, one of `debug`, `info`, `warn`, or `error`. Default is `info`.
 
 #### Consumer checkpointing
 
