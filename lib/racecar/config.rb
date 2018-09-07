@@ -59,7 +59,7 @@ module Racecar
     string :logfile
 
     desc "The log level for the Racecar logs"
-    string :log_level
+    string :log_level, default: "info"
 
     desc "A valid SSL certificate authority"
     string :ssl_ca_cert
