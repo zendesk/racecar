@@ -162,6 +162,8 @@ module Racecar
     end
 
     def load_consumer_class(consumer_class)
+      self.brokers = consumer_class.brokers || self.brokers
+
       self.group_id = consumer_class.group_id || self.group_id
 
       self.group_id ||= [
