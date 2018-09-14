@@ -56,6 +56,14 @@ describe Racecar::Config do
       OpenStruct.new(group_id: nil, name: "DoStuffConsumer", subscriptions: [])
     }
 
+    it "sets the brokers if they have been explicitly defined" do
+      consumer_class.brokers = ["broker1", "broker2"]
+
+      config.load_consumer_class(consumer_class)
+
+      expect(config.brokers).to match_array ["broker1", "broker2"]
+    end
+
     it "sets the group id if one has been explicitly defined" do
       consumer_class.group_id = "fiddle"
 

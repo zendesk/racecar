@@ -6,6 +6,7 @@ module Racecar
       attr_accessor :max_wait_time
       attr_accessor :group_id
       attr_accessor :offset_retention_time
+      attr_accessor :brokers
 
       def subscriptions
         @subscriptions ||= []
