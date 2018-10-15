@@ -4,6 +4,10 @@ module Racecar
       @config, @logger = config, logger
       @consumers = []
       @consumer_iterator = [].cycle
+
+      # for batch support
+      @messages = []
+      @last_batch = Time.now
     end
 
     def subscribe
@@ -32,11 +36,25 @@ module Racecar
       raise if e.message != "Broker: No more messages (partition_eof)"
       @logger.debug "No more messages on this partition."
       @consumer_iterator.next
+      nil
+    end
+
+    def batch_poll(timeout_ms)
+      @messages = []
+      @messages << current.poll(timeout_ms) while collect_messages_for_batch?
+      @last_batch = Time.now
+      @messages.compact
+    rescue Rdkafka::RdkafkaError => e
+      raise if e.message != "Broker: No more messages (partition_eof)"
+      @logger.debug "No more messages on this partition."
+      @consumer_iterator.next
+      @last_batch = Time.now
+      @messages.compact
     end
 
     def commit
       each do |consumer|
-        consumer.commit
+        consumer.commit(nil, !@config.synchonous_commits)
       rescue Rdkafka::RdkafkaError => e
         raise e if e.message != "Local: No offset stored (no_offset)"
         @logger.debug "Nothing to commit."
@@ -53,6 +71,13 @@ module Racecar
 
     def each
       @consumers.each
+    end
+
+    private
+
+    def collect_messages_for_batch?
+      @messages.size < @config.fetch_messages &&
+      (Time.now - @last_batch) < @config.fetch_wait_max
     end
   end
 end

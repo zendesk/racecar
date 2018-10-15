@@ -14,6 +14,15 @@ module Racecar
     def run
       install_signal_handlers
 
+      # When being in batch mode it might happen, that we send a commit before
+      # returning the consumer.batch_poll method. To circumvent this we don't
+      # autocommit but call commit after the whole batch was fetched. Because
+      # synchronous commits are disabled by default there should almost be no
+      # difference in performace.
+      if processor.respond_to?(:process_batch)
+        config.consumer << "enable.auto.commit=false"
+      end
+
       consumer = ConsumerSet.new(config, logger)
       consumer.subscribe
 
@@ -27,9 +36,18 @@ module Racecar
       # Main loop
       loop do
         break if @stop_requested
-        if message = consumer.poll(250)
-          # TODO: process_batch
-          process(message)
+        if processor.respond_to?(:process_batch)
+          messages = consumer.batch_poll(250)
+          if !messages.empty?
+            process_batch(messages)
+            consumer.commit # See above. Needed because auto commit is disabled
+          end
+        elsif processor.respond_to?(:process)
+          if message = consumer.poll(250)
+            process(message)
+          end
+        else
+          raise NotImplementedError, "Consumer class must implement process or process_batch method"
         end
       # TODO: pause handling
       end
@@ -71,6 +89,21 @@ module Racecar
 
       @instrumenter.instrument("process_message.racecar", payload) do
         processor.process(message)
+        processor.deliver!
+      end
+    end
+
+    def process_batch(messages)
+      payload = {
+        consumer_class: processor.class.to_s,
+        topic: messages.first.topic,
+        partition: messages.first.partition,
+        first_offset: messages.first.offset,
+        message_count: messages.size,
+      }
+
+      @instrumenter.instrument("process_batch.racecar", payload) do
+        processor.process_batch(messages)
         processor.deliver!
       end
     end

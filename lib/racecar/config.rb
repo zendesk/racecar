@@ -22,6 +22,18 @@ module Racecar
     desc "Kafka producer configuration options, separated with '=' -- https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md"
     list :producer, default: []
 
+    # TODO: not needed once there is batch support in rdkafka-ruby
+    desc "Maximum time the broker may wait to fill the response with fetch_messages"
+    float :fetch_wait_max, default: 0.33
+
+    # TODO: not needed once there is batch support in rdkafka-ruby
+    desc "Maxium number of messages that get consumed within one batch"
+    integer :fetch_messages, default: 1000
+
+    # TODO: not needed once there is batch support in rdkafka-ruby
+    desc "Automatically store offset of last message provided to application"
+    boolean :synchonous_commits, default: false
+
     desc "How long to pause a partition for if the consumer raises an exception while processing a message -- set to -1 to pause indefinitely"
     float :pause_timeout, default: 10
 
