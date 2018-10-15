@@ -16,7 +16,7 @@ module Racecar
 
       # TODO: start from beginning
       # TODO: max_bytes per partition
-      # TODO: does subscribing to multiple topics work like expected?
+      # TODO: subscribing to multiple topics
       config.subscriptions.each do |subscription|
         consumer.subscribe(subscription.topic)
       end
