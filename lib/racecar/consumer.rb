@@ -34,10 +34,19 @@ module Racecar
 
     def teardown; end
 
+    # Delivers messages that got produced.
+    def deliver!
+      @delivery_handles ||= []
+      @delivery_handles.each(&:wait)
+      @delivery_handles.clear
+    end
+
     protected
 
-    def produce(value, **options)
-      @_producer.produce(value, **options)
+    # https://github.com/appsignal/rdkafka-ruby#producing-messages
+    def produce(topic:, payload:, key:)
+      @delivery_handles ||= []
+      @delivery_handles << @_producer.produce(topic: topic, payload: payload, key: key)
     end
   end
 end

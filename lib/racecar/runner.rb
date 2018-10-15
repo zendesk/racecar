@@ -1,148 +1,96 @@
-require "kafka"
+require "rdkafka"
 
 module Racecar
   class Runner
-    attr_reader :processor, :config, :logger, :consumer
+    attr_reader :processor, :config, :logger
 
     def initialize(processor, config:, logger:, instrumenter: NullInstrumenter)
       @processor, @config, @logger = processor, config, logger
       @instrumenter = instrumenter
-    end
-
-    def stop
-      Thread.new do
-        processor.teardown
-        consumer.stop unless consumer.nil?
-      end.join
+      @stop_requested = false
+      Rdkafka::Config.logger = logger
     end
 
     def run
-      kafka = Kafka.new(
-        client_id: config.client_id,
-        seed_brokers: config.brokers,
-        logger: logger,
-        connect_timeout: config.connect_timeout,
-        socket_timeout: config.socket_timeout,
-        ssl_ca_cert: config.ssl_ca_cert,
-        ssl_ca_cert_file_path: config.ssl_ca_cert_file_path,
-        ssl_client_cert: config.ssl_client_cert,
-        ssl_client_cert_key: config.ssl_client_cert_key,
-        sasl_plain_username: config.sasl_plain_username,
-        sasl_plain_password: config.sasl_plain_password,
-        sasl_scram_username: config.sasl_scram_username,
-        sasl_scram_password: config.sasl_scram_password,
-        sasl_scram_mechanism: config.sasl_scram_mechanism,
-        ssl_ca_certs_from_system: config.ssl_ca_certs_from_system,
-      )
+      install_signal_handlers
 
-      @consumer = kafka.consumer(
-        group_id: config.group_id,
-        offset_commit_interval: config.offset_commit_interval,
-        offset_commit_threshold: config.offset_commit_threshold,
-        session_timeout: config.session_timeout,
-        heartbeat_interval: config.heartbeat_interval,
-        offset_retention_time: config.offset_retention_time,
-        fetcher_max_queue_size: config.max_fetch_queue_size,
-      )
-
-      # Stop the consumer on SIGINT, SIGQUIT or SIGTERM.
-      trap("QUIT") { stop }
-      trap("INT") { stop }
-      trap("TERM") { stop }
-
-      # Print the consumer config to STDERR on USR1.
-      trap("USR1") { $stderr.puts config.inspect }
-
+      # TODO: start from beginning
+      # TODO: max_bytes per partition
+      # TODO: does subscribing to multiple topics work like expected?
       config.subscriptions.each do |subscription|
-        consumer.subscribe(
-          subscription.topic,
-          start_from_beginning: subscription.start_from_beginning,
-          max_bytes_per_partition: subscription.max_bytes_per_partition,
-        )
+        consumer.subscribe(subscription.topic)
       end
 
       # Configure the consumer with a producer so it can produce messages.
-      producer = kafka.producer(
-        compression_codec: config.producer_compression_codec,
-      )
-
       processor.configure(producer: producer)
 
-      begin
-        if processor.respond_to?(:process)
-          consumer.each_message(max_wait_time: config.max_wait_time, max_bytes: config.max_bytes) do |message|
-            payload = {
-              consumer_class: processor.class.to_s,
-              topic: message.topic,
-              partition: message.partition,
-              offset: message.offset,
-            }
-
-            @instrumenter.instrument("process_message.racecar", payload) do
-              processor.process(message)
-              producer.deliver_messages
-            end
-          end
-        elsif processor.respond_to?(:process_batch)
-          consumer.each_batch(max_wait_time: config.max_wait_time, max_bytes: config.max_bytes) do |batch|
-            payload = {
-              consumer_class: processor.class.to_s,
-              topic: batch.topic,
-              partition: batch.partition,
-              first_offset: batch.first_offset,
-              message_count: batch.messages.count,
-            }
-
-            @instrumenter.instrument("process_batch.racecar", payload) do
-              processor.process_batch(batch)
-              producer.deliver_messages
-            end
-          end
-        else
-          raise NotImplementedError, "Consumer class must implement process or process_batch method"
+      # Main loop
+      loop do
+        break if @stop_requested
+        if message = consumer.poll(250)
+          # TODO: process_batch
+          process(message)
         end
-      rescue Kafka::ProcessingError => e
-        @logger.error "Error processing partition #{e.topic}/#{e.partition} at offset #{e.offset}"
-
-        if config.pause_timeout > 0
-          # Pause fetches from the partition. We'll continue processing the other partitions in the topic.
-          # The partition is automatically resumed after the specified timeout, and will continue where we
-          # left off.
-          @logger.warn "Pausing partition #{e.topic}/#{e.partition} for #{config.pause_timeout} seconds"
-          consumer.pause(
-            e.topic,
-            e.partition,
-            timeout: config.pause_timeout,
-            max_timeout: config.max_pause_timeout,
-            exponential_backoff: config.pause_with_exponential_backoff?,
-          )
-        elsif config.pause_timeout == -1
-          # A pause timeout of -1 means indefinite pausing, which in ruby-kafka is done by passing nil as
-          # the timeout.
-          @logger.warn "Pausing partition #{e.topic}/#{e.partition} indefinitely, or until the process is restarted"
-          consumer.pause(e.topic, e.partition, timeout: nil)
-        end
-
-        config.error_handler.call(e.cause, {
-          topic: e.topic,
-          partition: e.partition,
-          offset: e.offset,
-        })
-
-        # Restart the consumer loop.
-        retry
-      rescue Kafka::InvalidSessionTimeout
-        raise ConfigError, "`session_timeout` is set either too high or too low"
-      rescue Kafka::Error => e
-        error = "#{e.class}: #{e.message}\n" + e.backtrace.join("\n")
-        @logger.error "Consumer thread crashed: #{error}"
-
-        config.error_handler.call(e)
-
-        raise
-      else
-        @logger.info "Gracefully shutting down"
+      # TODO: pause handling
+      rescue Rdkafka::RdkafkaError => e
+        raise if e.message != "Broker: No more messages (partition_eof)"
+        logger.debug "No more messages on this partition."
       end
+
+      logger.info "Gracefully shutting down"
+      processor.deliver!
+      processor.teardown
+      consumer_commit
+      consumer.close
+    end
+
+    private
+
+    def consumer
+      # https://kafka.apache.org/documentation/#consumerconfigs
+      @consumer ||= Rdkafka::Config.new({
+        "bootstrap.servers": config.brokers.join(","),
+        "group.id":          config.group_id,
+        # TODO: other configuration values
+      }).consumer
+    end
+
+    def producer
+      @producer ||= Rdkafka::Config.new({
+        "bootstrap.servers": config.brokers.join(","),
+        # TODO: other configuration values
+      }).producer
+    end
+
+    def install_signal_handlers
+      # Stop the consumer on SIGINT, SIGQUIT or SIGTERM.
+      trap("QUIT") { @stop_requested = true }
+      trap("INT")  { @stop_requested = true }
+      trap("TERM") { @stop_requested = true }
+
+      # Print the consumer config to STDERR on USR1.
+      trap("USR1") { $stderr.puts config.inspect }
+    end
+
+    def process(message)
+      payload = {
+        consumer_class: processor.class.to_s,
+        topic: message.topic,
+        partition: message.partition,
+        offset: message.offset,
+      }
+
+      @instrumenter.instrument("process_message.racecar", payload) do
+        processor.process(message)
+        processor.deliver!
+      end
+    end
+
+    def consumer_commit
+      consumer.commit
+    rescue Rdkafka::RdkafkaError => e
+      raise e if e.message != "Local: No offset stored (no_offset)"
+      logger.debug "Nothing to commit."
     end
   end
 end
