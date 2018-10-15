@@ -10,20 +10,17 @@ module Racecar
     desc "A string used to identify the client in logs and metrics"
     string :client_id, default: "racecar"
 
-    desc "How frequently to commit offset positions"
-    float :offset_commit_interval, default: 10
+    desc "A prefix used when generating consumer group names"
+    string :group_id_prefix
 
-    desc "How many messages to process before forcing a checkpoint"
-    integer :offset_commit_threshold, default: 0
+    desc "The group id to use for a given group of consumers"
+    string :group_id
 
-    desc "How often to send a heartbeat message to Kafka"
-    float :heartbeat_interval, default: 10
+    desc "Kafka consumer configuration options, separated with '=' -- https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md"
+    list :consumer, default: []
 
-    desc "How long committed offsets will be retained."
-    integer :offset_retention_time
-
-    desc "The maximum number of fetch responses to keep queued before processing"
-    integer :max_fetch_queue_size, default: 10
+    desc "Kafka producer configuration options, separated with '=' -- https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md"
+    list :producer, default: []
 
     desc "How long to pause a partition for if the consumer raises an exception while processing a message -- set to -1 to pause indefinitely"
     float :pause_timeout, default: 10
@@ -34,80 +31,17 @@ module Racecar
     desc "Whether to exponentially increase the pause timeout on successive errors -- the timeout is doubled each time"
     boolean :pause_with_exponential_backoff, default: false
 
-    desc "The idle timeout after which a consumer is kicked out of the group"
-    float :session_timeout, default: 30
-
-    desc "How long to wait when trying to connect to a Kafka broker"
-    float :connect_timeout, default: 10
-
-    desc "How long to wait when trying to communicate with a Kafka broker"
-    float :socket_timeout, default: 30
-
-    desc "How long to allow the Kafka brokers to wait before returning messages"
-    float :max_wait_time, default: 1
-
-    desc "The maximum size of message sets returned from a single fetch"
-    integer :max_bytes, default: 10485760
-
-    desc "A prefix used when generating consumer group names"
-    string :group_id_prefix
-
-    desc "The group id to use for a given group of consumers"
-    string :group_id
-
     desc "A filename that log messages should be written to"
     string :logfile
 
     desc "The log level for the Racecar logs"
     string :log_level, default: "info"
 
-    desc "A valid SSL certificate authority"
-    string :ssl_ca_cert
-
-    desc "The path to a valid SSL certificate authority file"
-    string :ssl_ca_cert_file_path
-
-    desc "A valid SSL client certificate"
-    string :ssl_client_cert
-
-    desc "A valid SSL client certificate key"
-    string :ssl_client_cert_key
-
-    desc "Support for using the CA certs installed on your system by default for SSL. More info, see: https://github.com/zendesk/ruby-kafka/pull/521"
-    boolean :ssl_ca_certs_from_system, default: false
-
-    desc "The GSSAPI principal"
-    string :sasl_gssapi_principal
-
-    desc "Optional GSSAPI keytab"
-    string :sasl_gssapi_keytab
-
-    desc "The authorization identity to use"
-    string :sasl_plain_authzid
-
-    desc "The username used to authenticate"
-    string :sasl_plain_username
-
-    desc "The password used to authenticate"
-    string :sasl_plain_password
-
-    desc "The username used to authenticate"
-    string :sasl_scram_username
-
-    desc "The password used to authenticate"
-    string :sasl_scram_password
-
-    desc "The SCRAM mechanism to use, either `sha256` or `sha512`"
-    string :sasl_scram_mechanism, allowed_values: ["sha256", "sha512"]
-
     desc "The file in which to store the Racecar process' PID when daemonized"
     string :pidfile
 
     desc "Run the Racecar process in the background as a daemon"
     boolean :daemonize, default: false
-
-    desc "The codec used to compress messages with"
-    symbol :producer_compression_codec
 
     desc "Enable Datadog metrics"
     boolean :datadog_enabled, default: false
@@ -148,14 +82,6 @@ module Racecar
         raise ConfigError, "`brokers` must not be empty"
       end
 
-      if socket_timeout <= max_wait_time
-        raise ConfigError, "`socket_timeout` must be longer than `max_wait_time`"
-      end
-
-      if connect_timeout <= max_wait_time
-        raise ConfigError, "`connect_timeout` must be longer than `max_wait_time`"
-      end
-
       if max_pause_timeout && !pause_with_exponential_backoff?
         raise ConfigError, "`max_pause_timeout` only makes sense when `pause_with_exponential_backoff` is enabled"
       end
@@ -173,13 +99,23 @@ module Racecar
       ].compact.join("")
 
       self.subscriptions = consumer_class.subscriptions
-      self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time
-      self.offset_retention_time = consumer_class.offset_retention_time || self.offset_retention_time
       self.pidfile ||= "#{group_id}.pid"
     end
 
     def on_error(&handler)
       @error_handler = handler
+    end
+
+    def rdkafka_consumer
+      consumer.map do |param|
+        param.split("=", 2).map(&:strip)
+      end.to_h
+    end
+
+    def rdkafka_producer
+      producer.map do |param|
+        param.split("=", 2).map(&:strip)
+      end.to_h
     end
   end
 end

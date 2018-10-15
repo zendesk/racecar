@@ -15,7 +15,6 @@ module Racecar
       install_signal_handlers
 
       # TODO: start from beginning
-      # TODO: max_bytes per partition
       # TODO: subscribing to multiple topics
       config.subscriptions.each do |subscription|
         consumer.subscribe(subscription.topic)
@@ -47,19 +46,20 @@ module Racecar
     private
 
     def consumer
-      # https://kafka.apache.org/documentation/#consumerconfigs
+      # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
       @consumer ||= Rdkafka::Config.new({
         "bootstrap.servers": config.brokers.join(","),
         "group.id":          config.group_id,
-        # TODO: other configuration values
-      }).consumer
+        "client.id":         config.client_id,
+      }.merge(config.rdkafka_consumer)).consumer
     end
 
     def producer
+      # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
       @producer ||= Rdkafka::Config.new({
         "bootstrap.servers": config.brokers.join(","),
-        # TODO: other configuration values
-      }).producer
+        "client.id":         config.client_id,
+      }.merge(config.rdkafka_producer)).producer
     end
 
     def install_signal_handlers

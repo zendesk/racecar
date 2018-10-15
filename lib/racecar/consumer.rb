@@ -3,9 +3,7 @@ module Racecar
     Subscription = Struct.new(:topic, :start_from_beginning, :max_bytes_per_partition)
 
     class << self
-      attr_accessor :max_wait_time
       attr_accessor :group_id
-      attr_accessor :offset_retention_time
 
       def subscriptions
         @subscriptions ||= []

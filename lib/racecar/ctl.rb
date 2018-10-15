@@ -93,15 +93,12 @@ module Racecar
 
       Racecar.config.validate!
 
-      kafka = Kafka.new(
-        client_id: Racecar.config.client_id,
-        seed_brokers: Racecar.config.brokers,
-        logger: Racecar.logger,
-        connect_timeout: Racecar.config.connect_timeout,
-        socket_timeout: Racecar.config.socket_timeout,
-      )
+      producer = Rdkafka::Config.new({
+        "bootstrap.servers": Racecar.config.brokers.join(","),
+        "client.id":         Racecar.config.client_id,
+      }.merge(Racecar.config.rdkafka_producer)).producer
 
-      kafka.deliver_message(message.value, key: message.key, topic: message.topic)
+      producer.produce(payload: message.value, key: message.key, topic: message.topic).wait
 
       $stderr.puts "=> Delivered message to Kafka cluster"
     end
