@@ -114,7 +114,7 @@ This is useful to do any one-off work that you wouldn't want to do for each and 
 When a consumer is started for the first time, it needs to decide where in each partition to start. By default, it will start at the _beginning_, meaning that all past messages will be processed. If you want to instead start at the _end_ of each partition, change your `subscribes_to` like this:
 
 ```ruby
-subscribes_to "some-topic", start_from_beginning: false
+subscribes_to "some-topic", config: { "auto.offset.reset" => "largest" }
 ```
 
 Note that once the consumer has started, it will commit the offsets it has processed until and in the future will resume from those.

@@ -1,6 +1,7 @@
 require "logger"
 
 require "racecar/consumer"
+require "racecar/consumer_set"
 require "racecar/runner"
 require "racecar/config"
 

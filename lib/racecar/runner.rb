@@ -14,14 +14,15 @@ module Racecar
     def run
       install_signal_handlers
 
-      # TODO: start from beginning
-      # TODO: subscribing to multiple topics
-      config.subscriptions.each do |subscription|
-        consumer.subscribe(subscription.topic)
-      end
+      consumer = ConsumerSet.new(config, logger)
+      consumer.subscribe
 
-      # Configure the consumer with a producer so it can produce messages.
-      processor.configure(producer: producer)
+      # Configure the consumer with a producer so it can produce messages and
+      # with a consumer so that it can support advanced use-cases.
+      processor.configure(
+        producer: producer,
+        consumer: consumer
+      )
 
       # Main loop
       loop do
@@ -31,28 +32,16 @@ module Racecar
           process(message)
         end
       # TODO: pause handling
-      rescue Rdkafka::RdkafkaError => e
-        raise if e.message != "Broker: No more messages (partition_eof)"
-        logger.debug "No more messages on this partition."
       end
 
       logger.info "Gracefully shutting down"
       processor.deliver!
       processor.teardown
-      consumer_commit
+      consumer.commit
       consumer.close
     end
 
     private
-
-    def consumer
-      # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-      @consumer ||= Rdkafka::Config.new({
-        "bootstrap.servers": config.brokers.join(","),
-        "group.id":          config.group_id,
-        "client.id":         config.client_id,
-      }.merge(config.rdkafka_consumer)).consumer
-    end
 
     def producer
       # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
@@ -84,13 +73,6 @@ module Racecar
         processor.process(message)
         processor.deliver!
       end
-    end
-
-    def consumer_commit
-      consumer.commit
-    rescue Rdkafka::RdkafkaError => e
-      raise e if e.message != "Local: No offset stored (no_offset)"
-      logger.debug "Nothing to commit."
     end
   end
 end

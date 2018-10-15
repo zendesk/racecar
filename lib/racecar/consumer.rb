@@ -1,6 +1,6 @@
 module Racecar
   class Consumer
-    Subscription = Struct.new(:topic, :start_from_beginning, :max_bytes_per_partition)
+    Subscription = Struct.new(:topic, :config)
 
     class << self
       attr_accessor :group_id
@@ -14,20 +14,21 @@ module Racecar
       # Can be called multiple times in order to subscribe to more topics.
       #
       # @param topics [String] one or more topics to subscribe to.
-      # @param start_from_beginning [Boolean] whether to start from the beginning or the end
-      #   of each partition.
-      # @param max_bytes_per_partition [Integer] the maximum number of bytes to fetch from
-      #   each partition at a time.
+      # @param config [Hash] Configuration properties for consumer.
+      #   See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
       # @return [nil]
-      def subscribes_to(*topics, start_from_beginning: true, max_bytes_per_partition: 1048576)
+      def subscribes_to(*topics, config: {})
         topics.each do |topic|
-          subscriptions << Subscription.new(topic, start_from_beginning, max_bytes_per_partition)
+          subscriptions << Subscription.new(topic, config)
         end
       end
     end
 
-    def configure(producer:)
-      @_producer = producer
+    attr_accessor :producer, :consumer
+
+    def configure(producer:, consumer:)
+      @producer = producer
+      @consumer = consumer
     end
 
     def teardown; end
@@ -44,7 +45,7 @@ module Racecar
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
     def produce(topic:, payload:, key:)
       @delivery_handles ||= []
-      @delivery_handles << @_producer.produce(topic: topic, payload: payload, key: key)
+      @delivery_handles << @producer.produce(topic: topic, payload: payload, key: key)
     end
   end
 end
