@@ -37,13 +37,13 @@ module Racecar
       loop do
         break if @stop_requested
         if processor.respond_to?(:process_batch)
-          messages = consumer.batch_poll(250)
+          messages = consumer.batch_poll(config.max_wait_time)
           if !messages.empty?
             process_batch(messages)
             consumer.commit # See above. Needed because auto commit is disabled
           end
         elsif processor.respond_to?(:process)
-          if message = consumer.poll(250)
+          if message = consumer.poll(config.max_wait_time)
             process(message)
           end
         else
@@ -63,10 +63,17 @@ module Racecar
 
     def producer
       # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-      @producer ||= Rdkafka::Config.new({
-        "bootstrap.servers": config.brokers.join(","),
-        "client.id":         config.client_id,
-      }.merge(config.rdkafka_producer)).producer
+      @producer ||= Rdkafka::Config.new(producer_config).producer
+    end
+
+    def producer_config
+      producer_config = {
+        "bootstrap.servers" => config.brokers.join(","),
+        "client.id"         => config.client_id,
+      }
+      producer_config["compression.codec"] = config.producer_compression_codec unless config.producer_compression_codec.nil?
+      producer_config.merge(config.rdkafka_producer)
+      producer_config
     end
 
     def install_signal_handlers

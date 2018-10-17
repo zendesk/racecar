@@ -114,7 +114,7 @@ This is useful to do any one-off work that you wouldn't want to do for each and 
 When a consumer is started for the first time, it needs to decide where in each partition to start. By default, it will start at the _beginning_, meaning that all past messages will be processed. If you want to instead start at the _end_ of each partition, change your `subscribes_to` like this:
 
 ```ruby
-subscribes_to "some-topic", config: { "auto.offset.reset" => "largest" }
+subscribes_to "some-topic", start_from_beginning: false
 ```
 
 Note that once the consumer has started, it will commit the offsets it has processed until and in the future will resume from those.
@@ -237,8 +237,6 @@ end
 The consumers will checkpoint their positions from time to time in order to be able to recover from failures. This is called _committing offsets_, since it's done by tracking the offset reached in each partition being processed, and committing those offset numbers to the Kafka offset storage API. If you can tolerate more double-processing after a failure, you can increase the interval between commits in order to better performance. You can also do the opposite if you prefer less chance of double-processing.
 
 * `offset_commit_interval` – How often to save the consumer's position in Kafka. Default is every 10 seconds.
-* `offset_commit_threshold` – How many messages to process before forcing a checkpoint. Default is 0, which means there's no limit. Setting this to e.g. 100 makes the consumer stop every 100 messages to checkpoint its position.
-* `offset_retention_time` - How long committed offsets will be retained. Defaults to the broker setting.
 
 #### Timeouts & intervals
 
@@ -247,7 +245,6 @@ All timeouts are defined in number of seconds.
 * `session_timeout` – The idle timeout after which a consumer is kicked out of the group. Consumers must send heartbeats with at least this frequency.
 * `heartbeat_interval` – How often to send a heartbeat message to Kafka.
 * `pause_timeout` – How long to pause a partition for if the consumer raises an exception while processing a message. Default is to pause for 10 seconds. Set this to zero in order to disable automatic pausing of partitions.
-* `connect_timeout` – How long to wait when trying to connect to a Kafka broker. Default is 10 seconds.
 * `socket_timeout` – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
 * `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 1 second.
 
@@ -258,9 +255,9 @@ Kafka is _really_ good at throwing data at consumers, so you may want to tune th
 Racecar uses ruby-kafka under the hood, which fetches messages from the Kafka brokers in a background thread. This thread pushes fetch responses, possible containing messages from many partitions, into a queue that is read by the processing thread (AKA your code). The main way to control the fetcher thread is to control the size of those responses and the size of the queue.
 
 * `max_bytes` — The maximum size of message sets returned from a single fetch request.
-* `max_fetch_queue_size` — The maximum number of fetch responses to keep in the queue. Once reached, the fetcher will back off until the queue gets back down under to limit.
+* `min_message_queue_size` — The minimum number of messages in the local consumer queue.
 
-The memory usage limit is roughly estimated as `max_bytes * max_fetch_queue_size`, plus whatever your application uses.
+The memory usage limit is roughly estimated as `max_bytes * min_message_queue_size`, plus whatever your application uses.
 
 #### SSL encryption, authentication & authorization
 

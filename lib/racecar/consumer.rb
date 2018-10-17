@@ -1,9 +1,11 @@
 module Racecar
   class Consumer
-    Subscription = Struct.new(:topic, :config)
+    Subscription = Struct.new(:topic, :start_from_beginning, :max_bytes_per_partition, :additional_config)
 
     class << self
+      attr_accessor :max_wait_time
       attr_accessor :group_id
+      attr_accessor :producer, :consumer
 
       def subscriptions
         @subscriptions ||= []
@@ -14,17 +16,19 @@ module Racecar
       # Can be called multiple times in order to subscribe to more topics.
       #
       # @param topics [String] one or more topics to subscribe to.
-      # @param config [Hash] Configuration properties for consumer.
+      # @param start_from_beginning [Boolean] whether to start from the beginning or the end
+      #   of each partition.
+      # @param max_bytes_per_partition [Integer] the maximum number of bytes to fetch from
+      #   each partition at a time.
+      # @param additional_config [Hash] Configuration properties for consumer.
       #   See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
       # @return [nil]
-      def subscribes_to(*topics, config: {})
+      def subscribes_to(*topics, start_from_beginning: true, max_bytes_per_partition: 1048576, additional_config: {})
         topics.each do |topic|
-          subscriptions << Subscription.new(topic, config)
+          subscriptions << Subscription.new(topic, start_from_beginning, max_bytes_per_partition, additional_config)
         end
       end
     end
-
-    attr_accessor :producer, :consumer
 
     def configure(producer:, consumer:)
       @producer = producer

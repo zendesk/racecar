@@ -10,11 +10,14 @@ module Racecar
     desc "A string used to identify the client in logs and metrics"
     string :client_id, default: "racecar"
 
-    desc "A prefix used when generating consumer group names"
-    string :group_id_prefix
+    desc "How frequently to commit offset positions"
+    float :offset_commit_interval, default: 10
 
-    desc "The group id to use for a given group of consumers"
-    string :group_id
+    desc "How often to send a heartbeat message to Kafka"
+    float :heartbeat_interval, default: 10
+
+    desc "The minimum number of messages in the local consumer queue"
+    integer :min_message_queue_size, default: 2000
 
     desc "Kafka consumer configuration options, separated with '=' -- https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md"
     list :consumer, default: []
@@ -23,11 +26,7 @@ module Racecar
     list :producer, default: []
 
     # TODO: not needed once there is batch support in rdkafka-ruby
-    desc "Maximum time the broker may wait to fill the response with fetch_messages"
-    float :fetch_wait_max, default: 0.33
-
-    # TODO: not needed once there is batch support in rdkafka-ruby
-    desc "Maxium number of messages that get consumed within one batch"
+    desc "The maxium number of messages that get consumed within one batch"
     integer :fetch_messages, default: 1000
 
     # TODO: not needed once there is batch support in rdkafka-ruby
@@ -43,6 +42,24 @@ module Racecar
     desc "Whether to exponentially increase the pause timeout on successive errors -- the timeout is doubled each time"
     boolean :pause_with_exponential_backoff, default: false
 
+    desc "The idle timeout after which a consumer is kicked out of the group"
+    float :session_timeout, default: 30
+
+    desc "How long to wait when trying to communicate with a Kafka broker"
+    float :socket_timeout, default: 30
+
+    desc "How long to allow the Kafka brokers to wait before returning messages"
+    float :max_wait_time, default: 1
+
+    desc "The maximum size of message sets returned from a single fetch"
+    integer :max_bytes, default: 10485760
+
+    desc "A prefix used when generating consumer group names"
+    string :group_id_prefix
+
+    desc "The group id to use for a given group of consumers"
+    string :group_id
+
     desc "A filename that log messages should be written to"
     string :logfile
 
@@ -54,6 +71,9 @@ module Racecar
 
     desc "Run the Racecar process in the background as a daemon"
     boolean :daemonize, default: false
+
+    desc "The codec used to compress messages with"
+    symbol :producer_compression_codec
 
     desc "Enable Datadog metrics"
     boolean :datadog_enabled, default: false
@@ -94,6 +114,10 @@ module Racecar
         raise ConfigError, "`brokers` must not be empty"
       end
 
+      if socket_timeout <= max_wait_time
+        raise ConfigError, "`socket_timeout` must be longer than `max_wait_time`"
+      end
+
       if max_pause_timeout && !pause_with_exponential_backoff?
         raise ConfigError, "`max_pause_timeout` only makes sense when `pause_with_exponential_backoff` is enabled"
       end
@@ -111,6 +135,7 @@ module Racecar
       ].compact.join("")
 
       self.subscriptions = consumer_class.subscriptions
+      self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time
       self.pidfile ||= "#{group_id}.pid"
     end
 
