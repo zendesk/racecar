@@ -66,6 +66,45 @@ module Racecar
     desc "The log level for the Racecar logs"
     string :log_level, default: "info"
 
+    desc "Protocol used to communicate with brokers"
+    symbol :security_protocol, allowed_values: %i{plaintext ssl sasl_plaintext sasl_ssl} + %w{plaintext ssl sasl_plaintext sasl_ssl}
+
+    desc "File or directory path to CA certificate(s) for verifying the broker's key"
+    string :ssl_ca_location
+
+    desc "Path to CRL for verifying broker's certificate validity"
+    string :ssl_crl_location
+
+    desc "Path to client's keystore (PKCS#12) used for authentication"
+    string :ssl_keystore_location
+
+    desc "Client's keystore (PKCS#12) password"
+    string :ssl_keystore_password
+
+    desc "SASL mechanism to use for authentication"
+    string :sasl_mechanism, allowed_values: %w{GSSAPI PLAIN SCRAM-SHA-256 SCRAM-SHA-512}
+
+    desc "Kerberos principal name that Kafka runs as, not including /hostname@REALM"
+    string :sasl_kerberos_service_name
+
+    desc "This client's Kerberos principal name"
+    string :sasl_kerberos_principal
+
+    desc "Full kerberos kinit command string, %{config.prop.name} is replaced by corresponding config object value, %{broker.name} returns the broker's hostname"
+    string :sasl_kerberos_kinit_cmd
+
+    desc "Path to Kerberos keytab file. Uses system default if not set"
+    string :sasl_kerberos_keytab
+
+    desc "Minimum time in milliseconds between key refresh attempts"
+    integer :sasl_kerberos_min_time_before_relogin
+
+    desc "SASL username for use with the PLAIN and SASL-SCRAM-.. mechanism"
+    string :sasl_username
+
+    desc "SASL password for use with the PLAIN and SASL-SCRAM-.. mechanism"
+    string :sasl_password
+
     desc "The file in which to store the Racecar process' PID when daemonized"
     string :pidfile
 
@@ -73,7 +112,7 @@ module Racecar
     boolean :daemonize, default: false
 
     desc "The codec used to compress messages with"
-    symbol :producer_compression_codec
+    symbol :producer_compression_codec, allowed_values: %i{none lz4 snappy gzip} + %w{none lz4 snappy gzip}
 
     desc "Enable Datadog metrics"
     boolean :datadog_enabled, default: false
@@ -144,15 +183,39 @@ module Racecar
     end
 
     def rdkafka_consumer
-      consumer.map do |param|
+      consumer_config = consumer.map do |param|
         param.split("=", 2).map(&:strip)
       end.to_h
+      consumer_config.merge!(rdkafka_security_config)
+      consumer_config
     end
 
     def rdkafka_producer
-      producer.map do |param|
+      producer_config = producer.map do |param|
         param.split("=", 2).map(&:strip)
       end.to_h
+      producer_config.merge!(rdkafka_security_config)
+      producer_config
+    end
+
+    private
+
+    def rdkafka_security_config
+      security_config = {}
+      security_config["security.protocol"] = security_protocol unless security_protocol.nil?
+      security_config["ssl.ca.location"] = ssl_ca_location unless ssl_ca_location.nil?
+      security_config["ssl.crl.location"] = ssl_crl_location unless ssl_crl_location.nil?
+      security_config["ssl.keystore.location"] = ssl_keystore_location unless ssl_keystore_location.nil?
+      security_config["ssl.keystore.password"] = ssl_keystore_password unless ssl_keystore_password.nil?
+      security_config["sasl.mechanism"] = sasl_mechanism unless sasl_mechanism.nil?
+      security_config["sasl.kerberos.service.name"] = sasl_kerberos_service_name unless sasl_kerberos_service_name.nil?
+      security_config["sasl.kerberos.principal"] = sasl_kerberos_principal unless sasl_kerberos_principal.nil?
+      security_config["sasl.kerberos.kinit.cmd"] = sasl_kerberos_kinit_cmd unless sasl_kerberos_kinit_cmd.nil?
+      security_config["sasl.kerberos.keytab"] = sasl_kerberos_keytab unless sasl_kerberos_keytab.nil?
+      security_config["sasl.kerberos.min.time.before.relogin"] = sasl_kerberos_min_time_before_relogin unless sasl_kerberos_min_time_before_relogin.to_i.zero?
+      security_config["sasl.username"] = sasl_username unless sasl_username.nil?
+      security_config["sasl.password"] = sasl_password unless sasl_password.nil?
+      security_config
     end
   end
 end

@@ -8,14 +8,50 @@ describe Racecar::Config do
     expect(config.offset_commit_interval).to eq 10
   end
 
-  it "requires `sasl_scram_mechanism` to be a valid mechanism" do
+  it "requires `sasl_mechanism` to be a valid mechanism" do
     expect {
-      config.sasl_scram_mechanism = "sha256"
-      config.sasl_scram_mechanism = "sha512"
+      config.sasl_mechanism = "GSSAPI"
+      config.sasl_mechanism = "PLAIN"
+      config.sasl_mechanism = "SCRAM-SHA-256"
+      config.sasl_mechanism = "SCRAM-SHA-512"
     }.not_to raise_exception
 
     expect {
-      config.sasl_scram_mechanism = "banana"
+      config.sasl_mechanism = "banana"
+    }.to raise_exception(KingKonf::ConfigError)
+  end
+
+  it "requires `producer_compression_codec` to be a valid" do
+    expect {
+      config.producer_compression_codec = :none
+      config.producer_compression_codec = :gzip
+      config.producer_compression_codec = :snappy
+      config.producer_compression_codec = :lz4
+      config.producer_compression_codec = "none"
+      config.producer_compression_codec = "gzip"
+      config.producer_compression_codec = "snappy"
+      config.producer_compression_codec = "lz4"
+    }.not_to raise_exception
+
+    expect {
+      config.producer_compression_codec = "apple"
+    }.to raise_exception(KingKonf::ConfigError)
+  end
+
+  it "requires `security_protocol` to be a valid" do
+    expect {
+      config.security_protocol = :plaintext
+      config.security_protocol = :ssl
+      config.security_protocol = :sasl_plaintext
+      config.security_protocol = :sasl_ssl
+      config.security_protocol = "plaintext"
+      config.security_protocol = "ssl"
+      config.security_protocol = "sasl_plaintext"
+      config.security_protocol = "sasl_ssl"
+    }.not_to raise_exception
+
+    expect {
+      config.security_protocol = "peach"
     }.to raise_exception(KingKonf::ConfigError)
   end
 

@@ -261,12 +261,16 @@ The memory usage limit is roughly estimated as `max_bytes * min_message_queue_si
 
 #### SSL encryption, authentication & authorization
 
+TODO: update
+
 * `ssl_ca_cert` – A valid SSL certificate authority, as a string.
 * `ssl_ca_cert_file_path` - The path to a valid SSL certificate authority file.
 * `ssl_client_cert` – A valid SSL client certificate, as a string.
 * `ssl_client_cert_key` – A valid SSL client certificate key, as a string.
 
 #### SASL encryption, authentication & authorization
+
+TODO: update
 
 Racecar has support for using SASL to authenticate clients using either the GSSAPI or PLAIN mechanism.
 

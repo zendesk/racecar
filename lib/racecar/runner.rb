@@ -71,7 +71,7 @@ module Racecar
         "bootstrap.servers" => config.brokers.join(","),
         "client.id"         => config.client_id,
       }
-      producer_config["compression.codec"] = config.producer_compression_codec unless config.producer_compression_codec.nil?
+      producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
       producer_config.merge(config.rdkafka_producer)
       producer_config
     end
