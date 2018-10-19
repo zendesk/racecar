@@ -201,21 +201,21 @@ module Racecar
     private
 
     def rdkafka_security_config
-      security_config = {}
-      security_config["security.protocol"] = security_protocol unless security_protocol.nil?
-      security_config["ssl.ca.location"] = ssl_ca_location unless ssl_ca_location.nil?
-      security_config["ssl.crl.location"] = ssl_crl_location unless ssl_crl_location.nil?
-      security_config["ssl.keystore.location"] = ssl_keystore_location unless ssl_keystore_location.nil?
-      security_config["ssl.keystore.password"] = ssl_keystore_password unless ssl_keystore_password.nil?
-      security_config["sasl.mechanism"] = sasl_mechanism unless sasl_mechanism.nil?
-      security_config["sasl.kerberos.service.name"] = sasl_kerberos_service_name unless sasl_kerberos_service_name.nil?
-      security_config["sasl.kerberos.principal"] = sasl_kerberos_principal unless sasl_kerberos_principal.nil?
-      security_config["sasl.kerberos.kinit.cmd"] = sasl_kerberos_kinit_cmd unless sasl_kerberos_kinit_cmd.nil?
-      security_config["sasl.kerberos.keytab"] = sasl_kerberos_keytab unless sasl_kerberos_keytab.nil?
-      security_config["sasl.kerberos.min.time.before.relogin"] = sasl_kerberos_min_time_before_relogin unless sasl_kerberos_min_time_before_relogin.to_i.zero?
-      security_config["sasl.username"] = sasl_username unless sasl_username.nil?
-      security_config["sasl.password"] = sasl_password unless sasl_password.nil?
-      security_config
+      {
+        "security.protocol" => security_protocol,
+        "ssl.ca.location" => ssl_ca_location,
+        "ssl.crl.location" => ssl_crl_location,
+        "ssl.keystore.location" => ssl_keystore_location,
+        "ssl.keystore.password" => ssl_keystore_password,
+        "sasl.mechanism" => sasl_mechanism,
+        "sasl.kerberos.service.name" => sasl_kerberos_service_name,
+        "sasl.kerberos.principal" => sasl_kerberos_principal,
+        "sasl.kerberos.kinit.cmd" => sasl_kerberos_kinit_cmd,
+        "sasl.kerberos.keytab" => sasl_kerberos_keytab,
+        "sasl.kerberos.min.time.before.relogin" => sasl_kerberos_min_time_before_relogin,
+        "sasl.username" => sasl_username,
+        "sasl.password" => sasl_password,
+      }.compact
     end
   end
 end
