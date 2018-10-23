@@ -4,6 +4,7 @@ require "racecar/consumer"
 require "racecar/consumer_set"
 require "racecar/runner"
 require "racecar/config"
+require "ensure_hash_compact"
 
 module Racecar
   # Ignores all instrumentation events.
