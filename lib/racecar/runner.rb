@@ -59,6 +59,10 @@ module Racecar
       consumer.close
     end
 
+    def stop
+      @stop_requested = true
+    end
+
     private
 
     def producer
@@ -78,9 +82,9 @@ module Racecar
 
     def install_signal_handlers
       # Stop the consumer on SIGINT, SIGQUIT or SIGTERM.
-      trap("QUIT") { @stop_requested = true }
-      trap("INT")  { @stop_requested = true }
-      trap("TERM") { @stop_requested = true }
+      trap("QUIT") { stop }
+      trap("INT")  { stop }
+      trap("TERM") { stop }
 
       # Print the consumer config to STDERR on USR1.
       trap("USR1") { $stderr.puts config.inspect }

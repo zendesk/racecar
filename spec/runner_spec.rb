@@ -47,10 +47,10 @@ class TestBatchConsumer < Racecar::Consumer
     self
   end
 
-  def process_batch(batch)
-    @messages += batch.messages
+  def process_batch(messages)
+    @messages += messages
 
-    batch.messages.each do |message|
+    messages.each do |message|
       processor = @processor_queue.shift || proc {}
       processor.call(message)
     end
@@ -63,7 +63,7 @@ class TestProducingConsumer < Racecar::Consumer
   def process(message)
     value = Integer(message.value) * 2
 
-    produce value, topic: "doubled"
+    produce topic: "doubled", key: value, payload: value
   end
 end
 
@@ -72,8 +72,9 @@ class TestNilConsumer < Racecar::Consumer
 end
 
 class FakeConsumer
-  def initialize(kafka)
+  def initialize(kafka, runner)
     @kafka = kafka
+    @runner = runner
     @topics = []
   end
 
@@ -81,71 +82,40 @@ class FakeConsumer
     @topics << topic
   end
 
-  def each_message(*options, &block)
-    @kafka.messages.each do |message|
-      next unless @topics.include?(message.topic)
-
-      begin
-        block.call(message)
-      rescue StandardError => e
-        raise Kafka::ProcessingError.new(message.topic, message.partition, message.offset)
-      end
-    end
+  def poll(timeout)
+    @runner.stop if @kafka.messages.empty?
+    @kafka.messages.shift
   end
-
-  def each_batch(*options, &block)
-    begin
-      batch = Kafka::FetchedBatch.new(
-        topic: @kafka.messages.first.topic,
-        partition: @kafka.messages.first.partition,
-        messages: @kafka.messages,
-        highwater_mark_offset: @kafka.messages.first.offset,
-      )
-
-      block.call(batch)
-    rescue StandardError => e
-      raise Kafka::ProcessingError.new(batch.topic, batch.partition, batch.highwater_mark_offset)
-    end
-  end
-
-  def pause(topic, partition, timeout:, max_timeout: nil, exponential_backoff: false)
-    @kafka.paused_partitions[topic] ||= {}
-    @kafka.paused_partitions[topic][partition] = true
-  end
-
-  def stop; end
 end
 
 class FakeProducer
-  def initialize(kafka)
+  def initialize(kafka, runner)
     @kafka = kafka
+    @runner = runner
     @buffer = []
   end
 
-  def produce(value, **options)
-    @buffer << [value, options]
+  def produce(topic:, payload:, key:)
+    @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0)
+    @runner.stop
+    self
   end
 
-  def deliver_messages
-    @buffer.each do |value, **options|
-      @kafka.deliver_message(value.to_s, **options)
+  def wait
+    @buffer.each do |message|
+      @kafka.messages << message
     end
   end
 end
 
-class FakeKafka
+class FakeRdkafka
   FakeMessage = Struct.new(:value, :key, :topic, :partition, :offset)
 
-  attr_reader :messages, :paused_partitions
+  attr_reader :messages
 
-  def initialize(*options)
+  def initialize(runner:)
+    @runner = runner
     @messages = []
-    @paused_partitions = {}
-  end
-
-  def paused?(topic, partition)
-    @paused_partitions[topic] ||= {}
-    !!@paused_partitions[topic][partition]
   end
 
   def deliver_message(value, topic:)
@@ -157,11 +127,11 @@ class FakeKafka
   end
 
   def consumer(*options)
-    FakeConsumer.new(self)
+    FakeConsumer.new(self, @runner)
   end
 
   def producer(*)
-    FakeProducer.new(self)
+    FakeProducer.new(self, @runner)
   end
 end
 
@@ -170,7 +140,7 @@ FakeInstrumenter = Class.new(Racecar::NullInstrumenter)
 describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
   let(:logger) { Logger.new(StringIO.new) }
-  let(:kafka) { FakeKafka.new }
+  let(:kafka)  { FakeRdkafka.new(runner: runner) }
   let(:instrumenter) { FakeInstrumenter }
 
   let(:runner) do
@@ -178,7 +148,7 @@ describe Racecar::Runner do
   end
 
   before do
-    allow(Kafka).to receive(:new) { kafka }
+    allow(Rdkafka::Config).to receive(:new) { kafka }
 
     config.load_consumer_class(processor.class)
   end
@@ -208,36 +178,6 @@ describe Racecar::Runner do
 
       runner.run
     end
-
-    context "when the processing code raises an exception" do
-      it "pauses the partition if `pause_timeout` is > 0" do
-        config.pause_timeout = 10
-
-        processor
-          .on_message {|message| raise "OMG COOKIES!" }
-          .on_message {}
-
-        kafka.deliver_message("hello world", topic: "greetings")
-
-        runner.run
-
-        expect(kafka.paused?("greetings", 0)).to eq true
-      end
-
-      it "does not pause the partition if `pause_timeout` is 0" do
-        config.pause_timeout = 0
-
-        processor
-          .on_message {|message| raise "OMG COOKIES!" }
-          .on_message {}
-
-        kafka.deliver_message("hello world", topic: "greetings")
-
-        runner.run
-
-        expect(kafka.paused?("greetings", 0)).to eq false
-      end
-    end
   end
 
   context "with a consumer class with a #process_batch method" do
@@ -265,36 +205,6 @@ describe Racecar::Runner do
 
       runner.run
     end
-
-    context "when the processing code raises an exception" do
-      it "pauses the partition if `pause_timeout` is > 0" do
-        config.pause_timeout = 10
-
-        processor
-          .on_message {|message| raise "OMG COOKIES!" }
-          .on_message {}
-
-        kafka.deliver_message("hello world", topic: "greetings")
-
-        runner.run
-
-        expect(kafka.paused?("greetings", 0)).to eq true
-      end
-
-      it "does not pause the partition if `pause_timeout` is 0" do
-        config.pause_timeout = 0
-
-        processor
-          .on_message {|message| raise "OMG COOKIES!" }
-          .on_message {}
-
-        kafka.deliver_message("hello world", topic: "greetings")
-
-        runner.run
-
-        expect(kafka.paused?("greetings", 0)).to eq false
-      end
-    end
   end
 
   context "with a consumer class with neither a #process or a #process_batch method" do
@@ -315,7 +225,7 @@ describe Racecar::Runner do
 
       runner.run
 
-      expect(kafka.messages_in("doubled").map(&:value)).to eq ["4"]
+      expect(kafka.messages_in("doubled").map(&:value)).to eq [4]
     end
   end
 
@@ -323,7 +233,7 @@ describe Racecar::Runner do
     let(:processor) { TestConsumer.new }
 
     it "allows the processor to tear down resources" do
-      runner.stop
+      runner.run
 
       expect(processor.torn_down?).to eq true
     end
