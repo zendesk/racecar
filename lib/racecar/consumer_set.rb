@@ -40,10 +40,7 @@ module Racecar
 
     def commit
       each do |consumer|
-        consumer.commit(nil, !@config.synchonous_commits)
-      rescue Rdkafka::RdkafkaError => e
-        raise e if e.message != "Local: No offset stored (no_offset)"
-        @logger.debug "Nothing to commit."
+        commit_rescue_no_offset(consumer)
       end
     end
 
@@ -60,6 +57,13 @@ module Racecar
     end
 
     private
+
+    def commit_rescue_no_offset(consumer)
+      consumer.commit(nil, !@config.synchonous_commits)
+    rescue Rdkafka::RdkafkaError => e
+      raise e if e.message != "Local: No offset stored (no_offset)"
+      @logger.debug "Nothing to commit."
+    end
 
     def collect_messages_for_batch?
       @messages.size < @config.fetch_messages &&
