@@ -67,7 +67,7 @@ module Racecar
     string :log_level, default: "info"
 
     desc "Protocol used to communicate with brokers"
-    symbol :security_protocol, allowed_values: %i{plaintext ssl sasl_plaintext sasl_ssl} + %w{plaintext ssl sasl_plaintext sasl_ssl}
+    symbol :security_protocol, allowed_values: %i{plaintext ssl sasl_plaintext sasl_ssl}
 
     desc "File or directory path to CA certificate(s) for verifying the broker's key"
     string :ssl_ca_location
@@ -112,7 +112,7 @@ module Racecar
     boolean :daemonize, default: false
 
     desc "The codec used to compress messages with"
-    symbol :producer_compression_codec, allowed_values: %i{none lz4 snappy gzip} + %w{none lz4 snappy gzip}
+    symbol :producer_compression_codec, allowed_values: %i{none lz4 snappy gzip}
 
     desc "Enable Datadog metrics"
     boolean :datadog_enabled, default: false
