@@ -20,7 +20,7 @@ module Racecar
     def poll(timeout_ms)
       current.poll(timeout_ms)
     rescue Rdkafka::RdkafkaError => e
-      raise if e.message != "Broker: No more messages (partition_eof)"
+      raise unless e.is_partition_eof?
       @logger.debug "No more messages on this partition."
       @consumer_iterator.next
       nil
@@ -32,7 +32,7 @@ module Racecar
       @messages << current.poll(timeout_ms) while collect_messages_for_batch?
       @messages.compact
     rescue Rdkafka::RdkafkaError => e
-      raise if e.message != "Broker: No more messages (partition_eof)"
+      raise unless e.is_partition_eof?
       @logger.debug "No more messages on this partition."
       @consumer_iterator.next
       @messages.compact
@@ -53,7 +53,11 @@ module Racecar
     end
 
     def each
-      @consumers.each
+      if block_given?
+        @consumers.each { |c| yield c }
+      else
+        @consumers.each
+      end
     end
 
     private
@@ -61,7 +65,7 @@ module Racecar
     def commit_rescue_no_offset(consumer)
       consumer.commit(nil, !@config.synchonous_commits)
     rescue Rdkafka::RdkafkaError => e
-      raise e if e.message != "Local: No offset stored (no_offset)"
+      raise e if e.code != :no_offset
       @logger.debug "Nothing to commit."
     end
 
