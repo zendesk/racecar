@@ -5,6 +5,7 @@
 * Replace `ruby-kafka` with `rdkafka-ruby`
 * [Racecar::Consumer] Do not pause consuming partitions on exception
 * [Racecar::Consumer] `topic`, `payload` and `key` are mandadory to method `produce`
+* [Racecar::Consumer] `process_batch` retrieves an array of messages instead of batch object
 * [Racecar::Consumer] Remove `offset_retention_time`
 * [Racecar::Consumer] Allow providing `additional_config` for subscriptions
 * [Racecar::Consumer] Provide access to `producer` and `consumer`

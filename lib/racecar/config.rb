@@ -49,7 +49,7 @@ module Racecar
     desc "How long to allow the Kafka brokers to wait before returning messages"
     float :max_wait_time, default: 1
 
-    desc "The maximum size of message sets returned from a single fetch"
+    desc "Maximum amount of data the broker shall return for a Fetch request"
     integer :max_bytes, default: 10485760
 
     desc "A prefix used when generating consumer group names"

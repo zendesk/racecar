@@ -2,7 +2,7 @@
 
 Racecar is a friendly and easy-to-approach Kafka consumer framework. It allows you to write small applications that process messages stored in Kafka topics while optionally integrating with your Rails models.
 
-The framework is based on [ruby-kafka](https://github.com/zendesk/ruby-kafka), which, when used directly, can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though. Racecar provides a simple and intuitive way to build and configure Kafka consumers.
+The framework is based on [rdkafka-ruby](https://github.com/appsignal/rdkafka-ruby), which, when used directly, can be a challenge: it's a flexible library with lots of knobs and options. Most users don't need that level of flexibility, though. Racecar provides a simple and intuitive way to build and configure Kafka consumers.
 
 **NOTE:** Racecar requires Kafka 0.10 or higher.
 
@@ -121,23 +121,23 @@ Note that once the consumer has started, it will commit the offsets it has proce
 
 #### Processing messages in batches
 
-If you want to process whole _batches_ of messages at a time, simply rename your `#process` method to `#process_batch`. The method will now be called with a "batch" object rather than a message:
+If you want to process whole _batches_ of messages at a time, simply rename your `#process` method to `#process_batch`. The method will now be called with an array of message objects:
 
 ```ruby
 class ArchiveEventsConsumer < Racecar::Consumer
   subscribes_to "events"
 
-  def process_batch(batch)
+  def process_batch(messages)
     file_name = [
-      batch.topic, # the topic this batch of messages came from.
-      batch.partition, # the partition this batch of messages came from.
-      batch.first_offset, # offset of the first message in the batch.
-      batch.last_offset, # offset of the last message in the batch.
+      messages.first.topic, # the topic this batch of messages came from.
+      messages.first.partition, # the partition this batch of messages came from.
+      messages.first.offset, # offset of the first message in the batch.
+      messages.last.offset, # offset of the last message in the batch.
     ].join("-")
 
     File.open(file_name, "w") do |file|
       # the messages in the batch.
-      batch.messages.each do |message|
+      messages.each do |message|
         file << message.value
       end
     end
@@ -198,10 +198,12 @@ class GeoCodingConsumer < Racecar::Consumer
 
     # The `produce` method enqueues a message to be delivered after #process
     # returns. It won't actually deliver the message.
-    produce(JSON.dump(pageview), topic: "pageviews-with-country")
+    produce(payload: JSON.dump(pageview), topic: "pageviews-with-country", key: pageview["id"])
   end
 end
 ```
+
+The `deliver!` method can be used to block until the broker received all queued published messages (according to the publisher ack settings). This will automatically being called in the shutdown procedure of a consumer.
 
 ### Configuration
 
@@ -244,7 +246,6 @@ All timeouts are defined in number of seconds.
 
 * `session_timeout` – The idle timeout after which a consumer is kicked out of the group. Consumers must send heartbeats with at least this frequency.
 * `heartbeat_interval` – How often to send a heartbeat message to Kafka.
-* `pause_timeout` – How long to pause a partition for if the consumer raises an exception while processing a message. Default is to pause for 10 seconds. Set this to zero in order to disable automatic pausing of partitions.
 * `socket_timeout` – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
 * `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 1 second.
 
@@ -254,42 +255,32 @@ Kafka is _really_ good at throwing data at consumers, so you may want to tune th
 
 Racecar uses ruby-kafka under the hood, which fetches messages from the Kafka brokers in a background thread. This thread pushes fetch responses, possible containing messages from many partitions, into a queue that is read by the processing thread (AKA your code). The main way to control the fetcher thread is to control the size of those responses and the size of the queue.
 
-* `max_bytes` — The maximum size of message sets returned from a single fetch request.
+* `max_bytes` — Maximum amount of data the broker shall return for a Fetch request.
 * `min_message_queue_size` — The minimum number of messages in the local consumer queue.
 
 The memory usage limit is roughly estimated as `max_bytes * min_message_queue_size`, plus whatever your application uses.
 
 #### SSL encryption, authentication & authorization
 
-TODO: update
-
-* `ssl_ca_cert` – A valid SSL certificate authority, as a string.
-* `ssl_ca_cert_file_path` - The path to a valid SSL certificate authority file.
-* `ssl_client_cert` – A valid SSL client certificate, as a string.
-* `ssl_client_cert_key` – A valid SSL client certificate key, as a string.
+* `security_protocol` – Protocol used to communicate with brokers (`:ssl`)
+* `ssl_ca_location` – File or directory path to CA certificate(s) for verifying the broker's key
+* `ssl_crl_location` – Path to CRL for verifying broker's certificate validity
+* `ssl_keystore_location` – Path to client's keystore (PKCS#12) used for authentication
+* `ssl_keystore_password` – Client's keystore (PKCS#12) password
 
 #### SASL encryption, authentication & authorization
 
-TODO: update
+Racecar has support for using SASL to authenticate clients using either the GSSAPI or PLAIN mechanism either via plaintext or SSL connection.
 
-Racecar has support for using SASL to authenticate clients using either the GSSAPI or PLAIN mechanism.
+* `security_protocol` – Protocol used to communicate with brokers (`:sasl_plaintext` `:sasl_ssl`)
+* `sasl_mechanism` – SASL mechanism to use for authentication (`GSSAPI` `PLAIN` `SCRAM-SHA-256` `SCRAM-SHA-512`)
 
-If using GSSAPI:
-
-* `sasl_gssapi_principal` – The GSSAPI principal.
-* `sasl_gssapi_keytab` – Optional GSSAPI keytab.
-
-If using PLAIN:
-
-* `sasl_plain_authzid` – The authorization identity to use.
-* `sasl_plain_username` – The username used to authenticate.
-* `sasl_plain_password` – The password used to authenticate.
-
-If using SCRAM:
-
-* `sasl_scram_username` – The username used to authenticate.
-* `sasl_scram_password` – The password used to authenticate.
-* `sasl_scram_mechanism` – The SCRAM mechanism to use, either `sha256` or `sha512`.
+* `sasl_kerberos_principal` – This client's Kerberos principal name
+* `sasl_kerberos_kinit_cmd` – Full kerberos kinit command string, `%{config.prop.name}` is replaced by corresponding config object value, `%{broker.name}` returns the broker's hostname
+* `sasl_kerberos_keytab` – Path to Kerberos keytab file. Uses system default if not set
+* `sasl_kerberos_min_time_before_relogin` – Minimum time in milliseconds between key refresh attempts
+* `sasl_username` – SASL username for use with the PLAIN and SASL-SCRAM-.. mechanism
+* `sasl_password` – SASL password for use with the PLAIN and SASL-SCRAM-.. mechanism
 
 #### Producing messages
 
@@ -396,8 +387,6 @@ end
 ```
 
 Since the exception is handled by your `#process` method and is no longer raised, Racecar will consider the message successfully processed. Tracking these errors in an exception tracker or some other monitoring system is highly recommended, as you otherwise will have little insight into how many messages are being skipped this way.
-
-If, on the other hand, the exception was cause by a temporary network or database problem, you will probably want to retry processing of the message after some time has passed. By default, if an exception is raised by the `#process` method, the consumer will pause all processing of the message's partition for some number of seconds, configured by setting the `pause_timeout` configuration variable. This allows the consumer to continue processing messages from other partitions that may not be impacted by the problem while still making sure to not drop the original message. Since messages in a single Kafka topic partition _must_ be processed in order, it's not possible to keep processing _other_ messages in that partition.
 
 In addition to retrying the processing of messages, Racecar also allows defining an _error handler_ callback that is invoked whenever an exception is raised by your `#process` method. This allows you to track and report errors to a monitoring system:
 
