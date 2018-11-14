@@ -25,11 +25,9 @@ module Racecar
     desc "Kafka producer configuration options, separated with '=' -- https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md"
     list :producer, default: []
 
-    # TODO: not needed once there is batch support in rdkafka-ruby
     desc "The maxium number of messages that get consumed within one batch"
     integer :fetch_messages, default: 1000
 
-    # TODO: not needed once there is batch support in rdkafka-ruby
     desc "Automatically store offset of last message provided to application"
     boolean :synchonous_commits, default: false
 
