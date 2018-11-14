@@ -18,7 +18,7 @@ module Racecar
       # returning the consumer.batch_poll method. To circumvent this we don't
       # autocommit but call commit after the whole batch was fetched. Because
       # synchronous commits are disabled by default there should almost be no
-      # difference in performace.
+      # difference in performance.
       if processor.respond_to?(:process_batch)
         config.consumer << "enable.auto.commit=false"
       end
@@ -49,7 +49,6 @@ module Racecar
         else
           raise NotImplementedError, "Consumer class must implement process or process_batch method"
         end
-      # TODO: pause handling
       end
 
       logger.info "Gracefully shutting down"
