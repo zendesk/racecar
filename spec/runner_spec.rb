@@ -86,6 +86,12 @@ class FakeConsumer
     @runner.stop if @kafka.messages.empty?
     @kafka.messages.shift
   end
+
+  def commit(partitions, async)
+  end
+
+  def close
+  end
 end
 
 class FakeProducer
