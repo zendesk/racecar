@@ -10,8 +10,10 @@ module Racecar
     end
 
     def stop
-      processor.teardown
-      consumer.stop unless consumer.nil?
+      Thread.new do
+        processor.teardown
+        consumer.stop unless consumer.nil?
+      end.join
     end
 
     def run
