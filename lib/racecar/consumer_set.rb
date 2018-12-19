@@ -18,10 +18,12 @@ module Racecar
     end
 
     def poll(timeout_ms)
-      current.poll(timeout_ms)
+      current.poll(timeout_ms).tap do |msg|
+        @consumer_iterator.next if msg.nil?
+      end
     rescue Rdkafka::RdkafkaError => e
       raise unless e.is_partition_eof?
-      @logger.debug "No more messages on this partition."
+      @logger.debug "No more messages on these partition(s)."
       @consumer_iterator.next
       nil
     end
@@ -29,13 +31,12 @@ module Racecar
     def batch_poll(timeout_ms)
       @batch_started_at = Time.now
       @messages = []
-      @messages << current.poll(timeout_ms) while collect_messages_for_batch?
-      @messages.compact
-    rescue Rdkafka::RdkafkaError => e
-      raise unless e.is_partition_eof?
-      @logger.debug "No more messages on this partition."
-      @consumer_iterator.next
-      @messages.compact
+      while collect_messages_for_batch? do
+        msg = poll(timeout_ms)
+        break if msg.nil?
+        @messages << msg
+      end
+      @messages
     end
 
     def commit

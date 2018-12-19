@@ -5,10 +5,19 @@ def subscription(name)
 end
 
 describe Racecar::ConsumerSet do
-  let(:config)       { Racecar::Config.new }
-  let(:rdconsumer)   { double("rdconsumer", subscribe: true) }
-  let(:rdconfig)     { double("rdconfig", consumer: rdconsumer) }
-  let(:consumer_set) { Racecar::ConsumerSet.new(config, Logger.new(StringIO.new)) }
+  let(:config)              { Racecar::Config.new }
+  let(:rdconsumer)          { double("rdconsumer", subscribe: true) }
+  let(:rdconfig)            { double("rdconfig", consumer: rdconsumer) }
+  let(:consumer_set)        { Racecar::ConsumerSet.new(config, Logger.new(StringIO.new)) }
+  let(:partition_eof_error) { Rdkafka::RdkafkaError.new(-191) }
+
+  def message_generator(messages)
+    msgs = messages.dup
+    proc do
+      message = msgs.shift
+      message.is_a?(StandardError) ? raise(message) : message
+    end
+  end
 
   before do
     allow(Rdkafka::Config).to receive(:new).and_return(rdconfig)
@@ -34,14 +43,14 @@ describe Racecar::ConsumerSet do
     context "which is subscribed" do
       before { consumer_set.subscribe }
 
-      context "#poll" do
+      describe "#poll" do
         it "forwards to Rdkafka" do
           expect(rdconsumer).to receive(:poll).once.with(100).and_return(:message)
           expect(consumer_set.poll(100)).to be :message
         end
 
         it "returns nil on end of partition" do
-          allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, -191) # partition_eof
+          allow(rdconsumer).to receive(:poll).and_raise(partition_eof_error)
           expect(consumer_set.poll(100)).to be nil
         end
 
@@ -51,7 +60,7 @@ describe Racecar::ConsumerSet do
         end
       end
 
-      context "#batch_poll" do
+      describe "#batch_poll" do
         it "forwards to Rdkafka (as poll)" do
           config.fetch_messages = 3
           expect(rdconsumer).to receive(:poll).exactly(3).times.with(100).and_return(:msg1, :msg2, :msg3)
@@ -60,19 +69,26 @@ describe Racecar::ConsumerSet do
 
         it "returns remaining messages of current partition" do
           config.fetch_messages = 1000
-          @messages = [:msg1, :msg2, Rdkafka::RdkafkaError.new(-191), :msgN]
-          allow(rdconsumer).to receive(:poll) do
-            message = @messages.shift
-            message.is_a?(StandardError) ? raise(message) : message
-          end
+          messages = [:msg1, :msg2, partition_eof_error, :msgN]
+          allow(rdconsumer).to receive(:poll, &message_generator(messages))
 
           expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
         end
 
-        it "drops nil messages" do
-          config.fetch_messages = 7
-          allow(rdconsumer).to receive(:poll).and_return(nil, nil, :msg1, nil, :msg2, nil, :msg3)
-          expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2, :msg3]
+        it "returns messages until nil is encountered" do
+          config.fetch_messages = 3
+          allow(rdconsumer).to receive(:poll).and_return(:msg1, :msg2, nil, :msg3)
+          expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
+        end
+
+        it "eventually reads all messages" do
+          config.fetch_messages = 1
+          messages = [:msg1, :msg2, nil, nil, partition_eof_error, partition_eof_error,  :msgN]
+          allow(rdconsumer).to receive(:poll, &message_generator(messages))
+
+          polled = []
+          messages.size.times { polled += consumer_set.batch_poll(100) }
+          expect(polled).to eq [:msg1, :msg2, :msgN]
         end
 
         it "raises other Rdkafka errors" do
@@ -81,7 +97,7 @@ describe Racecar::ConsumerSet do
         end
       end
 
-      context "#commit" do
+      describe "#commit" do
         it "forwards to Rdkafka" do
           expect(rdconsumer).to receive(:commit).once
           consumer_set.commit
@@ -93,14 +109,14 @@ describe Racecar::ConsumerSet do
         end
       end
 
-      context "#close" do
+      describe "#close" do
         it "forwards to Rdkafka" do
           expect(rdconsumer).to receive(:close).once
           consumer_set.close
         end
       end
 
-      context "#current" do
+      describe "#current" do
         it "returns current rdkafka client" do
           expect(consumer_set.current).to be rdconsumer
         end
@@ -125,7 +141,7 @@ describe Racecar::ConsumerSet do
       consumer_set.subscribe
     end
 
-    context "A consumer with subscriptions" do
+    context "already setup" do
       before { consumer_set.subscribe }
 
       it "#current returns current rdkafka client" do
@@ -133,21 +149,40 @@ describe Racecar::ConsumerSet do
       end
 
       it "#poll changes rdkafka client on end of partition" do
-        allow(rdconsumer1).to receive(:poll).and_raise(Rdkafka::RdkafkaError, -191) # partition_eof
+        allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
         expect(consumer_set.poll(100)).to be nil
         expect(consumer_set.current).to be rdconsumer2
       end
 
       it "#batch_poll changes rdkafka client on end of partition" do
         config.fetch_messages = 1000
-        @messages = [:msg1, :msg2, Rdkafka::RdkafkaError.new(-191), :msgN]
-        allow(rdconsumer1).to receive(:poll) do
-          message = @messages.shift
-          message.is_a?(StandardError) ? raise(message) : message
-        end
+        messages = [:msg1, :msg2, partition_eof_error, :msgN]
+        allow(rdconsumer1).to receive(:poll, &message_generator(messages))
 
         expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
         expect(consumer_set.current).to be rdconsumer2
+      end
+
+      it "#batch_poll changes rdkafka client when encountering a nil message" do
+        config.fetch_messages = 1000
+        messages = [:msg1, :msg2, nil, :msgN]
+        allow(rdconsumer1).to receive(:poll, &message_generator(messages))
+
+        expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
+        expect(consumer_set.current).to be rdconsumer2
+      end
+
+      it "#batch_poll eventually reads all messages" do
+        config.fetch_messages = 1
+        messages = [:msg1, nil, nil, partition_eof_error, partition_eof_error,  :msgN]
+        allow(rdconsumer1).to receive(:poll, &message_generator(messages))
+        allow(rdconsumer2).to receive(:poll, &message_generator(messages))
+        allow(rdconsumer3).to receive(:poll, &message_generator(messages))
+
+        polled = []
+        count = (messages.size+1)*3
+        count.times { polled += consumer_set.batch_poll(100) }
+        expect(polled).to eq [:msg1, :msg1, :msg1, :msgN, :msgN, :msgN]
       end
     end
   end
