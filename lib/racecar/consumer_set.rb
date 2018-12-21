@@ -18,14 +18,9 @@ module Racecar
     end
 
     def poll(timeout_ms)
-      current.poll(timeout_ms).tap do |msg|
-        @consumer_iterator.next if msg.nil?
-      end
-    rescue Rdkafka::RdkafkaError => e
-      raise unless e.is_partition_eof?
-      @logger.debug "No more messages on these partition(s)."
-      @consumer_iterator.next
-      nil
+      msg = current.poll(timeout_ms)
+    ensure
+      @consumer_iterator.next if msg.nil?
     end
 
     def batch_poll(timeout_ms)
@@ -82,6 +77,7 @@ module Racecar
         "auto.offset.reset"       => subscription.start_from_beginning ? "earliest" : "largest",
         "bootstrap.servers"       => @config.brokers.join(","),
         "client.id"               => @config.client_id,
+        "enable.partition.eof"    => @config.raise_on_partition_eof,
         "fetch.max.bytes"         => @config.max_bytes,
         "fetch.message.max.bytes" => subscription.max_bytes_per_partition,
         "fetch.wait.max.ms"       => @config.max_wait_time * 1000,

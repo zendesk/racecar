@@ -50,8 +50,13 @@ describe Racecar::ConsumerSet do
         end
 
         it "returns nil on end of partition" do
-          allow(rdconsumer).to receive(:poll).and_raise(partition_eof_error)
+          allow(rdconsumer).to receive(:poll).and_return(nil)
           expect(consumer_set.poll(100)).to be nil
+        end
+
+        it "passes through end of partition errors" do
+          allow(rdconsumer).to receive(:poll).and_raise(partition_eof_error)
+          expect { consumer_set.poll(100) }.to raise_error(partition_eof_error)
         end
 
         it "raises other Rdkafka errors" do
@@ -69,10 +74,17 @@ describe Racecar::ConsumerSet do
 
         it "returns remaining messages of current partition" do
           config.fetch_messages = 1000
-          messages = [:msg1, :msg2, partition_eof_error, :msgN]
+          messages = [:msg1, :msg2, nil, :msgN]
           allow(rdconsumer).to receive(:poll, &message_generator(messages))
 
           expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
+        end
+
+        it "passes through end of partition errors" do
+          config.fetch_messages = 1000
+          allow(rdconsumer).to receive(:poll).and_raise(partition_eof_error)
+
+          expect { consumer_set.batch_poll(100) }.to raise_error(partition_eof_error)
         end
 
         it "returns messages until nil is encountered" do
@@ -87,7 +99,9 @@ describe Racecar::ConsumerSet do
           allow(rdconsumer).to receive(:poll, &message_generator(messages))
 
           polled = []
-          messages.size.times { polled += consumer_set.batch_poll(100) }
+          messages.size.times do
+            polled += consumer_set.batch_poll(100) rescue []
+          end
           expect(polled).to eq [:msg1, :msg2, :msgN]
         end
 
@@ -149,17 +163,29 @@ describe Racecar::ConsumerSet do
       end
 
       it "#poll changes rdkafka client on end of partition" do
-        allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+        allow(rdconsumer1).to receive(:poll).and_return(nil)
         expect(consumer_set.poll(100)).to be nil
+        expect(consumer_set.current).to be rdconsumer2
+      end
+
+      it "#poll changes rdkafka client when partition EOF is raised" do
+        allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+        expect { consumer_set.poll(100) }.to raise_error(partition_eof_error)
         expect(consumer_set.current).to be rdconsumer2
       end
 
       it "#batch_poll changes rdkafka client on end of partition" do
         config.fetch_messages = 1000
-        messages = [:msg1, :msg2, partition_eof_error, :msgN]
+        messages = [:msg1, :msg2, nil, :msgN]
         allow(rdconsumer1).to receive(:poll, &message_generator(messages))
 
         expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
+        expect(consumer_set.current).to be rdconsumer2
+      end
+
+      it "#batch_poll changes rdkafka client when partition EOF is raised" do
+        allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+        expect { consumer_set.batch_poll(100) }.to raise_error(partition_eof_error)
         expect(consumer_set.current).to be rdconsumer2
       end
 
@@ -174,14 +200,14 @@ describe Racecar::ConsumerSet do
 
       it "#batch_poll eventually reads all messages" do
         config.fetch_messages = 1
-        messages = [:msg1, nil, nil, partition_eof_error, partition_eof_error,  :msgN]
+        messages = [:msg1, nil, nil, partition_eof_error, partition_eof_error, :msgN]
         allow(rdconsumer1).to receive(:poll, &message_generator(messages))
         allow(rdconsumer2).to receive(:poll, &message_generator(messages))
         allow(rdconsumer3).to receive(:poll, &message_generator(messages))
 
         polled = []
         count = (messages.size+1)*3
-        count.times { polled += consumer_set.batch_poll(100) }
+        count.times { polled += consumer_set.batch_poll(100) rescue [] }
         expect(polled).to eq [:msg1, :msg1, :msg1, :msgN, :msgN, :msgN]
       end
     end
