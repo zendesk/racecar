@@ -64,7 +64,7 @@ module Racecar
     private
 
     def commit_rescue_no_offset(consumer)
-      consumer.commit(nil, !@config.synchonous_commits)
+      consumer.commit(nil, !@config.synchronous_commits)
     rescue Rdkafka::RdkafkaError => e
       raise e if e.code != :no_offset
       @logger.debug "Nothing to commit."

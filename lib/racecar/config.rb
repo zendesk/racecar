@@ -29,7 +29,7 @@ module Racecar
     integer :fetch_messages, default: 1000
 
     desc "Automatically store offset of last message provided to application"
-    boolean :synchonous_commits, default: false
+    boolean :synchronous_commits, default: false
 
     desc "How long to pause a partition for if the consumer raises an exception while processing a message -- set to -1 to pause indefinitely"
     float :pause_timeout, default: 10

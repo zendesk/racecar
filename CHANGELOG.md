@@ -13,7 +13,7 @@
 * [Racecar::Config] Remove `offset_retention_time`, `connect_timeout` and `offset_commit_threshold`
 * [Racecar::Config] Pass config to `rdkafka-ruby` via `producer` and `consumer`
 * [Racecar::Config] Replace `max_fetch_queue_size` with `min_message_queue_size`
-* [Racecar::Config] Add `synchonous_commits` to control blocking of `consumer.commit` (default `false`)
+* [Racecar::Config] Add `synchronous_commits` to control blocking of `consumer.commit` (default `false`)
 * [Racecar::Config] Add `security_protocol` to control protocol between client and broker
 * [Racecar::Config] SSL configuration via `ssl_ca_location`, `ssl_crl_location`, `ssl_keystore_location` and `ssl_keystore_password`
 * [Racecar::Config] SASL configuration via `sasl_mechanism`, `sasl_kerberos_service_name`, `sasl_kerberos_principal`, `sasl_kerberos_kinit_cmd`, `sasl_kerberos_keytab`, `sasl_kerberos_min_time_before_relogin`, `sasl_username` and `sasl_password`
