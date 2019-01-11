@@ -4,6 +4,7 @@ module Racecar
       @config, @logger = config, logger
       @consumers = []
       @consumer_iterator = [].cycle
+      @last_poll_read_partition_eof = false
     end
 
     def subscribe
@@ -18,7 +19,12 @@ module Racecar
     end
 
     def poll(timeout_ms)
+      @last_poll_read_partition_eof = false
       msg = current.poll(timeout_ms)
+    rescue Rdkafka::RdkafkaError => e
+      raise unless e.is_partition_eof?
+      @last_poll_read_partition_eof = true
+      msg = nil
     ensure
       @consumer_iterator.next if msg.nil?
     end
@@ -32,6 +38,10 @@ module Racecar
         @messages << msg
       end
       @messages
+    end
+
+    def last_poll_read_partition_eof?
+      @last_poll_read_partition_eof
     end
 
     def commit
@@ -77,7 +87,7 @@ module Racecar
         "auto.offset.reset"       => subscription.start_from_beginning ? "earliest" : "largest",
         "bootstrap.servers"       => @config.brokers.join(","),
         "client.id"               => @config.client_id,
-        "enable.partition.eof"    => @config.raise_on_partition_eof,
+        "enable.partition.eof"    => true,
         "fetch.max.bytes"         => @config.max_bytes,
         "fetch.message.max.bytes" => subscription.max_bytes_per_partition,
         "fetch.wait.max.ms"       => @config.max_wait_time * 1000,
