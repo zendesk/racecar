@@ -147,6 +147,15 @@ end
 
 An important detail is that, if an exception is raised while processing a batch, the _whole batch_ is re-processed.
 
+#### Message headers
+
+Any headers set on the message will be available when consuming the message:
+
+```ruby
+message.headers #=> { "Header-A" => 42, ... }
+```
+
+
 #### Tearing down resources when stopping
 
 When a Racecar consumer shuts down, it gets the opportunity to tear down any resources held by the consumer instance. For example, it may make sense to close any open files or network connections. Doing so is simple: just implement a `#teardown` method in your consumer class and it will be called during the shutdown procedure.
@@ -202,6 +211,8 @@ class GeoCodingConsumer < Racecar::Consumer
   end
 end
 ```
+
+You can set message headers by passing a `headers:` option with a Hash of headers.
 
 ### Configuration
 
