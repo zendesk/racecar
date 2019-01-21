@@ -28,13 +28,18 @@ module Racecar
       end
     end
 
-    def configure(producer:)
+    def configure(consumer:, producer:)
+      @_consumer = consumer
       @_producer = producer
     end
 
     def teardown; end
 
     protected
+
+    def heartbeat
+      @_consumer.trigger_heartbeat
+    end
 
     def produce(value, **options)
       @_producer.produce(value, **options)
