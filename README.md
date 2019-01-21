@@ -155,6 +155,23 @@ Any headers set on the message will be available when consuming the message:
 message.headers #=> { "Header-A" => 42, ... }
 ```
 
+#### Heartbeats
+
+In order to avoid your consumer being kicked out of its group during long-running message processing operations, it may be a good idea to periodically send so-called _heartbeats_ back to Kafka. This is done automatically for you after each message has been processed, but if the processing of a _single_ message takes a long time you may run into group stability issues.
+
+If possible, intersperse `heartbeat` calls in between long-running operations in your consumer, e.g.
+
+```ruby
+def process(message)
+  long_running_op_one(message)
+
+  # Signals back to Kafka that we're still alive!
+  heartbeat
+
+  long_running_op_two(message)
+end
+```
+
 
 #### Tearing down resources when stopping
 

@@ -66,7 +66,7 @@ module Racecar
         compression_codec: config.producer_compression_codec,
       )
 
-      processor.configure(producer: producer)
+      processor.configure(consumer: consumer, producer: producer)
 
       begin
         if processor.respond_to?(:process)
