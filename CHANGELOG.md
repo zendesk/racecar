@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## racecar v0.5.0
+
+* Add support for manually sending heartbeats with `heartbeat` (#105).
+
 ## racecar v0.4.2
 
 * Allow configuring `max_bytes` and `max_fetch_queue_size`.
