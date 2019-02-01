@@ -30,9 +30,10 @@ module Racecar
       end
     end
 
-    def configure(producer:, consumer:)
+    def configure(producer:, consumer:, instrumenter:)
       @producer = producer
       @consumer = consumer
+      @instrumenter = instrumenter
     end
 
     def teardown; end
@@ -49,7 +50,16 @@ module Racecar
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
     def produce(topic:, payload:, key:)
       @delivery_handles ||= []
-      @delivery_handles << @producer.produce(topic: topic, payload: payload, key: key)
+
+      extra_info = {
+        value:       payload,
+        key:         key,
+        topic:       topic,
+        create_time: Time.now,
+      }
+      @instrumenter.instrument("produce_message.racecar", extra_info) do
+        @delivery_handles << @producer.produce(topic: topic, payload: payload, key: key)
+      end
     end
   end
 end

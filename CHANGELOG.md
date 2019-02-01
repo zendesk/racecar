@@ -18,6 +18,8 @@
 * [Racecar::Config] Add `security_protocol` to control protocol between client and broker
 * [Racecar::Config] SSL configuration via `ssl_ca_location`, `ssl_crl_location`, `ssl_keystore_location` and `ssl_keystore_password`
 * [Racecar::Config] SASL configuration via `sasl_mechanism`, `sasl_kerberos_service_name`, `sasl_kerberos_principal`, `sasl_kerberos_kinit_cmd`, `sasl_kerberos_keytab`, `sasl_kerberos_min_time_before_relogin`, `sasl_username` and `sasl_password`
+* [Instrumentation] `produce_message.racecar` sent whenever a produced message is queued. Payload includes `topic`, `key`, `value` and `create_time`.
+* [Instrumentation] `acknowledged_message.racecar` send whenever a produced message was successfully received by Kafka. Payload includes `offset` and `partition`, but no message details.
 * [Instrumentation] `rdkafka-ruby` does not yet provide instrumentation [rdkafka-ruby#54](https://github.com/appsignal/rdkafka-ruby/issues/54)
 
 ## racecar v0.4.2

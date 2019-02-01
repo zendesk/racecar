@@ -99,18 +99,43 @@ class FakeProducer
     @kafka = kafka
     @runner = runner
     @buffer = []
+    @position = -1
+    @delivery_callback = nil
   end
 
   def produce(topic:, payload:, key:)
     @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0)
     @runner.stop
-    self
+    FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback)
+  end
+
+  def delivery_callback=(handler)
+    @delivery_callback = handler
+  end
+end
+
+class FakeDeliveryHandle
+  def initialize(kafka, msg, delivery_callback)
+    @kafka = kafka
+    @msg = msg
+    @delivery_callback = delivery_callback
+  end
+
+  def [](key)
+    @msg.public_send(key)
   end
 
   def wait
-    @buffer.each do |message|
-      @kafka.messages << message
-    end
+    @kafka.messages << @msg
+    @delivery_callback.call(self) if @delivery_callback
+  end
+
+  def offset
+    0
+  end
+
+  def partition
+    0
   end
 end
 
@@ -232,6 +257,29 @@ describe Racecar::Runner do
       runner.run
 
       expect(kafka.messages_in("doubled").map(&:value)).to eq [4]
+    end
+
+    it "instruments produced messages" do
+      allow(instrumenter).to receive(:instrument).and_call_original
+      kafka.deliver_message("2", topic: "numbers")
+
+      payload_start = a_hash_including(:create_time, topic: "doubled", key: 4, value: 4)
+      payload_finish = a_hash_including(message_count: 1)
+
+      runner.run
+
+      expect(instrumenter).to have_received(:instrument).with("produce_message.racecar", payload_start)
+    end
+
+    it "instruments delivery notifications" do
+      allow(instrumenter).to receive(:instrument).and_call_original
+      kafka.deliver_message("2", topic: "numbers")
+
+
+      runner.run
+
+      expect(instrumenter).to have_received(:instrument)
+        .with("acknowledged_message.racecar", {partition: 0, offset: 0})
     end
   end
 
