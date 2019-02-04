@@ -34,21 +34,25 @@ module Racecar
         instrumenter: @instrumenter,
       )
 
+      instrument_payload = { consumer_class: processor.class.to_s }
+
       # Main loop
       loop do
         break if @stop_requested
-        if processor.respond_to?(:process_batch)
-          messages = consumer.batch_poll(config.max_wait_time)
-          if !messages.empty?
-            process_batch(messages)
-            consumer.commit # See above. Needed because auto commit is disabled
+        @instrumenter.instrument("main_loop.racecar", instrument_payload) do
+          if processor.respond_to?(:process_batch)
+            messages = consumer.batch_poll(config.max_wait_time)
+            if !messages.empty?
+              process_batch(messages)
+              consumer.commit # See above. Needed because auto commit is disabled
+            end
+          elsif processor.respond_to?(:process)
+            if message = consumer.poll(config.max_wait_time)
+              process(message)
+            end
+          else
+            raise NotImplementedError, "Consumer class must implement process or process_batch method"
           end
-        elsif processor.respond_to?(:process)
-          if message = consumer.poll(config.max_wait_time)
-            process(message)
-          end
-        else
-          raise NotImplementedError, "Consumer class must implement process or process_batch method"
         end
       end
 
