@@ -9,6 +9,10 @@ module Racecar
       @instrumenter = instrumenter
       @stop_requested = false
       Rdkafka::Config.logger = logger
+
+      if processor.respond_to?(:statistics_callback)
+        Rdkafka::Config.statistics_callback = processor.method(:statistics_callback).to_proc
+      end
     end
 
     def run
@@ -70,16 +74,17 @@ module Racecar
     private
 
     def producer
-      # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
       @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |producer|
         producer.delivery_callback = delivery_callback
       end
     end
 
     def producer_config
+      # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
       producer_config = {
-        "bootstrap.servers" => config.brokers.join(","),
-        "client.id"         => config.client_id,
+        "bootstrap.servers"      => config.brokers.join(","),
+        "client.id"              => config.client_id,
+        "statistics.interval.ms" => 1000,
       }
       producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
       producer_config.merge(config.rdkafka_producer)
