@@ -2,34 +2,36 @@ module Racecar
   class ConsumerSet
     def initialize(config, logger)
       @config, @logger = config, logger
-      @consumers = []
-      @consumer_iterator = [].cycle
-      @last_poll_read_partition_eof = false
-    end
-
-    def subscribe
       raise ArgumentError, "Subscriptions must not be empty when subscribing" if @config.subscriptions.empty?
-      @consumers = @config.subscriptions.map do |subscription|
-        consumer = Rdkafka::Config.new(rdkafka_config(subscription)).consumer
-        consumer.subscribe subscription.topic
-        consumer
-      end
-      @consumer_iterator = @consumers.cycle
-      @consumers
+
+      @consumers = []
+      @consumer_id_iterator = (0...@config.subscriptions.size).cycle
+
+      @last_poll_read_partition_eof = false
     end
 
     def poll(timeout_ms)
+      retried ||= false
       @last_poll_read_partition_eof = false
       msg = current.poll(timeout_ms)
     rescue Rdkafka::RdkafkaError => e
-      unless e.is_partition_eof?
-        @logger.error "Error for #{current.subscription.inspect}: #{e}"
+      @logger.error "Error for topic subscription #{current_subscription}: #{e}"
+
+
+      case e.code
+      when :max_poll_exceeded, :"err_-147?" # Note: requires unreleased librdkafka version
+        reset_current_consumer
+        raise if retried
+        retried = true
+        retry
+      when :partition_eof
+        @last_poll_read_partition_eof = true
+        msg = nil
+      else
         raise
       end
-      @last_poll_read_partition_eof = true
-      msg = nil
     ensure
-      @consumer_iterator.next if msg.nil?
+      select_next_consumer if msg.nil?
     end
 
     def batch_poll(timeout_ms)
@@ -58,7 +60,11 @@ module Racecar
     end
 
     def current
-      @consumer_iterator.peek
+      @consumers[@consumer_id_iterator.peek] ||= begin
+        consumer = Rdkafka::Config.new(rdkafka_config(current_subscription)).consumer
+        consumer.subscribe current_subscription.topic
+        consumer
+      end
     end
 
     def each
@@ -70,6 +76,18 @@ module Racecar
     end
 
     private
+
+    def current_subscription
+      @config.subscriptions[@consumer_id_iterator.peek]
+    end
+
+    def reset_current_consumer
+      @consumers[@consumer_id_iterator.peek] = nil
+    end
+
+    def select_next_consumer
+      @consumer_id_iterator.next
+    end
 
     def commit_rescue_no_offset(consumer)
       consumer.commit(nil, !@config.synchronous_commits)

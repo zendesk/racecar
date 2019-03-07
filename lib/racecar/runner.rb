@@ -28,7 +28,6 @@ module Racecar
       end
 
       consumer = ConsumerSet.new(config, logger)
-      consumer.subscribe
 
       # Configure the consumer with a producer so it can produce messages and
       # with a consumer so that it can support advanced use-cases.

@@ -10,6 +10,7 @@ describe Racecar::ConsumerSet do
   let(:rdconfig)            { double("rdconfig", consumer: rdconsumer) }
   let(:consumer_set)        { Racecar::ConsumerSet.new(config, Logger.new(StringIO.new)) }
   let(:partition_eof_error) { Rdkafka::RdkafkaError.new(-191) }
+  let(:max_poll_exceeded_error) { Rdkafka::RdkafkaError.new(-147) }
 
   def message_generator(messages)
     msgs = messages.dup
@@ -28,20 +29,25 @@ describe Racecar::ConsumerSet do
     let(:subscriptions) { [] }
 
     it "raises an expeption" do
-      expect { consumer_set.subscribe }.to raise_error(ArgumentError)
+      expect { consumer_set }.to raise_error(ArgumentError)
     end
   end
 
   context "A consumer with subscription" do
     let(:subscriptions) { [ subscription("greetings") ] }
 
-    it "subscribes to a topic" do
-      expect(rdconsumer).to receive(:subscribe).with("greetings")
-      consumer_set.subscribe
+    it "subscribes to a topic upon first use" do
+      allow(rdconsumer).to receive(:subscribe)
+
+      consumer_set
+      expect(rdconsumer).not_to have_received(:subscribe)
+
+      consumer_set.current
+      expect(rdconsumer).to have_received(:subscribe).with("greetings")
     end
 
     context "which is subscribed" do
-      before { consumer_set.subscribe }
+      before { consumer_set; consumer_set.current }
 
       describe "#poll" do
         it "forwards to Rdkafka" do
@@ -180,90 +186,144 @@ describe Racecar::ConsumerSet do
       allow(rdconfig).to receive(:consumer).and_return(rdconsumer1, rdconsumer2, rdconsumer3)
     end
 
-    it "subscribes to topics" do
+    it ".new subscribes to all topics" do
       expect(rdconsumer1).to receive(:subscribe).with("feature")
       expect(rdconsumer2).to receive(:subscribe).with("profile")
       expect(rdconsumer3).to receive(:subscribe).with("account")
-      consumer_set.subscribe
+
+      3.times do
+        consumer_set.current
+        consumer_set.send(:select_next_consumer)
+      end
     end
 
-    context "already setup" do
-      before { consumer_set.subscribe }
+    it ".new subscribes lazily" do
+      expect(rdconsumer1).to receive(:subscribe).with("feature")
+      expect(rdconsumer2).to receive(:subscribe).never
+      expect(rdconsumer3).to receive(:subscribe).never
 
-      it "#current returns current rdkafka client" do
-        expect(consumer_set.current).to be rdconsumer1
+      consumer_set.current
+      consumer_set.send(:select_next_consumer)
+    end
+
+    it "#reset_current_consumer does what it says" do
+      3.times do
+        consumer_set.current
+        consumer_set.send(:select_next_consumer)
       end
+      consumer_set.send(:select_next_consumer)
 
-      it "#poll changes rdkafka client on end of partition" do
-        allow(rdconsumer1).to receive(:poll).and_return(nil)
-        expect(consumer_set.poll(100)).to be nil
-        expect(consumer_set.current).to be rdconsumer2
+      expect do
+        consumer_set.send(:reset_current_consumer)
+      end.to change {
+        consumer_set.instance_variable_get(:@consumers)[1]
+      }.from(rdconsumer2).to(nil)
+    end
+
+    it "#current recreates resetted consumers" do
+      3.times do
+        consumer_set.current
+        consumer_set.send(:select_next_consumer)
       end
+      consumer_set.send(:select_next_consumer)
+      consumer_set.send(:reset_current_consumer)
 
-      it "#poll changes rdkafka client when partition EOF is raised" do
-        allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+      expect(consumer_set.current).not_to be_nil
+    end
+
+    it "#current returns current rdkafka client" do
+      expect(consumer_set.current).to be rdconsumer1
+    end
+
+    it "#poll retries once upon max poll exceeded" do
+      raised = false
+      allow(rdconsumer1).to receive(:poll) do
+        next nil if raised
+        raised = true
+        raise(max_poll_exceeded_error)
+      end
+      allow(rdconsumer2).to receive(:poll).and_return(nil)
+      allow(rdconsumer3).to receive(:poll)
+      allow(consumer_set).to receive(:reset_current_consumer)
+
+      consumer_set.poll(100)
+      consumer_set.poll(100)
+
+      expect(consumer_set).to have_received(:reset_current_consumer).once
+      expect(rdconsumer1).to have_received(:poll).twice
+      expect(rdconsumer2).to have_received(:poll).once
+      expect(rdconsumer3).not_to have_received(:poll)
+    end
+
+    it "#poll changes rdkafka client on end of partition" do
+      allow(rdconsumer1).to receive(:poll).and_return(nil)
+      expect(consumer_set.poll(100)).to be nil
+      expect(consumer_set.current).to be rdconsumer2
+    end
+
+    it "#poll changes rdkafka client when partition EOF is raised" do
+      allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+      consumer_set.poll(100)
+      expect(consumer_set.current).to be rdconsumer2
+    end
+
+    it "#batch_poll changes rdkafka client on end of partition" do
+      config.fetch_messages = 1000
+      messages = [:msg1, :msg2, nil, :msgN]
+      allow(rdconsumer1).to receive(:poll, &message_generator(messages))
+
+      expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
+      expect(consumer_set.current).to be rdconsumer2
+    end
+
+    it "#batch_poll changes rdkafka client when partition EOF is raised" do
+      allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+      consumer_set.batch_poll(100)
+      expect(consumer_set.current).to be rdconsumer2
+    end
+
+    it "#batch_poll sets last_poll_read_partition_eof? on partition end" do
+      allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+
+      expect {
         consumer_set.poll(100)
-        expect(consumer_set.current).to be rdconsumer2
-      end
+      }.to change {
+        consumer_set.last_poll_read_partition_eof?
+      }.from(false).to(true)
+    end
 
-      it "#batch_poll changes rdkafka client on end of partition" do
-        config.fetch_messages = 1000
-        messages = [:msg1, :msg2, nil, :msgN]
-        allow(rdconsumer1).to receive(:poll, &message_generator(messages))
+    it "#batch_poll resets last_poll_read_partition_eof? on subsequent polls" do
+      allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+      allow(rdconsumer2).to receive(:poll).and_return(nil)
 
-        expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
-        expect(consumer_set.current).to be rdconsumer2
-      end
+      expect {
+        consumer_set.poll(100)
+        consumer_set.poll(100)
+      }.not_to change {
+        consumer_set.last_poll_read_partition_eof?
+      }
+    end
 
-      it "#batch_poll changes rdkafka client when partition EOF is raised" do
-        allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
-        consumer_set.batch_poll(100)
-        expect(consumer_set.current).to be rdconsumer2
-      end
+    it "#batch_poll changes rdkafka client when encountering a nil message" do
+      config.fetch_messages = 1000
+      messages = [:msg1, :msg2, nil, :msgN]
+      allow(rdconsumer1).to receive(:poll, &message_generator(messages))
 
-      it "#batch_poll sets last_poll_read_partition_eof? on partition end" do
-        allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+      expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
+      expect(consumer_set.current).to be rdconsumer2
+    end
 
-        expect {
-          consumer_set.poll(100)
-        }.to change {
-          consumer_set.last_poll_read_partition_eof?
-        }.from(false).to(true)
-      end
+    it "#batch_poll eventually reads all messages" do
+      config.fetch_messages = 1
+      messages = [:msg1, nil, nil, partition_eof_error, partition_eof_error, :msgN]
+      allow(rdconsumer1).to receive(:poll, &message_generator(messages))
+      allow(rdconsumer2).to receive(:poll, &message_generator(messages))
+      allow(rdconsumer3).to receive(:poll, &message_generator(messages))
 
-      it "#batch_poll resets last_poll_read_partition_eof? on subsequent polls" do
-        allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
-        allow(rdconsumer2).to receive(:poll).and_return(nil)
-
-        expect {
-          consumer_set.poll(100)
-          consumer_set.poll(100)
-        }.not_to change {
-          consumer_set.last_poll_read_partition_eof?
-        }
-      end
-
-      it "#batch_poll changes rdkafka client when encountering a nil message" do
-        config.fetch_messages = 1000
-        messages = [:msg1, :msg2, nil, :msgN]
-        allow(rdconsumer1).to receive(:poll, &message_generator(messages))
-
-        expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
-        expect(consumer_set.current).to be rdconsumer2
-      end
-
-      it "#batch_poll eventually reads all messages" do
-        config.fetch_messages = 1
-        messages = [:msg1, nil, nil, partition_eof_error, partition_eof_error, :msgN]
-        allow(rdconsumer1).to receive(:poll, &message_generator(messages))
-        allow(rdconsumer2).to receive(:poll, &message_generator(messages))
-        allow(rdconsumer3).to receive(:poll, &message_generator(messages))
-
-        polled = []
-        count = (messages.size+1)*3
-        count.times { polled += consumer_set.batch_poll(100) rescue [] }
-        expect(polled).to eq [:msg1, :msg1, :msg1, :msgN, :msgN, :msgN]
-      end
+      polled = []
+      count = (messages.size+1)*3
+      count.times { polled += consumer_set.batch_poll(100) rescue [] }
+      expect(polled).to eq [:msg1, :msg1, :msg1, :msgN, :msgN, :msgN]
     end
   end
 end
