@@ -22,7 +22,10 @@ module Racecar
       @last_poll_read_partition_eof = false
       msg = current.poll(timeout_ms)
     rescue Rdkafka::RdkafkaError => e
-      raise unless e.is_partition_eof?
+      unless e.is_partition_eof?
+        @logger.error "Error for #{current.subscription.inspect}: #{e}"
+        raise
+      end
       @last_poll_read_partition_eof = true
       msg = nil
     ensure

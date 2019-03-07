@@ -78,6 +78,7 @@ describe Racecar::ConsumerSet do
 
         it "raises other Rdkafka errors" do
           allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
+          allow(rdconsumer).to receive(:subscription)
           expect { consumer_set.poll(100) }.to raise_error(Rdkafka::RdkafkaError)
         end
       end
@@ -137,6 +138,7 @@ describe Racecar::ConsumerSet do
 
         it "raises other Rdkafka errors" do
           allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
+          allow(rdconsumer).to receive(:subscription)
           expect { consumer_set.batch_poll(100) }.to raise_error(Rdkafka::RdkafkaError)
         end
       end
