@@ -5,6 +5,7 @@
 ## racecar v0.5.0
 
 * Add support for manually sending heartbeats with `heartbeat` (#105).
+* Allow configuring `sasl_over_ssl`.
 
 ## racecar v0.4.2
 
