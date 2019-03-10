@@ -1,7 +1,7 @@
 require "ostruct"
 require "racecar/config"
 
-describe Racecar::Config do
+RSpec.describe Racecar::Config do
   let(:config) { Racecar::Config.new }
 
   it "uses the default config if no explicit value has been set" do
