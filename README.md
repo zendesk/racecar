@@ -205,8 +205,6 @@ The first time you execute `racecar` with a consumer class a _consumer group_ wi
 
 ### Producing messages
 
-**WARNING:** This is an alpha feature, and could cause weird and unpredictable errors. Use with caution.
-
 Consumers can produce messages themselves, allowing for powerful stream processing applications that transform and filter message streams. The API for this is simple:
 
 ```ruby
