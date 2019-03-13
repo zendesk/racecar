@@ -167,7 +167,7 @@ end
 
 FakeInstrumenter = Class.new(Racecar::NullInstrumenter)
 
-describe Racecar::Runner do
+RSpec.describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
   let(:logger) { Logger.new(StringIO.new) }
   let(:kafka) { FakeKafka.new }
