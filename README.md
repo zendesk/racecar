@@ -411,6 +411,7 @@ spec:
       containers:
       - name: my-racecar
         image: my-racecar-image
+        command: ["bundle", "exec", "racecar", "MyConsumer"]
         env: # <-- you can configure the consumer using environment variables!
         - name: RACECAR_BROKERS
           value: kafka1,kafka2,kafka3
