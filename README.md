@@ -411,6 +411,11 @@ spec:
       containers:
       - name: my-racecar
         image: my-racecar-image
+        env: # <-- you can configure the consumer using environment variables!
+        - name: RACECAR_BROKERS
+          value: kafka1,kafka2,kafka3
+        - name: RACECAR_OFFSET_COMMIT_INTERVAL
+          value: 5
 ```
 
 The important part is the `strategy.type` value, which tells Kubernetes how to upgrade from one version of your Deployment to another. Many services use so-called _rolling updates_, where some but not all containers are replaced with the new version. This is done so that, if the new version doesn't work, the old version is still there to serve most of the requests. For Kafka consumers, this doesn't work well. The reason is that every time a consumer joins or leaves a group, every other consumer in the group needs to stop and synchronize the list of partitions assigned to each group member. So if the group is updated in a rolling fashion, this synchronization would occur over and over again, causing undesirable double-processing of messages as consumers would start only to be synchronized shortly after.
