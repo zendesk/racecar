@@ -385,6 +385,38 @@ If you've ever used Heroku you'll recognize the format – indeed, deploying to 
 
 With Foreman, you can easily run these processes locally by executing `foreman run`; in production you'll want to _export_ to another process management format such as Upstart or Runit. [capistrano-foreman](https://github.com/hyperoslo/capistrano-foreman) allows you to do this with Capistrano.
 
+#### Deploying to Kubernetes
+
+If you run your applications in Kubernetes, use the following [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) spec as a starting point:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-racecar-deployment
+  labels:
+    app: my-racecar
+spec:
+  replicas: 3 # <-- this will give us three consumers in the group.
+  selector:
+    matchLabels:
+      app: my-racecar
+  strategy:
+    type: Recreate # <-- this is the important part.
+  template:
+    metadata:
+      labels:
+        app: my-racecar
+    spec:
+      containers:
+      - name: my-racecar
+        image: my-racecar-image
+```
+
+The important part is the `strategy.type` value, which tells Kubernetes how to upgrade from one version of your Deployment to another. Many services use so-called _rolling updates_, where some but not all containers are replaced with the new version. This is done so that, if the new version doesn't work, the old version is still there to serve most of the requests. For Kafka consumers, this doesn't work well. The reason is that every time a consumer joins or leaves a group, every other consumer in the group needs to stop and synchronize the list of partitions assigned to each group member. So if the group is updated in a rolling fashion, this synchronization would occur over and over again, causing undesirable double-processing of messages as consumers would start only to be synchronized shortly after.
+
+Instead, the `Recreate` update strategy should be used. It completely tears down the existing containers before starting all of the new containers simultaneously, allowing for a single synchronization stage and a much faster, more stable deployment update.
+
 
 #### Running consumers in the background
 
