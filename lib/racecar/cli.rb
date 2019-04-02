@@ -94,10 +94,14 @@ module Racecar
     end
 
     def build_parser
+      load_path_modified = false
+
       OptionParser.new do |opts|
         opts.banner = "Usage: racecar MyConsumer [options]"
 
         opts.on("-r", "--require STRING", "Require a library before starting the consumer") do |lib|
+          $LOAD_PATH.unshift(Dir.pwd) unless load_path_modified
+          load_path_modified = true
           require lib
         end
 
