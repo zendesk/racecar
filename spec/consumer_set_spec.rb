@@ -255,29 +255,48 @@ describe Racecar::ConsumerSet do
       expect(rdconsumer3).not_to have_received(:poll)
     end
 
-    it "#poll changes rdkafka client on end of partition" do
+    it "#poll changes rdkafka client after end of partition on next poll" do
       allow(rdconsumer1).to receive(:poll).and_return(nil)
-      expect(consumer_set.poll(100)).to be nil
-      expect(consumer_set.current).to be rdconsumer2
-    end
+      allow(rdconsumer2).to receive(:poll).and_return(nil)
 
-    it "#poll changes rdkafka client when partition EOF is raised" do
-      allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+      expect(consumer_set.poll(100)).to be nil
+      expect(consumer_set.current).to be rdconsumer1
+
       consumer_set.poll(100)
       expect(consumer_set.current).to be rdconsumer2
     end
 
-    it "#batch_poll changes rdkafka client on end of partition" do
+    it "#poll changes rdkafka client after partition EOF is raised on next poll" do
+      allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+      allow(rdconsumer2).to receive(:poll).and_return(nil)
+
+      consumer_set.poll(100)
+      expect(consumer_set.current).to be rdconsumer1
+
+      consumer_set.poll(100)
+      expect(consumer_set.current).to be rdconsumer2
+    end
+
+    it "#batch_poll changes rdkafka client after end of partition on next poll" do
       config.fetch_messages = 1000
       messages = [:msg1, :msg2, nil, :msgN]
       allow(rdconsumer1).to receive(:poll, &message_generator(messages))
+      allow(rdconsumer2).to receive(:poll).and_return(nil)
 
       expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
+      expect(consumer_set.current).to be rdconsumer1
+
+      consumer_set.batch_poll(100)
       expect(consumer_set.current).to be rdconsumer2
     end
 
     it "#batch_poll changes rdkafka client when partition EOF is raised" do
       allow(rdconsumer1).to receive(:poll).and_raise(partition_eof_error)
+      allow(rdconsumer2).to receive(:poll).and_return(nil)
+
+      consumer_set.batch_poll(100)
+      expect(consumer_set.current).to be rdconsumer1
+
       consumer_set.batch_poll(100)
       expect(consumer_set.current).to be rdconsumer2
     end
@@ -304,12 +323,16 @@ describe Racecar::ConsumerSet do
       }
     end
 
-    it "#batch_poll changes rdkafka client when encountering a nil message" do
+    it "#batch_poll changes rdkafka client after encountering a nil message on next poll" do
       config.fetch_messages = 1000
       messages = [:msg1, :msg2, nil, :msgN]
       allow(rdconsumer1).to receive(:poll, &message_generator(messages))
+      allow(rdconsumer2).to receive(:poll).and_return(nil)
 
       expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2]
+      expect(consumer_set.current).to be rdconsumer1
+
+      consumer_set.batch_poll(100)
       expect(consumer_set.current).to be rdconsumer2
     end
 

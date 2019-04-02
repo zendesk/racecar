@@ -57,6 +57,13 @@ class TestBatchConsumer < Racecar::Consumer
   end
 end
 
+class TestMultiConsumer < TestBatchConsumer
+  subscribes_to "greetings"
+  subscribes_to "second"
+
+  attr_reader :messages
+end
+
 class TestProducingConsumer < Racecar::Consumer
   subscribes_to "numbers"
 
@@ -75,22 +82,32 @@ class FakeConsumer
   def initialize(kafka, runner)
     @kafka = kafka
     @runner = runner
-    @topics = []
+    @topic = nil
+    @last_offset = "not set yet"
   end
 
+  attr_reader :topic, :last_offset
+
   def subscribe(topic, **)
-    @topics << topic
+    @topic ||= topic
+    raise "cannot handle more than one topic per consumer" if @topic != topic
   end
 
   def poll(timeout)
-    @runner.stop if @kafka.messages.empty?
-    @kafka.messages.shift
+    @runner.stop if @kafka.received_messages.empty?
+    return nil if @kafka.received_messages.first && @kafka.received_messages.first.topic != @topic
+    @kafka.received_messages.shift
   end
 
   def commit(partitions, async)
   end
 
   def close
+  end
+
+  def store_offset(message)
+    raise "storing offset on wrong consumer. own topic: #{@topic} vs #{message.topic}" if @topic != message.topic
+    @last_offset = message.offset
   end
 end
 
@@ -105,7 +122,6 @@ class FakeProducer
 
   def produce(topic:, payload:, key:)
     @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0)
-    @runner.stop
     FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback)
   end
 
@@ -126,7 +142,7 @@ class FakeDeliveryHandle
   end
 
   def wait
-    @kafka.messages << @msg
+    @kafka.produced_messages << @msg
     @delivery_callback.call(self) if @delivery_callback
   end
 
@@ -142,19 +158,21 @@ end
 class FakeRdkafka
   FakeMessage = Struct.new(:value, :key, :topic, :partition, :offset)
 
-  attr_reader :messages
+  attr_reader :received_messages, :produced_messages
 
   def initialize(runner:)
     @runner = runner
-    @messages = []
+    @received_messages = []
+    @produced_messages = []
   end
 
   def deliver_message(value, topic:)
-    @messages << FakeMessage.new(value, nil, topic, 0, 0)
+    raise "topic may not be nil" if topic.nil?
+    @received_messages << FakeMessage.new(value, nil, topic, 0, received_messages.size)
   end
 
   def messages_in(topic)
-    messages.select {|message| message.topic == topic }
+    produced_messages.select {|message| message.topic == topic }
   end
 
   def consumer(*options)
@@ -167,6 +185,32 @@ class FakeRdkafka
 end
 
 FakeInstrumenter = Class.new(Racecar::NullInstrumenter)
+
+RSpec.shared_examples "offset handling" do |topic|
+  let(:consumers) do
+    runner.send(:consumer).instance_variable_get(:@consumers)
+  end
+
+  it "stores offset after processing" do
+    kafka.deliver_message("2", topic: topic)
+    kafka.deliver_message("2", topic: topic)
+    kafka.deliver_message("2", topic: topic)
+
+    runner.run
+
+    expect(consumers.first.last_offset).to eq 2
+  end
+
+  it "doesn't store offset on error" do
+    kafka.deliver_message("2", topic: topic)
+    mock_method = processor.respond_to?(:process_batch) ? :process_batch : :process
+    allow(processor).to receive(mock_method).and_raise(StandardError)
+
+    runner.run rescue nil
+
+    expect(consumers.first.last_offset).to eq "not set yet"
+  end
+end
 
 describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
@@ -186,6 +230,8 @@ describe Racecar::Runner do
 
   context "with a consumer class with a #process method" do
     let(:processor) { TestConsumer.new }
+
+    include_examples "offset handling", "greetings"
 
     it "processes messages with the specified consumer class" do
       kafka.deliver_message("hello world", topic: "greetings")
@@ -212,8 +258,38 @@ describe Racecar::Runner do
     end
   end
 
+  context "with a consumer class with multiple subscriptions" do
+    let(:processor) { TestMultiConsumer.new }
+
+    include_examples "offset handling", "greetings"
+
+    it "processes messages with the specified consumer class" do
+      kafka.deliver_message("to_greet", topic: "greetings")
+      kafka.deliver_message("to_second", topic: "second")
+
+      runner.run
+
+      expect(processor.messages.map(&:value)).to eq ["to_greet", "to_second"]
+    end
+
+    it "stores offset on correct consumer" do
+      # Note: offset is generated from a global counter
+      kafka.deliver_message("2", topic: "greetings") # offset 0
+      kafka.deliver_message("2", topic: "greetings") # offset 1
+      kafka.deliver_message("2", topic: "second")    # offset 2
+
+      runner.run
+
+      consumers = runner.send(:consumer).instance_variable_get(:@consumers)
+      offsets = consumers.map { |c| [c.topic, c.last_offset] }.to_h
+      expect(offsets).to eq({"greetings" => 1, "second" => 2})
+    end
+  end
+
   context "with a consumer class with a #process_batch method" do
     let(:processor) { TestBatchConsumer.new }
+
+    include_examples "offset handling", "greetings"
 
     it "processes messages with the specified consumer class" do
       kafka.deliver_message("hello world", topic: "greetings")
@@ -252,6 +328,8 @@ describe Racecar::Runner do
 
   context "with a consumer that produces messages" do
     let(:processor) { TestProducingConsumer.new }
+
+    include_examples "offset handling", "numbers"
 
     it "delivers the messages to Kafka" do
       kafka.deliver_message("2", topic: "numbers")

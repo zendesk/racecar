@@ -8,15 +8,16 @@ module Racecar
       @consumer_id_iterator = (0...@config.subscriptions.size).cycle
 
       @last_poll_read_partition_eof = false
+      @last_poll_read_nil_message = false
     end
 
     def poll(timeout_ms)
+      maybe_select_next_consumer
       retried ||= false
       @last_poll_read_partition_eof = false
       msg = current.poll(timeout_ms)
     rescue Rdkafka::RdkafkaError => e
       @logger.error "Error for topic subscription #{current_subscription}: #{e}"
-
 
       case e.code
       when :max_poll_exceeded, :"err_-147?" # Note: requires unreleased librdkafka version
@@ -31,7 +32,7 @@ module Racecar
         raise
       end
     ensure
-      select_next_consumer if msg.nil?
+      @last_poll_read_nil_message = true if msg.nil?
     end
 
     def batch_poll(timeout_ms)
@@ -47,6 +48,10 @@ module Racecar
 
     def last_poll_read_partition_eof?
       @last_poll_read_partition_eof
+    end
+
+    def store_offset(message)
+      current.store_offset(message)
     end
 
     def commit
@@ -83,6 +88,12 @@ module Racecar
 
     def reset_current_consumer
       @consumers[@consumer_id_iterator.peek] = nil
+    end
+
+    def maybe_select_next_consumer
+      return unless @last_poll_read_nil_message
+      @last_poll_read_nil_message = false
+      select_next_consumer
     end
 
     def select_next_consumer

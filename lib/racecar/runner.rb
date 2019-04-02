@@ -18,16 +18,13 @@ module Racecar
     def run
       install_signal_handlers
 
-      # When being in batch mode it might happen, that we send a commit before
-      # returning the consumer.batch_poll method. To circumvent this we don't
-      # autocommit but call commit after the whole batch was fetched. Because
-      # synchronous commits are disabled by default there should almost be no
-      # difference in performance.
-      if processor.respond_to?(:process_batch)
-        config.consumer << "enable.auto.commit=false"
-      end
+      # Manually store offset after messages have been processed successfully
+      # to avoid marking failed messages as committed. The call just updates
+      # a value within librdkafka and is asynchronously written to proper
+      # storage through auto commits.
+      config.consumer << "enable.auto.offset.store=false"
 
-      consumer = ConsumerSet.new(config, logger)
+      @consumer = ConsumerSet.new(config, logger)
 
       # Configure the consumer with a producer so it can produce messages and
       # with a consumer so that it can support advanced use-cases.
@@ -43,18 +40,13 @@ module Racecar
       loop do
         break if @stop_requested
         @instrumenter.instrument("main_loop.racecar", instrument_payload) do
-          if processor.respond_to?(:process_batch)
+          case process_method
+          when :batch then
             messages = consumer.batch_poll(config.max_wait_time)
-            if !messages.empty?
-              process_batch(messages)
-              consumer.commit # See above. Needed because auto commit is disabled
-            end
-          elsif processor.respond_to?(:process)
-            if message = consumer.poll(config.max_wait_time)
-              process(message)
-            end
-          else
-            raise NotImplementedError, "Consumer class must implement process or process_batch method"
+            process_batch(messages) unless messages.empty?
+          when :single then
+            message = consumer.poll(config.max_wait_time)
+            process(message) if message
           end
         end
       end
@@ -71,6 +63,19 @@ module Racecar
     end
 
     private
+
+    attr_reader :consumer
+
+    def process_method
+      @process_method ||= begin
+        case
+        when processor.respond_to?(:process_batch) then :batch
+        when processor.respond_to?(:process) then :single
+        else
+          raise NotImplementedError, "Consumer class must implement process or process_batch method"
+        end
+      end
+    end
 
     def producer
       @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |producer|
@@ -118,6 +123,7 @@ module Racecar
       @instrumenter.instrument("process_message.racecar", payload) do
         processor.process(message)
         processor.deliver!
+        consumer.store_offset(message)
       end
     end
 
@@ -133,6 +139,7 @@ module Racecar
       @instrumenter.instrument("process_batch.racecar", payload) do
         processor.process_batch(messages)
         processor.deliver!
+        consumer.store_offset(messages.last)
       end
     end
   end
