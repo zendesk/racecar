@@ -166,9 +166,9 @@ class FakeRdkafka
     @produced_messages = []
   end
 
-  def deliver_message(value, topic:)
+  def deliver_message(value, topic:, partition: 0)
     raise "topic may not be nil" if topic.nil?
-    @received_messages << FakeMessage.new(value, nil, topic, 0, received_messages.size)
+    @received_messages << FakeMessage.new(value, nil, topic, partition, received_messages.size)
   end
 
   def messages_in(topic)
@@ -311,6 +311,24 @@ describe Racecar::Runner do
 
       expect(instrumenter).to receive(:instrument).with("main_loop.racecar", {consumer_class: "TestBatchConsumer"}).and_call_original
       expect(instrumenter).to receive(:instrument).with("process_batch.racecar", payload)
+
+      runner.run
+    end
+
+    it "batches per partition" do
+      kafka.deliver_message("hello", topic: "greetings", partition: 0)
+      kafka.deliver_message("world", topic: "greetings", partition: 1)
+      kafka.deliver_message("!", topic: "greetings", partition: 1)
+
+      payload = a_hash_including(
+        :partition,
+        :first_offset,
+        consumer_class: "TestBatchConsumer",
+        topic: "greetings"
+      )
+
+      expect(processor).to receive(:process_batch).with([kafka.received_messages[0]])
+      expect(processor).to receive(:process_batch).with(kafka.received_messages[1, 2])
 
       runner.run
     end

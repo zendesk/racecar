@@ -7,14 +7,12 @@ module Racecar
       @consumers = []
       @consumer_id_iterator = (0...@config.subscriptions.size).cycle
 
-      @last_poll_read_partition_eof = false
       @last_poll_read_nil_message = false
     end
 
     def poll(timeout_ms)
       maybe_select_next_consumer
       retried ||= false
-      @last_poll_read_partition_eof = false
       msg = current.poll(timeout_ms)
     rescue Rdkafka::RdkafkaError => e
       @logger.error "Error for topic subscription #{current_subscription}: #{e}"
@@ -25,9 +23,6 @@ module Racecar
         raise if retried
         retried = true
         retry
-      when :partition_eof
-        @last_poll_read_partition_eof = true
-        msg = nil
       else
         raise
       end
@@ -35,6 +30,7 @@ module Racecar
       @last_poll_read_nil_message = true if msg.nil?
     end
 
+    # XXX: messages are not guaranteed to be from the same partition
     def batch_poll(timeout_ms)
       @batch_started_at = Time.now
       @messages = []
@@ -44,10 +40,6 @@ module Racecar
         @messages << msg
       end
       @messages
-    end
-
-    def last_poll_read_partition_eof?
-      @last_poll_read_partition_eof
     end
 
     def store_offset(message)
@@ -119,7 +111,7 @@ module Racecar
         "auto.offset.reset"       => subscription.start_from_beginning ? "earliest" : "largest",
         "bootstrap.servers"       => @config.brokers.join(","),
         "client.id"               => @config.client_id,
-        "enable.partition.eof"    => true,
+        "enable.partition.eof"    => false,
         "fetch.max.bytes"         => @config.max_bytes,
         "fetch.message.max.bytes" => subscription.max_bytes_per_partition,
         "fetch.wait.max.ms"       => @config.max_wait_time * 1000,
