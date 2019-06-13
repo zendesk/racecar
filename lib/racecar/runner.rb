@@ -34,6 +34,7 @@ module Racecar
         sasl_scram_mechanism: config.sasl_scram_mechanism,
         sasl_over_ssl: config.sasl_over_ssl,
         ssl_ca_certs_from_system: config.ssl_ca_certs_from_system,
+        ssl_verify_hostname: config.ssl_verify_hostname
       )
 
       @consumer = kafka.consumer(
