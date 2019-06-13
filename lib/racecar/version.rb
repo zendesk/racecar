@@ -1,3 +1,3 @@
 module Racecar
-  VERSION = "0.5.0.beta2"
+  VERSION = "0.5.1.beta2"
 end
