@@ -26,7 +26,7 @@ module Racecar
       RailsConfigFileLoader.load!
 
       if File.exist?("config/racecar.rb")
-        require "racecar/config"
+        require "./config/racecar"
       end
 
       # Find the consumer class by name.
