@@ -3,8 +3,6 @@
 require "racecar"
 require "racecar/cli"
 
-$LOAD_PATH.unshift(Dir.pwd)
-
 begin
   Racecar::Cli.main(ARGV)
 rescue SignalException => e

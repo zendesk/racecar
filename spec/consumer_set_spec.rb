@@ -4,7 +4,7 @@ def subscription(name)
   Racecar::Consumer::Subscription.new(name, true, 1048576, {})
 end
 
-describe Racecar::ConsumerSet do
+RSpec.describe Racecar::ConsumerSet do
   let(:config)              { Racecar::Config.new }
   let(:rdconsumer)          { double("rdconsumer", subscribe: true) }
   let(:rdconfig)            { double("rdconfig", consumer: rdconsumer) }

@@ -48,7 +48,7 @@ module Racecar
     protected
 
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
-    def produce(topic:, payload:, key:)
+    def produce(topic:, payload:, key:, headers: nil)
       @delivery_handles ||= []
 
       extra_info = {
@@ -58,8 +58,12 @@ module Racecar
         create_time: Time.now,
       }
       @instrumenter.instrument("produce_message.racecar", extra_info) do
-        @delivery_handles << @producer.produce(topic: topic, payload: payload, key: key)
+        @delivery_handles << @producer.produce(topic: topic, payload: payload, key: key, headers: headers)
       end
+    end
+
+    def heartbeat
+      consumer.trigger_heartbeat
     end
   end
 end

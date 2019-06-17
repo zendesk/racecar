@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Replace `ruby-kafka` with `rdkafka-ruby`
+* Removed config option `sasl_over_ssl`
 * [Racecar::Consumer] Do not pause consuming partitions on exception
 * [Racecar::Consumer] `topic`, `payload` and `key` are mandadory to method `produce`
 * [Racecar::Consumer] `process_batch` retrieves an array of messages instead of batch object
@@ -22,6 +23,13 @@
 * [Instrumentation] `acknowledged_message.racecar` send whenever a produced message was successfully received by Kafka. Payload includes `offset` and `partition`, but no message details.
 * [Instrumentation] `rdkafka-ruby` does not yet provide instrumentation [rdkafka-ruby#54](https://github.com/appsignal/rdkafka-ruby/issues/54)
 * [Instrumentation] if processors define a `statistics_callback`, it will be called once every second for every subscription or producer connection. The first argument will be a Hash, for contents see [librdkafka STATISTICS.md](https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md)
+
+* Add current directory to `$LOAD_PATH` only when `--require` option is used (#117).
+
+## racecar v0.5.0
+
+* Add support for manually sending heartbeats with `heartbeat` (#105).
+* Allow configuring `sasl_over_ssl`.
 
 ## racecar v0.4.2
 

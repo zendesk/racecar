@@ -120,7 +120,7 @@ class FakeProducer
     @delivery_callback = nil
   end
 
-  def produce(topic:, payload:, key:)
+  def produce(topic:, payload:, key:, headers: nil)
     @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0)
     FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback)
   end
@@ -212,7 +212,7 @@ RSpec.shared_examples "offset handling" do |topic|
   end
 end
 
-describe Racecar::Runner do
+RSpec.describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
   let(:logger) { Logger.new(StringIO.new) }
   let(:kafka)  { FakeRdkafka.new(runner: runner) }

@@ -147,6 +147,32 @@ end
 
 An important detail is that, if an exception is raised while processing a batch, the _whole batch_ is re-processed.
 
+#### Message headers
+
+Any headers set on the message will be available when consuming the message:
+
+```ruby
+message.headers #=> { "Header-A" => 42, ... }
+```
+
+#### Heartbeats
+
+In order to avoid your consumer being kicked out of its group during long-running message processing operations, it may be a good idea to periodically send so-called _heartbeats_ back to Kafka. This is done automatically for you after each message has been processed, but if the processing of a _single_ message takes a long time you may run into group stability issues.
+
+If possible, intersperse `heartbeat` calls in between long-running operations in your consumer, e.g.
+
+```ruby
+def process(message)
+  long_running_op_one(message)
+
+  # Signals back to Kafka that we're still alive!
+  heartbeat
+
+  long_running_op_two(message)
+end
+```
+
+
 #### Tearing down resources when stopping
 
 When a Racecar consumer shuts down, it gets the opportunity to tear down any resources held by the consumer instance. For example, it may make sense to close any open files or network connections. Doing so is simple: just implement a `#teardown` method in your consumer class and it will be called during the shutdown procedure.
@@ -179,8 +205,6 @@ The first time you execute `racecar` with a consumer class a _consumer group_ wi
 
 ### Producing messages
 
-**WARNING:** This is an alpha feature, and could cause weird and unpredictable errors. Use with caution.
-
 Consumers can produce messages themselves, allowing for powerful stream processing applications that transform and filter message streams. The API for this is simple:
 
 ```ruby
@@ -205,6 +229,8 @@ end
 
 The `deliver!` method can be used to block until the broker received all queued published messages (according to the publisher ack settings). This will automatically being called in the shutdown procedure of a consumer.
 
+You can set message headers by passing a `headers:` option with a Hash of headers.
+
 ### Configuration
 
 Racecar provides a flexible way to configure your consumer in a way that feels at home in a Rails application. If you haven't already, run `bundle exec rails generate racecar:install` in order to generate a config file. You'll get a separate section for each Rails environment, with the common configuration values in a shared `common` section.
@@ -226,8 +252,8 @@ end
 
 * `brokers` – A list of Kafka brokers in the cluster that you're consuming from. Defaults to `localhost` on port 9092, the default Kafka port.
 * `client_id` – A string used to identify the client in logs and metrics.
-* `group_id` – The group id to use for a given group of consumers. Note that this _must_ be different for each consumer class. If left blank a group id is generated based on the consumer class name.
-* `group_id_prefix` – A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon_consumer`.
+* `group_id` – The group id to use for a given group of consumers. Note that this _must_ be different for each consumer class. If left blank a group id is generated based on the consumer class name such that (for example) a consumer with the class name `BaconConsumer` would default to a group id of `bacon-consumer`.
+* `group_id_prefix` – A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon-consumer`.
 
 #### Logging
 
@@ -348,6 +374,44 @@ racecar-resize-images: bundle exec racecar ResizeImagesConsumer
 If you've ever used Heroku you'll recognize the format – indeed, deploying to Heroku should just work if you add Racecar invocations to your Procfile.
 
 With Foreman, you can easily run these processes locally by executing `foreman run`; in production you'll want to _export_ to another process management format such as Upstart or Runit. [capistrano-foreman](https://github.com/hyperoslo/capistrano-foreman) allows you to do this with Capistrano.
+
+#### Deploying to Kubernetes
+
+If you run your applications in Kubernetes, use the following [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) spec as a starting point:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-racecar-deployment
+  labels:
+    app: my-racecar
+spec:
+  replicas: 3 # <-- this will give us three consumers in the group.
+  selector:
+    matchLabels:
+      app: my-racecar
+  strategy:
+    type: Recreate # <-- this is the important part.
+  template:
+    metadata:
+      labels:
+        app: my-racecar
+    spec:
+      containers:
+      - name: my-racecar
+        image: my-racecar-image
+        command: ["bundle", "exec", "racecar", "MyConsumer"]
+        env: # <-- you can configure the consumer using environment variables!
+        - name: RACECAR_BROKERS
+          value: kafka1,kafka2,kafka3
+        - name: RACECAR_OFFSET_COMMIT_INTERVAL
+          value: 5
+```
+
+The important part is the `strategy.type` value, which tells Kubernetes how to upgrade from one version of your Deployment to another. Many services use so-called _rolling updates_, where some but not all containers are replaced with the new version. This is done so that, if the new version doesn't work, the old version is still there to serve most of the requests. For Kafka consumers, this doesn't work well. The reason is that every time a consumer joins or leaves a group, every other consumer in the group needs to stop and synchronize the list of partitions assigned to each group member. So if the group is updated in a rolling fashion, this synchronization would occur over and over again, causing undesirable double-processing of messages as consumers would start only to be synchronized shortly after.
+
+Instead, the `Recreate` update strategy should be used. It completely tears down the existing containers before starting all of the new containers simultaneously, allowing for a single synchronization stage and a much faster, more stable deployment update.
 
 
 #### Running consumers in the background
