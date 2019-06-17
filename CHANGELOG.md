@@ -26,6 +26,8 @@
 
 * Add current directory to `$LOAD_PATH` only when `--require` option is used (#117).
 
+* TODO: reintroduce manual heartbeat support
+
 ## racecar v0.5.0
 
 * Add support for manually sending heartbeats with `heartbeat` (#105).

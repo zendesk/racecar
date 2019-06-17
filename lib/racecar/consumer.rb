@@ -63,7 +63,7 @@ module Racecar
     end
 
     def heartbeat
-      consumer.trigger_heartbeat
+      raise "not yet implemented for rdkafka"
     end
   end
 end
