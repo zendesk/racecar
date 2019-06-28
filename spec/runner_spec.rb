@@ -233,6 +233,14 @@ RSpec.describe Racecar::Runner do
 
     include_examples "offset handling", "greetings"
 
+    it "builds producer with all config options" do
+      config.producer = ["hello=world", "hi=all"]
+
+      runner.run
+
+      expect(Rdkafka::Config).to have_received(:new).with(hash_including("hello" => "world", "hi" => "all"))
+    end
+
     it "processes messages with the specified consumer class" do
       kafka.deliver_message("hello world", topic: "greetings")
 

@@ -93,7 +93,7 @@ module Racecar
         "statistics.interval.ms" => 1000,
       }
       producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
-      producer_config.merge(config.rdkafka_producer)
+      producer_config.merge!(config.rdkafka_producer)
       producer_config
     end
 
