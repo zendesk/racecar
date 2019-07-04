@@ -34,7 +34,7 @@ module Racecar
         instrumenter: @instrumenter,
       )
 
-      instrument_payload = { consumer_class: processor.class.to_s }
+      instrument_payload = { consumer_class: processor.class.to_s, consumer_set: consumer }
 
       # Main loop
       loop do

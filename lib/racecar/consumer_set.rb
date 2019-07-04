@@ -47,13 +47,13 @@ module Racecar
     end
 
     def commit
-      each do |consumer|
+      each_subscribed do |consumer|
         commit_rescue_no_offset(consumer)
       end
     end
 
     def close
-      each(&:close)
+      each_subscribed(&:close)
     end
 
     def current
@@ -64,11 +64,23 @@ module Racecar
       end
     end
 
-    def each
+    def each_subscribed
       if block_given?
         @consumers.each { |c| yield c }
       else
         @consumers.each
+      end
+    end
+
+    alias :each :each_subscribed
+
+    # Subscribe to all topics eagerly, even if there's still messages elsewhere. Usually
+    # that's not needed and Kafka might rebalance if topics are not polled frequently
+    # enough.
+    def subscribe_all
+      @config.subscriptions.size.times do
+        current
+        select_next_consumer
       end
     end
 

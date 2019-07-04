@@ -259,7 +259,7 @@ RSpec.describe Racecar::Runner do
         topic: "greetings"
       )
 
-      expect(instrumenter).to receive(:instrument).with("main_loop.racecar", {consumer_class: "TestConsumer"}).and_call_original.twice
+      expect(instrumenter).to receive(:instrument).with("main_loop.racecar", hash_including(consumer_class: "TestConsumer")).and_call_original.twice
       expect(instrumenter).to receive(:instrument).with("process_message.racecar", payload)
 
       runner.run
@@ -317,7 +317,7 @@ RSpec.describe Racecar::Runner do
         topic: "greetings"
       )
 
-      expect(instrumenter).to receive(:instrument).with("main_loop.racecar", {consumer_class: "TestBatchConsumer"}).and_call_original
+      expect(instrumenter).to receive(:instrument).with("main_loop.racecar", hash_including(consumer_class: "TestBatchConsumer")).and_call_original
       expect(instrumenter).to receive(:instrument).with("process_batch.racecar", payload)
 
       runner.run
