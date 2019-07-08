@@ -4,6 +4,12 @@ def subscription(name)
   Racecar::Consumer::Subscription.new(name, true, 1048576, {})
 end
 
+def tpl(subscription)
+  Rdkafka::Consumer::TopicPartitionList.new.tap do |tpl|
+    tpl.add_topic(subscription.topic, 1)
+  end
+end
+
 RSpec.describe Racecar::ConsumerSet do
   let(:config)              { Racecar::Config.new }
   let(:rdconsumer)          { double("rdconsumer", subscribe: true) }
@@ -47,6 +53,49 @@ RSpec.describe Racecar::ConsumerSet do
 
     context "which is subscribed" do
       before { consumer_set; consumer_set.current }
+
+      describe "pause and resume" do
+        before do
+          allow(rdconsumer).to receive(:assignment).and_return(tpl(subscriptions.first))
+        end
+
+        it "#pause allows to pause known partitions" do
+          expect(rdconsumer).to receive(:pause) do |tpl|
+            expect(tpl.count).to eq 1
+            expect(tpl).to be_kind_of Rdkafka::Consumer::TopicPartitionList
+          end
+          expect(rdconsumer).to receive(:seek)
+          consumer_set.pause("greetings", 0, 123456)
+        end
+
+        it "#pause doesn't pause unknown partitions" do
+          expect(rdconsumer).not_to receive(:pause)
+          expect(rdconsumer).not_to receive(:seek)
+
+          consumer_set.pause("greetings", 1, 123456)
+        end
+
+        it "#pause seeks to given offset" do
+          allow(rdconsumer).to receive(:pause)
+          expect(rdconsumer).to receive(:seek) do |msg|
+            expect(msg.offset).to eq 123456
+          end
+          consumer_set.pause("greetings", 0, 123456)
+        end
+
+        it "#resume allows to resume known partitions" do
+          expect(rdconsumer).to receive(:resume) do |tpl|
+            expect(tpl.count).to eq 1
+            expect(tpl).to be_kind_of Rdkafka::Consumer::TopicPartitionList
+          end
+          consumer_set.resume("greetings", 0)
+        end
+
+        it "#resume doesn't resume unknown partitions" do
+          expect(rdconsumer).not_to receive(:resume)
+          consumer_set.resume("greetings", 1)
+        end
+      end
 
       describe "#poll" do
         it "forwards to Rdkafka" do
@@ -135,9 +184,9 @@ RSpec.describe Racecar::ConsumerSet do
 
   context "A consumer with multiple subscriptions" do
     let(:subscriptions) { [ subscription("feature"), subscription("profile"), subscription("account") ] }
-    let(:rdconsumer1)   { double("rdconsumer_feature", subscribe: true) }
-    let(:rdconsumer2)   { double("rdconsumer_profile", subscribe: true) }
-    let(:rdconsumer3)   { double("rdconsumer_account", subscribe: true) }
+    let(:rdconsumer1)   { double("rdconsumer_feature", subscribe: true, assignment: tpl(subscriptions[0])) }
+    let(:rdconsumer2)   { double("rdconsumer_profile", subscribe: true, assignment: tpl(subscriptions[1])) }
+    let(:rdconsumer3)   { double("rdconsumer_account", subscribe: true, assignment: tpl(subscriptions[2])) }
 
     before do
       allow(rdconfig).to receive(:consumer).and_return(rdconsumer1, rdconsumer2, rdconsumer3)
@@ -190,6 +239,52 @@ RSpec.describe Racecar::ConsumerSet do
 
     it "#current returns current rdkafka client" do
       expect(consumer_set.current).to be rdconsumer1
+    end
+
+    describe "pause and resume" do
+      before do
+        3.times do
+          consumer_set.current
+          consumer_set.send(:select_next_consumer)
+        end
+      end
+
+      it "#pause pauses partition in right consumer" do
+        expect(rdconsumer1).not_to receive(:pause)
+        expect(rdconsumer1).not_to receive(:seek)
+        expect(rdconsumer2).to receive(:pause).once
+        expect(rdconsumer2).to receive(:seek).once
+        consumer_set.pause("profile", 0, 1233456)
+      end
+
+      it "#pause doesn't pause unknown partitions" do
+        expect(rdconsumer2).not_to receive(:pause)
+        consumer_set.pause("profile", 1, 1233456)
+      end
+
+      it "#pause doesn't pause unknown topics" do
+        expect(rdconsumer1).not_to receive(:pause)
+        expect(rdconsumer2).not_to receive(:pause)
+        expect(rdconsumer3).not_to receive(:pause)
+        consumer_set.pause("unknowntopic", 0, 1233456)
+      end
+
+      it "#resume resumes partition in right consumer" do
+        expect(rdconsumer3).to receive(:resume).once
+        consumer_set.resume("account", 0)
+      end
+
+      it "#resume doesn't resume unknown partitions" do
+        expect(rdconsumer3).not_to receive(:resume)
+        consumer_set.resume("account", 1)
+      end
+
+      it "#resume doesn't resume unknown topics" do
+        expect(rdconsumer1).not_to receive(:resume)
+        expect(rdconsumer2).not_to receive(:resume)
+        expect(rdconsumer3).not_to receive(:resume)
+        consumer_set.resume("unknowntopic", 0)
+      end
     end
 
     it "#poll retries once upon max poll exceeded" do

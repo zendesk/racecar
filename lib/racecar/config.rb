@@ -43,6 +43,9 @@ module Racecar
     desc "The idle timeout after which a consumer is kicked out of the group"
     float :session_timeout, default: 30
 
+    desc "The maximum time between two message fetches before the consumer is kicked out of the group (in seconds)"
+    integer :max_poll_interval, default: 5*60
+
     desc "How long to wait when trying to communicate with a Kafka broker"
     float :socket_timeout, default: 30
 

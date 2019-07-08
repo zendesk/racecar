@@ -72,6 +72,28 @@ module Racecar
       end
     end
 
+    def pause(topic, partition, offset)
+      consumer, filtered_tpl = find_consumer_by(topic, partition)
+      if !consumer
+        @logger.warn "Attempted to pause #{topic}/#{partition}, but we're not subscribed to it"
+        return
+      end
+
+      consumer.pause(filtered_tpl)
+      fake_msg = OpenStruct.new(topic: topic, partition: partition, offset: offset)
+      consumer.seek(fake_msg)
+    end
+
+    def resume(topic, partition)
+      consumer, filtered_tpl = find_consumer_by(topic, partition)
+      if !consumer
+        @logger.warn "Attempted to resume #{topic}/#{partition}, but we're not subscribed to it"
+        return
+      end
+
+      consumer.resume(filtered_tpl)
+    end
+
     alias :each :each_subscribed
 
     # Subscribe to all topics eagerly, even if there's still messages elsewhere. Usually
@@ -85,6 +107,18 @@ module Racecar
     end
 
     private
+
+    def find_consumer_by(topic, partition)
+      each do |consumer|
+        tpl = consumer.assignment.to_h
+        rdkafka_partition = tpl[topic]&.detect { |part| part.partition == partition }
+        next unless rdkafka_partition
+        filtered_tpl = Rdkafka::Consumer::TopicPartitionList.new({ topic => [rdkafka_partition] })
+        return consumer, filtered_tpl
+      end
+
+      return nil, nil
+    end
 
     def current_subscription
       @config.subscriptions[@consumer_id_iterator.peek]
@@ -129,6 +163,7 @@ module Racecar
         "fetch.wait.max.ms"       => @config.max_wait_time * 1000,
         "group.id"                => @config.group_id,
         "heartbeat.interval.ms"   => @config.heartbeat_interval * 1000,
+        "max.poll.interval.ms"    => @config.max_poll_interval * 1000,
         "queued.min.messages"     => @config.min_message_queue_size,
         "session.timeout.ms"      => @config.session_timeout * 1000,
         "socket.timeout.ms"       => @config.socket_timeout * 1000,

@@ -1,4 +1,5 @@
 require "rdkafka"
+require "racecar/pause"
 
 module Racecar
   class Runner
@@ -13,18 +14,35 @@ module Racecar
       if processor.respond_to?(:statistics_callback)
         Rdkafka::Config.statistics_callback = processor.method(:statistics_callback).to_proc
       end
+
+      setup_pauses
+    end
+
+    def setup_pauses
+      timeout = if config.pause_timeout == -1
+        nil
+      elsif config.pause_timeout == 0
+        # no op, handled elsewhere
+      elsif config.pause_timeout > 0
+        config.pause_timeout
+      else
+        raise ArgumentError, "Invalid value for pause_timeout: must be integer greater or equal -1"
+      end
+
+      @pauses = Hash.new {|h, k|
+        h[k] = Hash.new {|h2, k2|
+          h2[k2] = ::Racecar::Pause.new(
+            timeout:             timeout,
+            max_timeout:         config.max_pause_timeout,
+            exponential_backoff: config.pause_with_exponential_backoff
+          )
+        }
+      }
     end
 
     def run
       install_signal_handlers
-
-      # Manually store offset after messages have been processed successfully
-      # to avoid marking failed messages as committed. The call just updates
-      # a value within librdkafka and is asynchronously written to proper
-      # storage through auto commits.
-      config.consumer << "enable.auto.offset.store=false"
-
-      @consumer = ConsumerSet.new(config, logger)
+      @stop_requested = false
 
       # Configure the consumer with a producer so it can produce messages and
       # with a consumer so that it can support advanced use-cases.
@@ -39,6 +57,7 @@ module Racecar
       # Main loop
       loop do
         break if @stop_requested
+        resume_paused_partitions
         @instrumenter.instrument("main_loop.racecar", instrument_payload) do
           case process_method
           when :batch then
@@ -66,7 +85,7 @@ module Racecar
 
     private
 
-    attr_reader :consumer
+    attr_reader :pauses
 
     def process_method
       @process_method ||= begin
@@ -76,6 +95,17 @@ module Racecar
         else
           raise NotImplementedError, "Consumer class must implement process or process_batch method"
         end
+      end
+    end
+
+    def consumer
+      @consumer ||= begin
+        # Manually store offset after messages have been processed successfully
+        # to avoid marking failed messages as committed. The call just updates
+        # a value within librdkafka and is asynchronously written to proper
+        # storage through auto commits.
+        config.consumer << "enable.auto.offset.store=false"
+        ConsumerSet.new(config, logger)
       end
     end
 
@@ -123,9 +153,11 @@ module Racecar
       }
 
       @instrumenter.instrument("process_message.racecar", payload) do
-        processor.process(message)
-        processor.deliver!
-        consumer.store_offset(message)
+        with_pause(message.topic, message.partition, message.offset..message.offset) do
+          processor.process(message)
+          processor.deliver!
+          consumer.store_offset(message)
+        end
       end
     end
 
@@ -139,9 +171,51 @@ module Racecar
       }
 
       @instrumenter.instrument("process_batch.racecar", payload) do
-        processor.process_batch(messages)
-        processor.deliver!
-        consumer.store_offset(messages.last)
+        first, last = messages.first, messages.last
+        with_pause(first.topic, first.partition, first.offset..last.offset) do
+          processor.process_batch(messages)
+          processor.deliver!
+          consumer.store_offset(messages.last)
+        end
+      end
+    end
+
+    def with_pause(topic, partition, offsets)
+      return yield if config.pause_timeout == 0
+
+      begin
+        yield
+        # We've successfully processed a batch from the partition, so we can clear the pause.
+        pauses[topic][partition].reset!
+      rescue => e
+        desc = "#{topic}/#{partition}"
+        logger.error "Failed to process #{desc} at #{offsets}: #{e}"
+
+        pause = pauses[topic][partition]
+        logger.warn "Pausing partition #{desc} for #{pause.backoff_interval} seconds"
+        consumer.pause(topic, partition, offsets.first)
+        pause.pause!
+      end
+    end
+
+    def resume_paused_partitions
+      return if config.pause_timeout == 0
+
+      pauses.each do |topic, partitions|
+        partitions.each do |partition, pause|
+          @instrumenter.instrument("pause_status.racecar", {
+            topic: topic,
+            partition: partition,
+            duration: pause.pause_duration,
+          })
+
+          if pause.paused? && pause.expired?
+            logger.info "Automatically resuming partition #{topic}/#{partition}, pause timeout expired"
+            consumer.resume(topic, partition)
+            pause.resume!
+            # TODO: # During re-balancing we might have lost the paused partition. Check if partition is still in group before seek. ?
+          end
+        end
       end
     end
   end

@@ -63,7 +63,7 @@ module Racecar
     end
 
     def heartbeat
-      raise "not yet implemented for rdkafka"
+      warn "DEPRECATION WARNING: Manual heartbeats are not supported and not needed with librdkafka."
     end
   end
 end

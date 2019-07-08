@@ -155,23 +155,13 @@ Any headers set on the message will be available when consuming the message:
 message.headers #=> { "Header-A" => 42, ... }
 ```
 
-#### Heartbeats
+#### Long-running message processing
 
-In order to avoid your consumer being kicked out of its group during long-running message processing operations, it may be a good idea to periodically send so-called _heartbeats_ back to Kafka. This is done automatically for you after each message has been processed, but if the processing of a _single_ message takes a long time you may run into group stability issues.
+In order to avoid your consumer being kicked out of its group during long-running message processing operations, you'll need to let Kafka regularly know that the consumer is still healthy. There's two mechanisms in place to ensure that:
 
-If possible, intersperse `heartbeat` calls in between long-running operations in your consumer, e.g.
+*Heartbeats:* They are automatically sent in the background and ensure the broker can still talk to the consumer. This will detect network splits, ungraceful shutdowns, etc.
 
-```ruby
-def process(message)
-  long_running_op_one(message)
-
-  # Signals back to Kafka that we're still alive!
-  heartbeat
-
-  long_running_op_two(message)
-end
-```
-
+*Message Fetch Interval:* Kafka expects the consumer to query for new messages within this time limit. This will detect situations with slow IO or the consumer being stuck in an infinite loop without making actual progress. This limit applies to a whole batch if you do batch processing. Use `max_poll_interval` to increase the default 5 minute timeout, or reduce batching with `fetch_messages`.
 
 #### Tearing down resources when stopping
 
@@ -272,6 +262,9 @@ All timeouts are defined in number of seconds.
 
 * `session_timeout` – The idle timeout after which a consumer is kicked out of the group. Consumers must send heartbeats with at least this frequency.
 * `heartbeat_interval` – How often to send a heartbeat message to Kafka.
+* `max_poll_interval` – The maximum time between two message fetches before the consumer is kicked out of the group. Put differently, your (batch) processing must finish earlier than this.
+* `pause_timeout` – How long to pause a partition for if the consumer raises an exception while processing a message. Default is to pause for 10 seconds. Set this to `0` in order to disable automatic pausing of partitions or to `-1` to pause indefinitely.
+* `pause_with_exponential_backoff` – Set to `true` if you want to double the `pause_timeout` on each consecutive failure of a particular partition.
 * `socket_timeout` – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
 * `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 1 second.
 
@@ -451,6 +444,8 @@ end
 ```
 
 Since the exception is handled by your `#process` method and is no longer raised, Racecar will consider the message successfully processed. Tracking these errors in an exception tracker or some other monitoring system is highly recommended, as you otherwise will have little insight into how many messages are being skipped this way.
+
+If, on the other hand, the exception was cause by a temporary network or database problem, you will probably want to retry processing of the message after some time has passed. By default, if an exception is raised by the `#process` method, the consumer will pause all processing of the message's partition for some number of seconds, configured by setting the `pause_timeout` configuration variable. This allows the consumer to continue processing messages from other partitions that may not be impacted by the problem while still making sure to not drop the original message. Since messages in a single Kafka topic partition _must_ be processed in order, it's not possible to keep processing _other_ messages in that partition.
 
 In addition to retrying the processing of messages, Racecar also allows defining an _error handler_ callback that is invoked whenever an exception is raised by your `#process` method. This allows you to track and report errors to a monitoring system:
 
