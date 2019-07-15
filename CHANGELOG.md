@@ -2,12 +2,12 @@
 
 ## Unreleased
 
-* Add current directory to `$LOAD_PATH` only when `--require` option is used (#117).
-
 ## racecar v0.5.0
 
 * Add support for manually sending heartbeats with `heartbeat` (#105).
 * Allow configuring `sasl_over_ssl`.
+* Add current directory to `$LOAD_PATH` only when `--require` option is used (#117).
+* Support for `ssl_verify_hostname` in the configuration (#120)
 
 ## racecar v0.4.2
 
