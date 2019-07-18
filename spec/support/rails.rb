@@ -1,0 +1,1 @@
+module Rails; end
