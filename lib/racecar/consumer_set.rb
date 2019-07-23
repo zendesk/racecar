@@ -75,7 +75,7 @@ module Racecar
     def pause(topic, partition, offset)
       consumer, filtered_tpl = find_consumer_by(topic, partition)
       if !consumer
-        @logger.warn "Attempted to pause #{topic}/#{partition}, but we're not subscribed to it"
+        @logger.info "Attempted to pause #{topic}/#{partition}, but we're not subscribed to it"
         return
       end
 
@@ -87,7 +87,7 @@ module Racecar
     def resume(topic, partition)
       consumer, filtered_tpl = find_consumer_by(topic, partition)
       if !consumer
-        @logger.warn "Attempted to resume #{topic}/#{partition}, but we're not subscribed to it"
+        @logger.info "Attempted to resume #{topic}/#{partition}, but we're not subscribed to it"
         return
       end
 
