@@ -18,7 +18,7 @@ module Racecar
       @logger.error "Error for topic subscription #{current_subscription}: #{e}"
 
       case e.code
-      when :max_poll_exceeded, :"err_-147?" # Note: requires unreleased librdkafka version
+      when :max_poll_exceeded
         reset_current_consumer
         raise if retried
         retried = true
