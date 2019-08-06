@@ -133,6 +133,9 @@ module Racecar
     desc "Tags that should always be set on Datadog metrics"
     list :datadog_tags
 
+    desc "Whether to check the server certificate is valid for the hostname"
+    boolean :ssl_verify_hostname, default: true
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
