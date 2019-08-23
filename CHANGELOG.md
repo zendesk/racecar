@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## racecar v1.0.0
+
+Unchanged from v0.5.0.
+
 ## racecar v0.5.0
 
 * Add support for manually sending heartbeats with `heartbeat` (#105).
