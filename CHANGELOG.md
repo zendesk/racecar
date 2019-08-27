@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## racecar v2.0.0
 
 * Replace `ruby-kafka` with `rdkafka-ruby`
 * Removed config option `sasl_over_ssl`
@@ -25,6 +25,10 @@
 * [Instrumentation] if processors define a `statistics_callback`, it will be called once every second for every subscription or producer connection. The first argument will be a Hash, for contents see [librdkafka STATISTICS.md](https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md)
 * Add current directory to `$LOAD_PATH` only when `--require` option is used (#117).
 * Remove manual heartbeat support, see [Long-running message processing section in README](README.md#long-running-message-processing)
+
+## racecar v1.0.0
+
+Unchanged from v0.5.0.
 
 ## racecar v0.5.0
 
