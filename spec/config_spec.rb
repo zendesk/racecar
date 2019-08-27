@@ -8,14 +8,50 @@ RSpec.describe Racecar::Config do
     expect(config.offset_commit_interval).to eq 10
   end
 
-  it "requires `sasl_scram_mechanism` to be a valid mechanism" do
+  it "requires `sasl_mechanism` to be a valid mechanism" do
     expect {
-      config.sasl_scram_mechanism = "sha256"
-      config.sasl_scram_mechanism = "sha512"
+      config.sasl_mechanism = "GSSAPI"
+      config.sasl_mechanism = "PLAIN"
+      config.sasl_mechanism = "SCRAM-SHA-256"
+      config.sasl_mechanism = "SCRAM-SHA-512"
     }.not_to raise_exception
 
     expect {
-      config.sasl_scram_mechanism = "banana"
+      config.sasl_mechanism = "banana"
+    }.to raise_exception(KingKonf::ConfigError)
+  end
+
+  it "requires `producer_compression_codec` to be a valid" do
+    expect {
+      config.producer_compression_codec = :none
+      config.producer_compression_codec = :gzip
+      config.producer_compression_codec = :snappy
+      config.producer_compression_codec = :lz4
+      config.producer_compression_codec = "none"
+      config.producer_compression_codec = "gzip"
+      config.producer_compression_codec = "snappy"
+      config.producer_compression_codec = "lz4"
+    }.not_to raise_exception
+
+    expect {
+      config.producer_compression_codec = "apple"
+    }.to raise_exception(KingKonf::ConfigError)
+  end
+
+  it "requires `security_protocol` to be a valid" do
+    expect {
+      config.security_protocol = :plaintext
+      config.security_protocol = :ssl
+      config.security_protocol = :sasl_plaintext
+      config.security_protocol = :sasl_ssl
+      config.security_protocol = "plaintext"
+      config.security_protocol = "ssl"
+      config.security_protocol = "sasl_plaintext"
+      config.security_protocol = "sasl_ssl"
+    }.not_to raise_exception
+
+    expect {
+      config.security_protocol = "peach"
     }.to raise_exception(KingKonf::ConfigError)
   end
 
@@ -36,12 +72,6 @@ RSpec.describe Racecar::Config do
       ENV["RACECAR_OFFSET_COMMIT_INTERVAL"] = "45"
 
       expect(config.offset_commit_interval).to eq 45
-    end
-
-    it "sets the offset commit threshold from RACECAR_OFFSET_COMMIT_THRESHOLD" do
-      ENV["RACECAR_OFFSET_COMMIT_THRESHOLD"] = "45"
-
-      expect(config.offset_commit_threshold).to eq 45
     end
 
     it "sets the heartbeat interval from RACECAR_HEARTBEAT_INTERVAL" do
@@ -72,14 +102,6 @@ RSpec.describe Racecar::Config do
       expect(config.group_id).to eq "my-app.do-stuff-consumer"
     end
 
-    it "sets the offset_retention_time if one has been explicitly defined" do
-      consumer_class.offset_retention_time = 86400
-
-      config.load_consumer_class(consumer_class)
-
-      expect(config.offset_retention_time).to eq 86400
-    end
-
     it "sets the subscriptions to the ones defined on the consumer class" do
       consumer_class.subscriptions = ["one", "two"]
 
@@ -91,16 +113,13 @@ RSpec.describe Racecar::Config do
     it "doesn't override existing values if the consumer hasn't specified anything" do
       consumer_class.max_wait_time = nil
       consumer_class.group_id = nil
-      consumer_class.offset_retention_time = nil
 
       config.max_wait_time = 10
       config.group_id = "cats"
-      config.offset_retention_time = 43200
       config.load_consumer_class(consumer_class)
 
       expect(config.max_wait_time).to eq 10
       expect(config.group_id).to eq "cats"
-      expect(config.offset_retention_time).to eq 43200
     end
   end
 
@@ -127,15 +146,6 @@ RSpec.describe Racecar::Config do
       expect {
         config.validate!
       }.to raise_exception(Racecar::ConfigError, "`socket_timeout` must be longer than `max_wait_time`")
-    end
-
-    it "raises an exception if max_wait_time is greater than connect_timeout" do
-      config.connect_timeout = 10
-      config.max_wait_time = 11
-
-      expect {
-        config.validate!
-      }.to raise_exception(Racecar::ConfigError, "`connect_timeout` must be longer than `max_wait_time`")
     end
 
     it "raises an exception if max_pause_timeout is set but pause_with_exponential_backoff is disabled" do

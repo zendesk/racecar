@@ -17,6 +17,7 @@ class TestConsumer < Racecar::Consumer
   end
 
   def process(message)
+    raise message.value if message.value.is_a?(StandardError)
     @messages << message
 
     processor = @processor_queue.shift || proc {}
@@ -47,14 +48,22 @@ class TestBatchConsumer < Racecar::Consumer
     self
   end
 
-  def process_batch(batch)
-    @messages += batch.messages
+  def process_batch(messages)
+    @messages += messages
 
-    batch.messages.each do |message|
+    messages.each do |message|
       processor = @processor_queue.shift || proc {}
+      raise message.value if message.value.is_a?(StandardError)
       processor.call(message)
     end
   end
+end
+
+class TestMultiConsumer < TestBatchConsumer
+  subscribes_to "greetings"
+  subscribes_to "second"
+
+  attr_reader :messages
 end
 
 class TestProducingConsumer < Racecar::Consumer
@@ -63,7 +72,7 @@ class TestProducingConsumer < Racecar::Consumer
   def process(message)
     value = Integer(message.value) * 2
 
-    produce value, topic: "doubled"
+    produce topic: "doubled", key: value, payload: value
   end
 end
 
@@ -72,105 +81,242 @@ class TestNilConsumer < Racecar::Consumer
 end
 
 class FakeConsumer
-  def initialize(kafka)
+  def initialize(kafka, runner)
     @kafka = kafka
-    @topics = []
+    @runner = runner
+
+    @topic = nil
+    @committed_offset = "not set yet"
+    @internal_offset = 0
+    @_paused = false
+    @previous_messages = []
+
+    @poll_count = 0
   end
+
+  attr_reader :topic, :committed_offset, :_paused
 
   def subscribe(topic, **)
-    @topics << topic
+    @topic ||= topic
+    raise "cannot handle more than one topic per consumer" if @topic != topic
   end
 
-  def each_message(*options, &block)
-    @kafka.messages.each do |message|
-      next unless @topics.include?(message.topic)
-
-      begin
-        block.call(message)
-      rescue StandardError => e
-        raise Kafka::ProcessingError.new(message.topic, message.partition, message.offset)
-      end
+  def assignment
+    Rdkafka::Consumer::TopicPartitionList.new.tap do |tpl|
+      tpl.add_topic(topic, 1)
     end
   end
 
-  def each_batch(*options, &block)
-    begin
-      batch = Kafka::FetchedBatch.new(
-        topic: @kafka.messages.first.topic,
-        partition: @kafka.messages.first.partition,
-        messages: @kafka.messages,
-        highwater_mark_offset: @kafka.messages.first.offset,
-      )
+  def poll(timeout)
+    # just stop after a big amount of messages read, which is easier to figure out when to
+    # exactly stop when reading from multiple topics
+    @runner.stop if (@poll_count += 1) >= 10
 
-      block.call(batch)
-    rescue StandardError => e
-      raise Kafka::ProcessingError.new(batch.topic, batch.partition, batch.highwater_mark_offset)
-    end
+    msg = @kafka.received_messages[@topic][@internal_offset]
+    @internal_offset += 1
+    msg
   end
 
-  def pause(topic, partition, timeout:, max_timeout: nil, exponential_backoff: false)
-    @kafka.paused_partitions[topic] ||= {}
-    @kafka.paused_partitions[topic][partition] = true
+  def commit(partitions, async)
   end
 
-  def stop; end
+  def close
+  end
+
+  def store_offset(message)
+    raise "storing offset on wrong consumer. own topic: #{@topic} vs #{message.topic}" if @topic != message.topic
+    # + 1 as per: https://github.com/edenhill/librdkafka/wiki/Consumer-offset-management#terminology
+    @internal_offset = @committed_offset = message.offset + 1
+  end
+
+  def pause(tpl)
+    raise "not a TopicPartitionList" unless tpl.is_a?(Rdkafka::Consumer::TopicPartitionList)
+    @_paused = true
+  end
+
+  def resume(tpl)
+    raise "not a TopicPartitionList" unless tpl.is_a?(Rdkafka::Consumer::TopicPartitionList)
+    @_paused = false
+  end
+
+  def seek(message)
+    raise "seeking on wrong consumer. own topic: #{@topic} vs #{message.topic}" if @topic != message.topic
+    @internal_offset = message.offset
+  end
 end
 
 class FakeProducer
-  def initialize(kafka)
+  def initialize(kafka, runner)
     @kafka = kafka
+    @runner = runner
     @buffer = []
+    @position = -1
+    @delivery_callback = nil
   end
 
-  def produce(value, **options)
-    @buffer << [value, options]
+  def produce(topic:, payload:, key:, headers: nil)
+    @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0)
+    FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback)
   end
 
-  def deliver_messages
-    @buffer.each do |value, **options|
-      @kafka.deliver_message(value.to_s, **options)
-    end
+  def delivery_callback=(handler)
+    @delivery_callback = handler
   end
 end
 
-class FakeKafka
+class FakeDeliveryHandle
+  def initialize(kafka, msg, delivery_callback)
+    @kafka = kafka
+    @msg = msg
+    @delivery_callback = delivery_callback
+  end
+
+  def [](key)
+    @msg.public_send(key)
+  end
+
+  def wait
+    @kafka.produced_messages << @msg
+    @delivery_callback.call(self) if @delivery_callback
+  end
+
+  def offset
+    0
+  end
+
+  def partition
+    0
+  end
+end
+
+class FakeRdkafka
   FakeMessage = Struct.new(:value, :key, :topic, :partition, :offset)
 
-  attr_reader :messages, :paused_partitions
+  attr_accessor :received_messages
+  attr_reader :produced_messages, :consumers
 
-  def initialize(*options)
-    @messages = []
-    @paused_partitions = {}
+  def initialize(runner:)
+    @runner = runner
+    @received_messages = Hash.new { |h, k| h[k] = [] }
+    @produced_messages = []
+    @consumers = []
   end
 
-  def paused?(topic, partition)
-    @paused_partitions[topic] ||= {}
-    !!@paused_partitions[topic][partition]
-  end
-
-  def deliver_message(value, topic:)
-    @messages << FakeMessage.new(value, nil, topic, 0, 0)
+  def deliver_message(value, topic:, partition: 0)
+    raise "topic may not be nil" if topic.nil?
+    @received_messages[topic] << FakeMessage.new(value, nil, topic, partition, received_messages[topic].size)
   end
 
   def messages_in(topic)
-    messages.select {|message| message.topic == topic }
+    produced_messages.select {|message| message.topic == topic }
   end
 
   def consumer(*options)
-    FakeConsumer.new(self)
+    consumers << FakeConsumer.new(self, @runner)
+    consumers.last
   end
 
   def producer(*)
-    FakeProducer.new(self)
+    FakeProducer.new(self, @runner)
   end
 end
 
 FakeInstrumenter = Class.new(Racecar::NullInstrumenter)
 
+RSpec.shared_examples "offset handling" do |topic|
+  let(:consumers) do
+    runner.send(:consumer).instance_variable_get(:@consumers)
+  end
+
+  it "stores offset after processing" do
+    kafka.deliver_message("2", topic: topic) # offset 0
+    kafka.deliver_message("2", topic: topic) # offset 1
+    kafka.deliver_message("2", topic: topic) # offset 2
+
+    runner.run
+
+    expect(consumers.first.committed_offset).to eq 3
+  end
+
+  it "doesn't store offset on error" do
+    kafka.deliver_message(StandardError.new("2"), topic: topic)
+
+    runner.run rescue nil
+
+    expect(consumers.first.committed_offset).to eq "not set yet"
+  end
+end
+
+RSpec.shared_examples "pause handling" do
+  after do
+    Timecop.return
+  end
+
+  it "pauses on failing messages" do
+    kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+
+    runner.run
+
+    expect(kafka.consumers.first._paused).to eq true
+    runner.run
+  end
+
+  it "resumes paused partitions" do
+    now = Time.local(2019, 6, 18, 14, 0, 0)
+    later = Time.local(2019, 6, 18, 14, 0, 30)
+
+    Timecop.freeze(now)
+    kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+    runner.run
+
+    # expect no op
+    runner.send(:resume_paused_partitions)
+    expect(kafka.consumers.first._paused).to eq true
+
+    # expect to resume
+    Timecop.freeze(later)
+    runner.send(:resume_paused_partitions)
+    expect(kafka.consumers.first._paused).to eq false
+  end
+
+  it "seeks to given message and returns it on resume" do
+    now = Time.local(2019, 6, 18, 14, 0, 0)
+    later = Time.local(2019, 6, 18, 14, 0, 30)
+
+    kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+    kafka.deliver_message("never get here", topic: "greetings")
+
+    Timecop.freeze(now)
+    runner.run
+    expect(kafka.consumers.first._paused).to eq true
+
+    Timecop.freeze(later)
+    runner.send(:resume_paused_partitions)
+    expect(kafka.consumers.first._paused).to eq false
+
+    runner.run
+    expect(kafka.consumers.first._paused).to eq true
+  end
+
+  it "instruments on pauses" do
+      allow(instrumenter).to receive(:instrument).and_call_original
+      kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+
+      runner.run
+
+      expect(instrumenter).to have_received(:instrument).with("pause_status.racecar", {
+        duration:  kind_of(Float),
+        partition: 0,
+        topic:     "greetings"
+      }).at_least(:once)
+  end
+
+end
+
 RSpec.describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
   let(:logger) { Logger.new(StringIO.new) }
-  let(:kafka) { FakeKafka.new }
+  let(:kafka)  { FakeRdkafka.new(runner: runner) }
   let(:instrumenter) { FakeInstrumenter }
 
   let(:runner) do
@@ -178,13 +324,24 @@ RSpec.describe Racecar::Runner do
   end
 
   before do
-    allow(Kafka).to receive(:new) { kafka }
+    allow(Rdkafka::Config).to receive(:new) { kafka }
 
     config.load_consumer_class(processor.class)
   end
 
   context "with a consumer class with a #process method" do
     let(:processor) { TestConsumer.new }
+
+    include_examples "offset handling", "greetings"
+    include_examples "pause handling"
+
+    it "builds producer with all config options" do
+      config.producer = ["hello=world", "hi=all"]
+
+      runner.run
+
+      expect(Rdkafka::Config).to have_received(:new).with(hash_including("hello" => "world", "hi" => "all"))
+    end
 
     it "processes messages with the specified consumer class" do
       kafka.deliver_message("hello world", topic: "greetings")
@@ -204,44 +361,47 @@ RSpec.describe Racecar::Runner do
         topic: "greetings"
       )
 
+      expect(instrumenter).to receive(:instrument).with("main_loop.racecar", hash_including(consumer_class: "TestConsumer")).and_call_original.at_least(:once)
       expect(instrumenter).to receive(:instrument).with("process_message.racecar", payload)
 
       runner.run
     end
+  end
 
-    context "when the processing code raises an exception" do
-      it "pauses the partition if `pause_timeout` is > 0" do
-        config.pause_timeout = 10
+  context "with a consumer class with multiple subscriptions" do
+    let(:processor) { TestMultiConsumer.new }
 
-        processor
-          .on_message {|message| raise "OMG COOKIES!" }
-          .on_message {}
+    include_examples "offset handling", "greetings"
+    include_examples "pause handling"
 
-        kafka.deliver_message("hello world", topic: "greetings")
+    it "processes messages with the specified consumer class" do
+      kafka.deliver_message("to_greet", topic: "greetings")
+      kafka.deliver_message("to_second", topic: "second")
 
-        runner.run
+      runner.run
 
-        expect(kafka.paused?("greetings", 0)).to eq true
-      end
+      expect(processor.messages.map(&:value)).to eq ["to_greet", "to_second"]
+    end
 
-      it "does not pause the partition if `pause_timeout` is 0" do
-        config.pause_timeout = 0
+    it "stores offset on correct consumer" do
+      # Note: offset is generated from a global counter
+      kafka.deliver_message("2", topic: "greetings") # offset 0
+      kafka.deliver_message("2", topic: "greetings") # offset 1
+      kafka.deliver_message("2", topic: "second")    # offset 2
 
-        processor
-          .on_message {|message| raise "OMG COOKIES!" }
-          .on_message {}
+      runner.run
 
-        kafka.deliver_message("hello world", topic: "greetings")
-
-        runner.run
-
-        expect(kafka.paused?("greetings", 0)).to eq false
-      end
+      consumers = runner.send(:consumer).instance_variable_get(:@consumers)
+      offsets = consumers.map { |c| [c.topic, c.committed_offset] }.to_h
+      expect(offsets).to eq({"greetings" => 2, "second" => 1})
     end
   end
 
   context "with a consumer class with a #process_batch method" do
     let(:processor) { TestBatchConsumer.new }
+
+    include_examples "offset handling", "greetings"
+    include_examples "pause handling"
 
     it "processes messages with the specified consumer class" do
       kafka.deliver_message("hello world", topic: "greetings")
@@ -261,39 +421,28 @@ RSpec.describe Racecar::Runner do
         topic: "greetings"
       )
 
+      expect(instrumenter).to receive(:instrument).with("main_loop.racecar", hash_including(consumer_class: "TestBatchConsumer")).and_call_original.at_least(:once)
       expect(instrumenter).to receive(:instrument).with("process_batch.racecar", payload)
 
       runner.run
     end
 
-    context "when the processing code raises an exception" do
-      it "pauses the partition if `pause_timeout` is > 0" do
-        config.pause_timeout = 10
+    it "batches per partition" do
+      kafka.deliver_message("hello", topic: "greetings", partition: 0)
+      kafka.deliver_message("world", topic: "greetings", partition: 1)
+      kafka.deliver_message("!", topic: "greetings", partition: 1)
 
-        processor
-          .on_message {|message| raise "OMG COOKIES!" }
-          .on_message {}
+      payload = a_hash_including(
+        :partition,
+        :first_offset,
+        consumer_class: "TestBatchConsumer",
+        topic: "greetings"
+      )
 
-        kafka.deliver_message("hello world", topic: "greetings")
+      expect(processor).to receive(:process_batch).with([kafka.received_messages["greetings"][0]])
+      expect(processor).to receive(:process_batch).with(kafka.received_messages["greetings"][1, 2])
 
-        runner.run
-
-        expect(kafka.paused?("greetings", 0)).to eq true
-      end
-
-      it "does not pause the partition if `pause_timeout` is 0" do
-        config.pause_timeout = 0
-
-        processor
-          .on_message {|message| raise "OMG COOKIES!" }
-          .on_message {}
-
-        kafka.deliver_message("hello world", topic: "greetings")
-
-        runner.run
-
-        expect(kafka.paused?("greetings", 0)).to eq false
-      end
+      runner.run
     end
   end
 
@@ -310,12 +459,37 @@ RSpec.describe Racecar::Runner do
   context "with a consumer that produces messages" do
     let(:processor) { TestProducingConsumer.new }
 
+    include_examples "offset handling", "numbers"
+
     it "delivers the messages to Kafka" do
       kafka.deliver_message("2", topic: "numbers")
 
       runner.run
 
-      expect(kafka.messages_in("doubled").map(&:value)).to eq ["4"]
+      expect(kafka.messages_in("doubled").map(&:value)).to eq [4]
+    end
+
+    it "instruments produced messages" do
+      allow(instrumenter).to receive(:instrument).and_call_original
+      kafka.deliver_message("2", topic: "numbers")
+
+      payload_start = a_hash_including(:create_time, topic: "doubled", key: 4, value: 4)
+      payload_finish = a_hash_including(message_count: 1)
+
+      runner.run
+
+      expect(instrumenter).to have_received(:instrument).with("produce_message.racecar", payload_start)
+    end
+
+    it "instruments delivery notifications" do
+      allow(instrumenter).to receive(:instrument).and_call_original
+      kafka.deliver_message("2", topic: "numbers")
+
+
+      runner.run
+
+      expect(instrumenter).to have_received(:instrument)
+        .with("acknowledged_message.racecar", {partition: 0, offset: 0})
     end
   end
 
@@ -323,7 +497,7 @@ RSpec.describe Racecar::Runner do
     let(:processor) { TestConsumer.new }
 
     it "allows the processor to tear down resources" do
-      runner.stop
+      runner.run
 
       expect(processor.torn_down?).to eq true
     end
