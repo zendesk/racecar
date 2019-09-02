@@ -30,7 +30,7 @@ module Racecar
       end
     end
 
-    def configure(producer:, consumer:, instrumenter:)
+    def configure(producer:, consumer:, instrumenter: NullInstrumenter)
       @producer = producer
       @consumer = consumer
       @instrumenter = instrumenter
