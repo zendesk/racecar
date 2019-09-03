@@ -15,6 +15,6 @@ jobs:
         ruby-version: 2.6.x
     - name: Build and test with RSpec
       run: |
-        gem install bundler
+        gem install bundler --no-document
         bundle install --jobs 4 --retry 3
-        bundle exec rspec -d
+        bundle exec rspec --format documentation
