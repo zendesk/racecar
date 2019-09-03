@@ -1,0 +1,19 @@
+name: Run Integration Tests
+
+on: [push]
+
+jobs:
+
+  integration:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build Docker image
+      run: docker build --tag racecar .
+    - name: Start docker-compose services
+      run: docker-compose up --build -d
+    - name: Run test consumer
+      run: |
+        docker run --network container:kafka racecar bundle exec racecarctl produce --value 123 --topic test-tokens
