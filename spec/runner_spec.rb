@@ -72,7 +72,7 @@ class TestProducingConsumer < Racecar::Consumer
   def process(message)
     value = Integer(message.value) * 2
 
-    produce topic: "doubled", key: value, payload: value
+    produce value, topic: "doubled", key: value
   end
 end
 
@@ -154,7 +154,7 @@ class FakeProducer
     @delivery_callback = nil
   end
 
-  def produce(topic:, payload:, key:, headers: nil)
+  def produce(payload:, topic:, key:, headers: nil)
     @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0)
     FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback)
   end

@@ -48,7 +48,7 @@ module Racecar
     protected
 
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
-    def produce(topic:, payload:, key:, headers: nil)
+    def produce(payload, topic:, key:, headers: nil)
       @delivery_handles ||= []
 
       extra_info = {
