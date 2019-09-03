@@ -72,7 +72,7 @@ class TestProducingConsumer < Racecar::Consumer
   def process(message)
     value = Integer(message.value) * 2
 
-    produce value, topic: "doubled", key: value
+    produce value, topic: "doubled", key: value, create_time: 123
   end
 end
 
@@ -154,8 +154,8 @@ class FakeProducer
     @delivery_callback = nil
   end
 
-  def produce(payload:, topic:, key:, headers: nil)
-    @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0)
+  def produce(payload:, topic:, key:, timestamp: nil, headers: nil)
+    @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0, timestamp)
     FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback)
   end
 
@@ -190,7 +190,7 @@ class FakeDeliveryHandle
 end
 
 class FakeRdkafka
-  FakeMessage = Struct.new(:value, :key, :topic, :partition, :offset)
+  FakeMessage = Struct.new(:value, :key, :topic, :partition, :offset, :timestamp)
 
   attr_accessor :received_messages
   attr_reader :produced_messages, :consumers
@@ -466,7 +466,10 @@ RSpec.describe Racecar::Runner do
 
       runner.run
 
-      expect(kafka.messages_in("doubled").map(&:value)).to eq [4]
+      messages = kafka.messages_in("doubled")
+
+      expect(messages.map(&:value)).to eq [4]
+      expect(messages.map(&:timestamp)).to eq [123]
     end
 
     it "instruments produced messages" do
