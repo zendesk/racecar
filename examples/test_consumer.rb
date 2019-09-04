@@ -3,17 +3,16 @@ class TestConsumer < Racecar::Consumer
 
   def initialize
     @logger = Logger.new(STDOUT)
-    @base_dir = ENV.fetch("RESULTS_DIR", "/")
+    @token_path = "/token"
   end
 
   def process(message)
     token = message.payload
-    token_path = [@base_dir, token].join("/")
 
     @logger.info "Got #{token}"
 
     File.open(token_path, "w") do |file|
-      file << "OK"
+      file << token
     end
   end
 end
