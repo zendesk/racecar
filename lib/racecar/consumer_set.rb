@@ -15,13 +15,14 @@ module Racecar
       retried ||= false
       msg = current.poll(timeout_ms)
     rescue Rdkafka::RdkafkaError => e
+      raise if retried
+      retried = true
+
       @logger.error "Error for topic subscription #{current_subscription}: #{e}"
 
       case e.code
-      when :max_poll_exceeded
+      when :max_poll_exceeded, :transport # -147, -195
         reset_current_consumer
-        raise if retried
-        retried = true
         retry
       else
         raise
