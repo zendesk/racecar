@@ -3,7 +3,7 @@ name: Execute Specs
 on: [push]
 
 jobs:
-  build:
+  rspec:
 
     runs-on: ubuntu-latest
 
