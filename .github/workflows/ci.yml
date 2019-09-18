@@ -21,4 +21,4 @@ jobs:
       run: |
         gem install bundler --no-document
         bundle install --jobs 4 --retry 3
-        bundle exec rspec --format documentation
+        bundle exec rspec --format documentation --require spec_helper --color
