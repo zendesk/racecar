@@ -439,8 +439,8 @@ RSpec.describe Racecar::Runner do
         topic: "greetings"
       )
 
-      expect(processor).to receive(:process_batch).with([kafka.received_messages["greetings"][0]])
-      expect(processor).to receive(:process_batch).with(kafka.received_messages["greetings"][1, 2])
+      expect(processor).to receive(:process_batch).with([Racecar::Message.new(kafka.received_messages["greetings"][0])])
+      expect(processor).to receive(:process_batch).with(kafka.received_messages["greetings"][1, 2].map {|message| Racecar::Message.new(message) })
 
       runner.run
     end

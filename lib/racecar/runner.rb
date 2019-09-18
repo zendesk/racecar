@@ -1,5 +1,6 @@
 require "rdkafka"
 require "racecar/pause"
+require "racecar/message"
 
 module Racecar
   class Runner
@@ -154,7 +155,7 @@ module Racecar
 
       @instrumenter.instrument("process_message.racecar", payload) do
         with_pause(message.topic, message.partition, message.offset..message.offset) do
-          processor.process(message)
+          processor.process(Racecar::Message.new(message))
           processor.deliver!
           consumer.store_offset(message)
         end
@@ -173,7 +174,7 @@ module Racecar
       @instrumenter.instrument("process_batch.racecar", payload) do
         first, last = messages.first, messages.last
         with_pause(first.topic, first.partition, first.offset..last.offset) do
-          processor.process_batch(messages)
+          processor.process_batch(messages.map {|message| Racecar::Message.new(message) })
           processor.deliver!
           consumer.store_offset(messages.last)
         end
