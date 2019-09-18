@@ -1,5 +1,6 @@
 require "logger"
 
+require "racecar/null_instrumenter"
 require "racecar/consumer"
 require "racecar/consumer_set"
 require "racecar/runner"
@@ -7,13 +8,6 @@ require "racecar/config"
 require "ensure_hash_compact"
 
 module Racecar
-  # Ignores all instrumentation events.
-  class NullInstrumenter
-    def self.instrument(*)
-      yield({}) if block_given?
-    end
-  end
-
   class Error < StandardError
   end
 
