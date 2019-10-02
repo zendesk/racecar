@@ -109,10 +109,31 @@ RSpec.describe Racecar::ConsumerSet do
         end
 
         it "raises other Rdkafka errors" do
+          allow(consumer_set).to receive(:sleep)
           allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
           allow(rdconsumer).to receive(:subscription)
           expect { consumer_set.poll(100) }.to raise_error(Rdkafka::RdkafkaError)
         end
+
+        it "retries with exponential backoff" do
+          allow(consumer_set).to receive(:sleep)
+          allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
+          allow(rdconsumer).to receive(:subscription)
+
+          expect { consumer_set.poll(100) }.to raise_error(Rdkafka::RdkafkaError)
+
+          expect(consumer_set).to have_received(:sleep).ordered.with(1)
+          expect(consumer_set).to have_received(:sleep).ordered.with(2)
+          expect(consumer_set).to have_received(:sleep).ordered.with(4)
+          expect(consumer_set).to have_received(:sleep).ordered.with(8)
+          expect(consumer_set).to have_received(:sleep).ordered.with(16)
+          expect(consumer_set).to have_received(:sleep).ordered.with(32)
+          expect(consumer_set).to have_received(:sleep).ordered.with(64)
+          expect(consumer_set).to have_received(:sleep).ordered.with(128)
+          expect(consumer_set).to have_received(:sleep).ordered.with(256)
+          expect(rdconsumer).to have_received(:poll).exactly(Racecar::ConsumerSet::MAX_POLL_TRIES).times
+        end
+
       end
 
       describe "#batch_poll" do
@@ -149,6 +170,7 @@ RSpec.describe Racecar::ConsumerSet do
         end
 
         it "raises other Rdkafka errors" do
+          allow(consumer_set).to receive(:sleep)
           allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
           allow(rdconsumer).to receive(:subscription)
           expect { consumer_set.batch_poll(100) }.to raise_error(Rdkafka::RdkafkaError)
@@ -287,7 +309,7 @@ RSpec.describe Racecar::ConsumerSet do
       end
     end
 
-    it "#poll retries once upon max poll exceeded" do
+    it "#poll retries upon max poll exceeded" do
       raised = false
       allow(rdconsumer1).to receive(:poll) do
         next nil if raised
@@ -297,6 +319,7 @@ RSpec.describe Racecar::ConsumerSet do
       allow(rdconsumer2).to receive(:poll).and_return(nil)
       allow(rdconsumer3).to receive(:poll)
       allow(consumer_set).to receive(:reset_current_consumer)
+      allow(consumer_set).to receive(:sleep)
 
       consumer_set.poll(100)
       consumer_set.poll(100)

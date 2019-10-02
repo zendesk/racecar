@@ -1,5 +1,7 @@
 module Racecar
   class ConsumerSet
+    MAX_POLL_TRIES = 10
+
     def initialize(config, logger)
       @config, @logger = config, logger
       raise ArgumentError, "Subscriptions must not be empty when subscribing" if @config.subscriptions.empty?
@@ -12,21 +14,21 @@ module Racecar
 
     def poll(timeout_ms)
       maybe_select_next_consumer
-      retried ||= false
+      try ||= 0
       msg = current.poll(timeout_ms)
     rescue Rdkafka::RdkafkaError => e
-      raise if retried
-      retried = true
+      try += 1
+      raise if try >= MAX_POLL_TRIES
 
-      @logger.error "Error for topic subscription #{current_subscription}: #{e}"
+      @logger.error "(try #{try} of #{MAX_POLL_TRIES}): Error for topic subscription #{current_subscription}: #{e}"
 
       case e.code
       when :max_poll_exceeded, :transport # -147, -195
         reset_current_consumer
-        retry
-      else
-        raise
       end
+
+      sleep 2**(try-1)
+      retry
     ensure
       @last_poll_read_nil_message = true if msg.nil?
     end
