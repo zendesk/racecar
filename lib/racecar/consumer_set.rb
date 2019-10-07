@@ -24,7 +24,7 @@ module Racecar
       try += 1
       raise if try >= MAX_POLL_TRIES || remain <= wait_before_retry_ms
 
-      @logger.error "(try #{try} of #{MAX_POLL_TRIES}): Error for topic subscription #{current_subscription}: #{e}"
+      @logger.error "(try #{try}): Error for topic subscription #{current_subscription}: #{e}"
 
       case e.code
       when :max_poll_exceeded, :transport # -147, -195
