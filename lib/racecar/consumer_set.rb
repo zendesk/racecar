@@ -16,8 +16,8 @@ module Racecar
       maybe_select_next_consumer
       started_at ||= Time.now
       try ||= 0
+      remain ||= timeout_ms
 
-      remain = remaining_time_ms(timeout_ms, started_at)
       msg = remain <= 0 ? nil : current.poll(remain)
     rescue Rdkafka::RdkafkaError => e
       wait_before_retry_ms = 100 * (2**try) # 100ms, 200ms, 400ms, …
@@ -30,6 +30,9 @@ module Racecar
       when :max_poll_exceeded, :transport # -147, -195
         reset_current_consumer
       end
+
+      remain = remaining_time_ms(timeout_ms, started_at)
+      raise if remain <= wait_before_retry_ms
 
       sleep wait_before_retry_ms/1000.0
       retry

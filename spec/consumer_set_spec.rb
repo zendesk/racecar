@@ -14,7 +14,8 @@ RSpec.describe Racecar::ConsumerSet do
   let(:config)              { Racecar::Config.new }
   let(:rdconsumer)          { double("rdconsumer", subscribe: true) }
   let(:rdconfig)            { double("rdconfig", consumer: rdconsumer) }
-  let(:consumer_set)        { Racecar::ConsumerSet.new(config, Logger.new(StringIO.new)) }
+  let(:logger)              { Logger.new(StringIO.new) }
+  let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger) }
   let(:max_poll_exceeded_error) { Rdkafka::RdkafkaError.new(-147) }
 
   def message_generator(messages)
@@ -147,6 +148,15 @@ RSpec.describe Racecar::ConsumerSet do
           expect { consumer_set.poll(1000) }.to raise_error(Rdkafka::RdkafkaError)
 
           expect(rdconsumer).to have_received(:poll).exactly(4).times
+        end
+
+        it "skips retries if rescue block was too slow" do
+          allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
+          allow(logger).to receive(:error) do
+            Timecop.freeze(Time.now + 1)
+          end
+
+          expect { consumer_set.poll(1000) }.to raise_error(Rdkafka::RdkafkaError)
         end
       end
 
