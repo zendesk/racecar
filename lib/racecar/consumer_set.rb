@@ -14,11 +14,15 @@ module Racecar
 
     def poll(timeout_ms)
       maybe_select_next_consumer
+      started_at ||= Time.now
       try ||= 0
-      msg = current.poll(timeout_ms)
+
+      remain = remaining_time_ms(timeout_ms, started_at)
+      msg = remain <= 0 ? nil : current.poll(remain)
     rescue Rdkafka::RdkafkaError => e
+      wait_before_retry_ms = 100 * (2**try) # 100ms, 200ms, 400ms, …
       try += 1
-      raise if try >= MAX_POLL_TRIES
+      raise if try >= MAX_POLL_TRIES || remain <= wait_before_retry_ms
 
       @logger.error "(try #{try} of #{MAX_POLL_TRIES}): Error for topic subscription #{current_subscription}: #{e}"
 
@@ -27,7 +31,7 @@ module Racecar
         reset_current_consumer
       end
 
-      sleep 2**(try-1)
+      sleep wait_before_retry_ms/1000.0
       retry
     ensure
       @last_poll_read_nil_message = true if msg.nil?
@@ -38,7 +42,9 @@ module Racecar
       @batch_started_at = Time.now
       @messages = []
       while collect_messages_for_batch? do
-        msg = poll(timeout_ms)
+        remain = remaining_time_ms(timeout_ms, @batch_started_at)
+        break if remain <= 0
+        msg = poll(remain)
         break if msg.nil?
         @messages << msg
       end
@@ -175,6 +181,11 @@ module Racecar
       config.merge! @config.rdkafka_consumer
       config.merge! subscription.additional_config
       config
+    end
+
+    def remaining_time_ms(limit_ms, started_at_time)
+      r = limit_ms - ((Time.now - started_at_time)*1000).round
+      r <= 0 ? 0 : r
     end
   end
 end
