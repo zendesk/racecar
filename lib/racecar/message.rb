@@ -8,7 +8,11 @@ module Racecar
       @rdkafka_message = rdkafka_message
     end
 
-    def_delegators :@rdkafka_message, :topic, :partition, :offset, :key, :value, :headers
+    def_delegators :@rdkafka_message, :topic, :partition, :offset, :key, :headers
+
+    def value
+      @rdkafka_message.payload
+    end
 
     def create_time
       @rdkafka_message.timestamp

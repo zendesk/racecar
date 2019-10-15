@@ -190,7 +190,7 @@ class FakeDeliveryHandle
 end
 
 class FakeRdkafka
-  FakeMessage = Struct.new(:value, :key, :topic, :partition, :offset, :timestamp)
+  FakeMessage = Struct.new(:payload, :key, :topic, :partition, :offset, :timestamp)
 
   attr_accessor :received_messages
   attr_reader :produced_messages, :consumers
@@ -202,9 +202,9 @@ class FakeRdkafka
     @consumers = []
   end
 
-  def deliver_message(value, topic:, partition: 0)
+  def deliver_message(payload, topic:, partition: 0)
     raise "topic may not be nil" if topic.nil?
-    @received_messages[topic] << FakeMessage.new(value, nil, topic, partition, received_messages[topic].size)
+    @received_messages[topic] << FakeMessage.new(payload, nil, topic, partition, received_messages[topic].size)
   end
 
   def messages_in(topic)
@@ -468,7 +468,7 @@ RSpec.describe Racecar::Runner do
 
       messages = kafka.messages_in("doubled")
 
-      expect(messages.map(&:value)).to eq [4]
+      expect(messages.map(&:payload)).to eq [4]
       expect(messages.map(&:timestamp)).to eq [123]
     end
 
