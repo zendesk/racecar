@@ -1,5 +1,7 @@
 module Racecar
   class ConsumerSet
+    MAX_POLL_TRIES = 10
+
     def initialize(config, logger)
       @config, @logger = config, logger
       raise ArgumentError, "Subscriptions must not be empty when subscribing" if @config.subscriptions.empty?
@@ -12,21 +14,28 @@ module Racecar
 
     def poll(timeout_ms)
       maybe_select_next_consumer
-      retried ||= false
-      msg = current.poll(timeout_ms)
-    rescue Rdkafka::RdkafkaError => e
-      raise if retried
-      retried = true
+      started_at ||= Time.now
+      try ||= 0
+      remain ||= timeout_ms
 
-      @logger.error "Error for topic subscription #{current_subscription}: #{e}"
+      msg = remain <= 0 ? nil : current.poll(remain)
+    rescue Rdkafka::RdkafkaError => e
+      wait_before_retry_ms = 100 * (2**try) # 100ms, 200ms, 400ms, …
+      try += 1
+      raise if try >= MAX_POLL_TRIES || remain <= wait_before_retry_ms
+
+      @logger.error "(try #{try}): Error for topic subscription #{current_subscription}: #{e}"
 
       case e.code
       when :max_poll_exceeded, :transport # -147, -195
         reset_current_consumer
-        retry
-      else
-        raise
       end
+
+      remain = remaining_time_ms(timeout_ms, started_at)
+      raise if remain <= wait_before_retry_ms
+
+      sleep wait_before_retry_ms/1000.0
+      retry
     ensure
       @last_poll_read_nil_message = true if msg.nil?
     end
@@ -36,7 +45,9 @@ module Racecar
       @batch_started_at = Time.now
       @messages = []
       while collect_messages_for_batch? do
-        msg = poll(timeout_ms)
+        remain = remaining_time_ms(timeout_ms, @batch_started_at)
+        break if remain <= 0
+        msg = poll(remain)
         break if msg.nil?
         @messages << msg
       end
@@ -173,6 +184,11 @@ module Racecar
       config.merge! @config.rdkafka_consumer
       config.merge! subscription.additional_config
       config
+    end
+
+    def remaining_time_ms(limit_ms, started_at_time)
+      r = limit_ms - ((Time.now - started_at_time)*1000).round
+      r <= 0 ? 0 : r
     end
   end
 end

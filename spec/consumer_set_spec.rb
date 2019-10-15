@@ -14,7 +14,8 @@ RSpec.describe Racecar::ConsumerSet do
   let(:config)              { Racecar::Config.new }
   let(:rdconsumer)          { double("rdconsumer", subscribe: true) }
   let(:rdconfig)            { double("rdconfig", consumer: rdconsumer) }
-  let(:consumer_set)        { Racecar::ConsumerSet.new(config, Logger.new(StringIO.new)) }
+  let(:logger)              { Logger.new(StringIO.new) }
+  let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger) }
   let(:max_poll_exceeded_error) { Rdkafka::RdkafkaError.new(-147) }
 
   def message_generator(messages)
@@ -98,6 +99,14 @@ RSpec.describe Racecar::ConsumerSet do
       end
 
       describe "#poll" do
+        before do
+          Timecop.freeze
+          allow(consumer_set).to receive(:sleep) do |val|
+            Timecop.freeze(Time.now + val)
+          end
+        end
+        after { Timecop.return }
+
         it "forwards to Rdkafka" do
           expect(rdconsumer).to receive(:poll).once.with(100).and_return(:message)
           expect(consumer_set.poll(100)).to be :message
@@ -113,9 +122,60 @@ RSpec.describe Racecar::ConsumerSet do
           allow(rdconsumer).to receive(:subscription)
           expect { consumer_set.poll(100) }.to raise_error(Rdkafka::RdkafkaError)
         end
+
+        it "retries with exponential backoff" do
+          allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
+          allow(rdconsumer).to receive(:subscription)
+
+          expect { consumer_set.poll(2**31) }.to raise_error(Rdkafka::RdkafkaError)
+
+          expect(consumer_set).to have_received(:sleep).ordered.with(0.1)
+          expect(consumer_set).to have_received(:sleep).ordered.with(0.2)
+          expect(consumer_set).to have_received(:sleep).ordered.with(0.4)
+          expect(consumer_set).to have_received(:sleep).ordered.with(0.8)
+          expect(consumer_set).to have_received(:sleep).ordered.with(1.6)
+          expect(consumer_set).to have_received(:sleep).ordered.with(3.2)
+          expect(consumer_set).to have_received(:sleep).ordered.with(6.4)
+          expect(consumer_set).to have_received(:sleep).ordered.with(12.8)
+          expect(consumer_set).to have_received(:sleep).ordered.with(25.6)
+          expect(rdconsumer).to have_received(:poll).exactly(Racecar::ConsumerSet::MAX_POLL_TRIES).times
+        end
+
+        it "honors timeout on retries" do
+          allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
+          allow(rdconsumer).to receive(:subscription)
+
+          expect { consumer_set.poll(1000) }.to raise_error(Rdkafka::RdkafkaError)
+
+          expect(rdconsumer).to have_received(:poll).exactly(4).times
+        end
+
+        it "skips retries if rescue block was too slow" do
+          allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
+          allow(logger).to receive(:error) do
+            Timecop.freeze(Time.now + 1)
+          end
+
+          expect { consumer_set.poll(1000) }.to raise_error(Rdkafka::RdkafkaError)
+        end
       end
 
       describe "#batch_poll" do
+        it "honors timeout on subsequent polls" do
+          Timecop.freeze do
+            allow(consumer_set).to receive(:poll) do
+              Timecop.freeze(Time.now + 0.1)
+              :fake_msg
+            end
+
+            consumer_set.batch_poll(150)
+
+            expect(consumer_set).to have_received(:poll).ordered.with(150)
+            expect(consumer_set).to have_received(:poll).ordered.with(50)
+            expect(consumer_set).to have_received(:poll).twice
+          end
+        end
+
         it "forwards to Rdkafka (as poll)" do
           config.fetch_messages = 3
           expect(rdconsumer).to receive(:poll).exactly(3).times.with(100).and_return(:msg1, :msg2, :msg3)
@@ -149,6 +209,7 @@ RSpec.describe Racecar::ConsumerSet do
         end
 
         it "raises other Rdkafka errors" do
+          allow(consumer_set).to receive(:sleep)
           allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
           allow(rdconsumer).to receive(:subscription)
           expect { consumer_set.batch_poll(100) }.to raise_error(Rdkafka::RdkafkaError)
@@ -287,7 +348,7 @@ RSpec.describe Racecar::ConsumerSet do
       end
     end
 
-    it "#poll retries once upon max poll exceeded" do
+    it "#poll retries upon max poll exceeded" do
       raised = false
       allow(rdconsumer1).to receive(:poll) do
         next nil if raised
@@ -297,9 +358,10 @@ RSpec.describe Racecar::ConsumerSet do
       allow(rdconsumer2).to receive(:poll).and_return(nil)
       allow(rdconsumer3).to receive(:poll)
       allow(consumer_set).to receive(:reset_current_consumer)
+      allow(consumer_set).to receive(:sleep)
 
-      consumer_set.poll(100)
-      consumer_set.poll(100)
+      consumer_set.poll(200)
+      consumer_set.poll(200)
 
       expect(consumer_set).to have_received(:reset_current_consumer).once
       expect(rdconsumer1).to have_received(:poll).twice
