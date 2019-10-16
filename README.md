@@ -214,7 +214,7 @@ class GeoCodingConsumer < Racecar::Consumer
 
     # The `produce` method enqueues a message to be delivered after #process
     # returns. It won't actually deliver the message.
-    produce(payload: JSON.dump(pageview), topic: "pageviews-with-country", key: pageview["id"])
+    produce(JSON.dump(pageview), topic: "pageviews-with-country", key: pageview["id"])
   end
 end
 ```
