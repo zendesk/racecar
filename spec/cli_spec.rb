@@ -10,7 +10,7 @@ RSpec.describe Racecar::Cli do
     expect { Racecar::Cli.main([]) }.to raise_exception(Racecar::Error, "no consumer specified")
   end
 
-  it "doesn't start Rails if --no-rails option is specified" do
+  it "doesn't start Rails if --norrails option is specified" do
     args = ["--require", "./examples/cat_consumer.rb", "CatConsumer", "--norails"]
 
     allow(Racecar).to receive(:run)
@@ -19,7 +19,7 @@ RSpec.describe Racecar::Cli do
     Racecar::Cli.main(args)
   end
 
-  it "starts Rails if the --no-rails option is omitted" do
+  it "starts Rails if the --norails option is omitted" do
     args = ["--require", "./examples/cat_consumer.rb", "CatConsumer"]
 
     allow(Racecar).to receive(:run)
