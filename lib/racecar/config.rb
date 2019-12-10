@@ -137,7 +137,7 @@ module Racecar
     boolean :ssl_verify_hostname, default: true
 
     desc "Whether to boot Rails when starting the consumer"
-    boolean :disable_rails, default: false
+    boolean :without_rails, default: false
 
     # The error handler must be set directly on the object.
     attr_reader :error_handler
