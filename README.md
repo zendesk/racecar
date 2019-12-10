@@ -319,6 +319,9 @@ Racecar supports configuring ruby-kafka's [Datadog](https://www.datadoghq.com/) 
 * `datadog_namespace` – The namespace to use for Datadog metrics.
 * `datadog_tags` – Tags that should always be set on Datadog metrics.
 
+#### Consumers Without Rails ####
+
+By default, if Rails is detected, it will be automatically started when the consumer is started. There are cases where you might not want or need Rails. You can pass the `--without-rails` option when starting the consumer and Rails won't be started.
 
 ### Testing consumers
 
