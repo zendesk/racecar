@@ -148,6 +148,9 @@ module Racecar
     desc "Whether to boot Rails when starting the consumer"
     boolean :without_rails, default: false
 
+    desc "Run the racecar process as a standalone process or use threads within a existing process"
+    boolean :standalone, default: true
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 

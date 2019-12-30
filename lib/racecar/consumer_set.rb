@@ -15,7 +15,7 @@ module Racecar
 
     def poll(timeout_ms)
       maybe_select_next_consumer
-      started_at ||= Time.now
+      started_at ||= Process.clock_gettime(Process::CLOCK_MONOTONIC)
       try ||= 0
       remain ||= timeout_ms
 
@@ -43,7 +43,7 @@ module Racecar
 
     # XXX: messages are not guaranteed to be from the same partition
     def batch_poll(timeout_ms)
-      @batch_started_at = Time.now
+      @batch_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       @messages = []
       while collect_messages_for_batch? do
         remain = remaining_time_ms(timeout_ms, @batch_started_at)
@@ -162,7 +162,7 @@ module Racecar
 
     def collect_messages_for_batch?
       @messages.size < @config.fetch_messages &&
-      (Time.now - @batch_started_at) < @config.max_wait_time
+      (Process.clock_gettime(Process::CLOCK_MONOTONIC) - @batch_started_at) < @config.max_wait_time
     end
 
     def rdkafka_config(subscription)
@@ -190,7 +190,7 @@ module Racecar
     end
 
     def remaining_time_ms(limit_ms, started_at_time)
-      r = limit_ms - ((Time.now - started_at_time)*1000).round
+      r = limit_ms - ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at_time)*1000)
       r <= 0 ? 0 : r
     end
   end

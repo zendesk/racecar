@@ -147,7 +147,7 @@ RSpec.describe Racecar::ConsumerSet do
 
           expect { consumer_set.poll(1000) }.to raise_error(Rdkafka::RdkafkaError)
 
-          expect(rdconsumer).to have_received(:poll).exactly(4).times
+          expect(rdconsumer).to have_received(:poll).at_least(:twice).with(less_than(1000))
         end
 
         it "skips retries if rescue block was too slow" do
@@ -160,25 +160,23 @@ RSpec.describe Racecar::ConsumerSet do
         end
       end
 
+      RSpec::Matchers.define :less_than do |x|
+        match { |actual| (actual < x) }
+      end
+
       describe "#batch_poll" do
         it "honors timeout on subsequent polls" do
-          Timecop.freeze do
-            allow(consumer_set).to receive(:poll) do
-              Timecop.freeze(Time.now + 0.1)
-              :fake_msg
-            end
-
-            consumer_set.batch_poll(150)
-
-            expect(consumer_set).to have_received(:poll).ordered.with(150)
-            expect(consumer_set).to have_received(:poll).ordered.with(50)
-            expect(consumer_set).to have_received(:poll).twice
+          allow(consumer_set).to receive(:poll) do
+            :fake_msg
           end
+
+          consumer_set.batch_poll(150)
+          expect(consumer_set).to have_received(:poll).at_least(10).with(less_than(150))
         end
 
         it "forwards to Rdkafka (as poll)" do
           config.fetch_messages = 3
-          expect(rdconsumer).to receive(:poll).exactly(3).times.with(100).and_return(:msg1, :msg2, :msg3)
+          expect(rdconsumer).to receive(:poll).exactly(3).times.with(less_than(100)).and_return(:msg1, :msg2, :msg3)
           expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2, :msg3]
         end
 

@@ -47,7 +47,43 @@ module Racecar
     end
   end
 
+  def self.mutex
+    @mutex ||= Mutex.new
+  end
+
+  def self.install_at_exit
+    return if @installed
+
+    @installed = true
+    at_exit { stop }
+  end
+
+  def self.runners
+    @runners ||= []
+  end
+
   def self.run(processor)
-    Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter).run
+    unless config.standalone
+      # Ensure thread-safe at_exit installation
+      mutex.synchronize { install_at_exit }
+  
+      # Load the config specific to this processor.
+      configuration = config.dup
+      configuration.load_consumer_class(processor.class)
+      configuration.validate!
+    end
+
+    configuration ||= config
+
+    runners << Runner.new(
+      processor,
+      config: configuration,
+      logger: logger,
+      instrumenter: instrumenter,
+    ).tap(&:run)
+  end
+
+  def self.stop
+    runners.each(&:stop)
   end
 end

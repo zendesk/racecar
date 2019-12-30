@@ -42,7 +42,8 @@ module Racecar
     end
 
     def run
-      install_signal_handlers
+      install_signal_handlers if config.standalone
+
       @stop_requested = false
 
       # Configure the consumer with a producer so it can produce messages and
