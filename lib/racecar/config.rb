@@ -130,6 +130,9 @@ module Racecar
     desc "Whether to check the server certificate is valid for the hostname"
     boolean :ssl_verify_hostname, default: true
 
+    desc "Whether to boot Rails when starting the consumer"
+    boolean :without_rails, default: false
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 

@@ -22,6 +22,10 @@ module Racecar
     @config ||= Config.new
   end
 
+  def self.config=(config)
+    @config = config
+  end
+
   def self.configure
     yield config
   end

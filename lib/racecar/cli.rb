@@ -23,7 +23,7 @@ module Racecar
     def run
       $stderr.puts "=> Starting Racecar consumer #{consumer_name}..."
 
-      RailsConfigFileLoader.load!
+      RailsConfigFileLoader.load! unless config.without_rails?
 
       if File.exist?("config/racecar.rb")
         require "./config/racecar"
