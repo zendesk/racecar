@@ -1,5 +1,6 @@
 require "logger"
 
+require "racecar/instrumenter"
 require "racecar/null_instrumenter"
 require "racecar/consumer"
 require "racecar/consumer_set"
@@ -35,13 +36,15 @@ module Racecar
   end
 
   def self.instrumenter
-    require "active_support/notifications"
+    @instrumenter ||= begin
+      default_payload = { client_id: config.client_id, group_id: config.group_id }
 
-    ActiveSupport::Notifications
-  rescue LoadError
-    logger.warn "ActiveSupport::Notifications not available, instrumentation is disabled"
-
-    NullInstrumenter
+      Instrumenter.new(default_payload).tap do |instrumenter|
+        if instrumenter.backend == NullInstrumenter
+          logger.warn "ActiveSupport::Notifications not available, instrumentation is disabled"
+        end
+      end
+    end
   end
 
   def self.run(processor)

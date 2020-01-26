@@ -155,7 +155,7 @@ class FakeProducer
   end
 
   def produce(payload:, topic:, key:, timestamp: nil, headers: nil)
-    @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0, timestamp)
+    @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0, timestamp, headers)
     FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback)
   end
 
@@ -190,7 +190,7 @@ class FakeDeliveryHandle
 end
 
 class FakeRdkafka
-  FakeMessage = Struct.new(:payload, :key, :topic, :partition, :offset, :timestamp)
+  FakeMessage = Struct.new(:payload, :key, :topic, :partition, :offset, :timestamp, :headers)
 
   attr_accessor :received_messages
   attr_reader :produced_messages, :consumers
@@ -221,7 +221,12 @@ class FakeRdkafka
   end
 end
 
-FakeInstrumenter = Class.new(Racecar::NullInstrumenter)
+class FakeInstrumenter < Racecar::Instrumenter
+  def initialize(*)
+    super
+    @backend = Racecar::NullInstrumenter
+  end
+end
 
 RSpec.shared_examples "offset handling" do |topic|
   let(:consumers) do
@@ -298,26 +303,34 @@ RSpec.shared_examples "pause handling" do
     expect(kafka.consumers.first._paused).to eq true
   end
 
-  it "instruments on pauses" do
+  context 'with instrumentation enabled' do
+    let(:pause_instrumentation) do
+      {
+        topic:        'greetings',
+        partition:    0,
+        duration:     kind_of(Float)
+      }
+    end
+    before do
       allow(instrumenter).to receive(:instrument).and_call_original
       kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+    end
+
+    it 'instruments pause status' do
+      expect(instrumenter).
+        to receive(:instrument).
+        with("pause_status", hash_including(pause_instrumentation))
 
       runner.run
-
-      expect(instrumenter).to have_received(:instrument).with("pause_status.racecar", {
-        duration:  kind_of(Float),
-        partition: 0,
-        topic:     "greetings"
-      }).at_least(:once)
+    end
   end
-
 end
 
 RSpec.describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
   let(:logger) { Logger.new(StringIO.new) }
   let(:kafka)  { FakeRdkafka.new(runner: runner) }
-  let(:instrumenter) { FakeInstrumenter }
+  let(:instrumenter) { FakeInstrumenter.new }
 
   let(:runner) do
     Racecar::Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter)
@@ -351,20 +364,52 @@ RSpec.describe Racecar::Runner do
       expect(processor.messages.map(&:value)).to eq ["hello world"]
     end
 
-    it "sends instrumentation signals" do
-      kafka.deliver_message("hello world", topic: "greetings")
+    context 'with instrumentation enabled' do
+      let(:message_instrumentation) do
+        {
+          partition: 0,
+          offset: 0,
+          create_time: nil,
+          headers: nil,
+          key: nil,
+          value: 'hello world',
+          consumer_class: "TestConsumer",
+          topic: "greetings"
+        }
+      end
 
-      payload = a_hash_including(
-        :partition,
-        :offset,
-        consumer_class: "TestConsumer",
-        topic: "greetings"
-      )
+      let(:loop_instrumentation) do
+        { consumer_class: "TestConsumer" }
+      end
 
-      expect(instrumenter).to receive(:instrument).with("main_loop.racecar", hash_including(consumer_class: "TestConsumer")).and_call_original.at_least(:once)
-      expect(instrumenter).to receive(:instrument).with("process_message.racecar", payload)
+      before do
+        allow(instrumenter).to receive(:instrument).and_call_original
+        kafka.deliver_message("hello world", topic: "greetings")
+      end
 
-      runner.run
+      it 'instruments main_loop' do
+        expect(instrumenter).
+          to receive(:instrument).
+          with("main_loop", hash_including(loop_instrumentation))
+
+        runner.run
+      end
+
+      it 'instruments the start of processing a message' do
+        expect(instrumenter).
+          to receive(:instrument).
+          with("start_process_message", hash_including(message_instrumentation))
+
+        runner.run
+      end
+
+      it 'instruments a message being processed' do
+        expect(instrumenter).
+          to receive(:instrument).
+          with("process_message", hash_including(message_instrumentation))
+
+        runner.run
+      end
     end
   end
 
@@ -411,20 +456,45 @@ RSpec.describe Racecar::Runner do
       expect(processor.messages.map(&:value)).to eq ["hello world"]
     end
 
-    it "sends instrumentation signals" do
-      kafka.deliver_message("hello world", topic: "greetings")
+    context 'with instrumentation enabled' do
+      let(:batch_instrumentation) do
+        {
+          consumer_class: 'TestBatchConsumer',
+          topic:          'greetings',
+          partition:      0,
+          first_offset:   0,
+          last_offset:    0,
+          message_count:  1
+        }
+      end
+      before do
+        allow(instrumenter).to receive(:instrument).and_call_original
+        kafka.deliver_message("hello world", topic: "greetings")
+      end
 
-      payload = a_hash_including(
-        :partition,
-        :first_offset,
-        consumer_class: "TestBatchConsumer",
-        topic: "greetings"
-      )
+      it 'instruments the main loop' do
+        expect(instrumenter).
+          to receive(:instrument).
+          with("main_loop", hash_including(consumer_class: "TestBatchConsumer"))
 
-      expect(instrumenter).to receive(:instrument).with("main_loop.racecar", hash_including(consumer_class: "TestBatchConsumer")).and_call_original.at_least(:once)
-      expect(instrumenter).to receive(:instrument).with("process_batch.racecar", payload)
+        runner.run
+      end
 
-      runner.run
+      it 'instruments the start of a batch processing' do
+        expect(instrumenter).
+          to receive(:instrument).
+          with("start_process_batch", hash_including(batch_instrumentation))
+
+        runner.run
+      end
+
+      it 'instruments the batch processing' do
+        expect(instrumenter).
+          to receive(:instrument).
+          with("process_batch", hash_including(batch_instrumentation))
+
+        runner.run
+      end
     end
 
     it "batches per partition" do
@@ -461,7 +531,7 @@ RSpec.describe Racecar::Runner do
 
     include_examples "offset handling", "numbers"
 
-    it "delivers the messages to Kafka" do
+    it "delivers the messages to Kafka", focus: true do
       kafka.deliver_message("2", topic: "numbers")
 
       runner.run
@@ -481,7 +551,7 @@ RSpec.describe Racecar::Runner do
 
       runner.run
 
-      expect(instrumenter).to have_received(:instrument).with("produce_message.racecar", payload_start)
+      expect(instrumenter).to have_received(:instrument).with("produce_message", payload_start)
     end
 
     it "instruments delivery notifications" do
@@ -492,7 +562,7 @@ RSpec.describe Racecar::Runner do
       runner.run
 
       expect(instrumenter).to have_received(:instrument)
-        .with("acknowledged_message.racecar", {partition: 0, offset: 0})
+        .with("acknowledged_message", {partition: 0, offset: 0})
     end
   end
 
