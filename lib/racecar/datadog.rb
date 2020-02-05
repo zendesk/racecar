@@ -239,7 +239,7 @@ module Racecar
         increment("producer.ack.messages", tags: tags)
       end
 
-      attach_to "producer.racecar"
+      attach_to "racecar"
     end
   end
 end
