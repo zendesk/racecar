@@ -63,9 +63,9 @@ RSpec.describe Racecar::Config do
     end
 
     it "sets the client id from RACECAR_CLIENT_ID" do
-      ENV["RACECAR_CLIENT_ID"] = "witch"
-
-      expect(config.client_id).to eq "witch"
+      with_env('RACECAR_CLIENT_ID', 'witch') do
+        expect(config.client_id).to eq "witch"
+      end
     end
 
     it "sets the offset commit interval from RACECAR_OFFSET_COMMIT_INTERVAL" do

@@ -144,13 +144,14 @@ module Racecar
     end
 
     def configure_datadog
-      require "kafka/datadog"
+      require_relative './datadog'
 
-      datadog = Kafka::Datadog
-      datadog.host = config.datadog_host unless config.datadog_host.nil?
-      datadog.port = config.datadog_port unless config.datadog_port.nil?
-      datadog.namespace = config.datadog_namespace unless config.datadog_namespace.nil?
-      datadog.tags = config.datadog_tags unless config.datadog_tags.nil?
+      Datadog.configure do |datadog|
+        datadog.host      = config.datadog_host unless config.datadog_host.nil?
+        datadog.port      = config.datadog_port unless config.datadog_port.nil?
+        datadog.namespace = config.datadog_namespace unless config.datadog_namespace.nil?
+        datadog.tags      = config.datadog_tags unless config.datadog_tags.nil?
+      end
     end
   end
 end

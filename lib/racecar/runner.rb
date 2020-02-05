@@ -53,13 +53,16 @@ module Racecar
         instrumenter: @instrumenter,
       )
 
-      instrument_payload = { consumer_class: processor.class.to_s, consumer_set: consumer }
+      instrumentation_payload = {
+        consumer_class: processor.class.to_s,
+        consumer_set: consumer
+      }
 
       # Main loop
       loop do
         break if @stop_requested
         resume_paused_partitions
-        @instrumenter.instrument("main_loop.racecar", instrument_payload) do
+        @instrumenter.instrument("main_loop", instrumentation_payload) do
           case process_method
           when :batch then
             msg_per_part = consumer.batch_poll(config.max_wait_time).group_by(&:partition)
@@ -77,7 +80,9 @@ module Racecar
       processor.deliver!
       processor.teardown
       consumer.commit
-      consumer.close
+      @instrumenter.instrument('leave_group') do
+        consumer.close
+      end
     end
 
     def stop
@@ -106,7 +111,7 @@ module Racecar
         # a value within librdkafka and is asynchronously written to proper
         # storage through auto commits.
         config.consumer << "enable.auto.offset.store=false"
-        ConsumerSet.new(config, logger)
+        ConsumerSet.new(config, logger, @instrumenter)
       end
     end
 
@@ -130,8 +135,11 @@ module Racecar
 
     def delivery_callback
       ->(delivery_report) do
-        data = {offset: delivery_report.offset, partition: delivery_report.partition}
-        @instrumenter.instrument("acknowledged_message.racecar", data)
+        payload = {
+          offset: delivery_report.offset,
+          partition: delivery_report.partition
+        }
+        @instrumenter.instrument("acknowledged_message", payload)
       end
     end
 
@@ -146,14 +154,19 @@ module Racecar
     end
 
     def process(message)
-      payload = {
+      instrumentation_payload = {
         consumer_class: processor.class.to_s,
-        topic: message.topic,
-        partition: message.partition,
-        offset: message.offset,
+        topic:          message.topic,
+        partition:      message.partition,
+        offset:         message.offset,
+        create_time:    message.timestamp,
+        key:            message.key,
+        value:          message.payload,
+        headers:        message.headers
       }
 
-      @instrumenter.instrument("process_message.racecar", payload) do
+      @instrumenter.instrument("start_process_message", instrumentation_payload)
+      @instrumenter.instrument("process_message", instrumentation_payload) do
         with_pause(message.topic, message.partition, message.offset..message.offset) do
           processor.process(Racecar::Message.new(message))
           processor.deliver!
@@ -163,16 +176,18 @@ module Racecar
     end
 
     def process_batch(messages)
-      payload = {
+      first, last = messages.first, messages.last
+      instrumentation_payload = {
         consumer_class: processor.class.to_s,
-        topic: messages.first.topic,
-        partition: messages.first.partition,
-        first_offset: messages.first.offset,
-        message_count: messages.size,
+        topic:          first.topic,
+        partition:      first.partition,
+        first_offset:   first.offset,
+        last_offset:    last.offset,
+        message_count:  messages.size
       }
 
-      @instrumenter.instrument("process_batch.racecar", payload) do
-        first, last = messages.first, messages.last
+      @instrumenter.instrument("start_process_batch", instrumentation_payload)
+      @instrumenter.instrument("process_batch", instrumentation_payload) do
         with_pause(first.topic, first.partition, first.offset..last.offset) do
           processor.process_batch(messages.map {|message| Racecar::Message.new(message) })
           processor.deliver!
@@ -204,11 +219,13 @@ module Racecar
 
       pauses.each do |topic, partitions|
         partitions.each do |partition, pause|
-          @instrumenter.instrument("pause_status.racecar", {
-            topic: topic,
-            partition: partition,
-            duration: pause.pause_duration,
-          })
+          instrumentation_payload = {
+            topic:      topic,
+            partition:  partition,
+            duration:   pause.pause_duration,
+            consumer_class: processor.class.to_s,
+          }
+          @instrumenter.instrument("pause_status", instrumentation_payload)
 
           if pause.paused? && pause.expired?
             logger.info "Automatically resuming partition #{topic}/#{partition}, pause timeout expired"

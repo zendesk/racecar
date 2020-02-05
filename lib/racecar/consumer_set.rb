@@ -2,8 +2,9 @@ module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10
 
-    def initialize(config, logger)
+    def initialize(config, logger, instrumenter = NullInstrumenter)
       @config, @logger = config, logger
+      @instrumenter = instrumenter
       raise ArgumentError, "Subscriptions must not be empty when subscribing" if @config.subscriptions.empty?
 
       @consumers = []
@@ -71,7 +72,9 @@ module Racecar
     def current
       @consumers[@consumer_id_iterator.peek] ||= begin
         consumer = Rdkafka::Config.new(rdkafka_config(current_subscription)).consumer
-        consumer.subscribe current_subscription.topic
+        @instrumenter.instrument('join_group') do
+          consumer.subscribe current_subscription.topic
+        end
         consumer
       end
     end

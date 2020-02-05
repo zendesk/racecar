@@ -41,7 +41,13 @@ module Racecar
     # Delivers messages that got produced.
     def deliver!
       @delivery_handles ||= []
-      @delivery_handles.each(&:wait)
+      if @delivery_handles.any?
+        instrumentation_payload = { delivered_message_count: @delivery_handles.size }
+
+        @instrumenter.instrument('deliver_messages', instrumentation_payload) do
+          @delivery_handles.each(&:wait)
+        end
+      end
       @delivery_handles.clear
     end
 
@@ -50,14 +56,18 @@ module Racecar
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
     def produce(payload, topic:, key:, headers: nil, create_time: nil)
       @delivery_handles ||= []
-
-      extra_info = {
-        value:       payload,
-        key:         key,
-        topic:       topic,
-        create_time: Time.now,
+      message_size = payload.respond_to?(:bytesize) ? payload.bytesize : 0
+      instrumentation_payload = {
+        value:        payload,
+        headers:      headers,
+        key:          key,
+        topic:        topic,
+        message_size: message_size,
+        create_time:  Time.now,
+        buffer_size:  @delivery_handles.size
       }
-      @instrumenter.instrument("produce_message.racecar", extra_info) do
+
+      @instrumenter.instrument("produce_message", instrumentation_payload) do
         @delivery_handles << @producer.produce(topic: topic, payload: payload, key: key, timestamp: create_time, headers: headers)
       end
     end
