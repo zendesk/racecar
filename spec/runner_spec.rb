@@ -303,6 +303,15 @@ RSpec.shared_examples "pause handling" do
     expect(kafka.consumers.first._paused).to eq true
   end
 
+  it "calls error handler" do
+    error = StandardError.new("surprise")
+    expect(config.error_handler).to receive(:call).at_least(:once).with(error)
+
+    kafka.deliver_message(error, topic: "greetings")
+
+    runner.run
+  end
+
   context 'with instrumentation enabled' do
     let(:pause_instrumentation) do
       {

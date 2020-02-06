@@ -206,6 +206,7 @@ module Racecar
       rescue => e
         desc = "#{topic}/#{partition}"
         logger.error "Failed to process #{desc} at #{offsets}: #{e}"
+        config.error_handler.call(e)
 
         pause = pauses[topic][partition]
         logger.warn "Pausing partition #{desc} for #{pause.backoff_interval} seconds"

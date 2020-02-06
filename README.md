@@ -455,12 +455,8 @@ If, on the other hand, the exception was cause by a temporary network or databas
 In addition to retrying the processing of messages, Racecar also allows defining an _error handler_ callback that is invoked whenever an exception is raised by your `#process` method. This allows you to track and report errors to a monitoring system:
 
 ```ruby
-Racecar.config.on_error do |exception, info|
-  MyErrorTracker.report(exception, {
-    topic: info[:topic],
-    partition: info[:partition],
-    offset: info[:offset],
-  })
+Racecar.config.on_error do |exception|
+  MyErrorTracker.report(exception)
 end
 ```
 
