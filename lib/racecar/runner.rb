@@ -168,9 +168,14 @@ module Racecar
       @instrumenter.instrument("start_process_message", instrumentation_payload)
       @instrumenter.instrument("process_message", instrumentation_payload) do
         with_pause(message.topic, message.partition, message.offset..message.offset) do
-          processor.process(Racecar::Message.new(message))
-          processor.deliver!
-          consumer.store_offset(message)
+          begin
+            processor.process(Racecar::Message.new(message))
+            processor.deliver!
+            consumer.store_offset(message)
+          rescue => e
+            config.error_handler.call(e, instrumentation_payload)
+            raise e
+          end
         end
       end
     end
@@ -189,9 +194,14 @@ module Racecar
       @instrumenter.instrument("start_process_batch", instrumentation_payload)
       @instrumenter.instrument("process_batch", instrumentation_payload) do
         with_pause(first.topic, first.partition, first.offset..last.offset) do
-          processor.process_batch(messages.map {|message| Racecar::Message.new(message) })
-          processor.deliver!
-          consumer.store_offset(messages.last)
+          begin
+            processor.process_batch(messages.map {|message| Racecar::Message.new(message) })
+            processor.deliver!
+            consumer.store_offset(messages.last)
+          rescue => e
+            config.error_handler.call(e, instrumentation_payload)
+            raise e
+          end
         end
       end
     end
@@ -206,7 +216,6 @@ module Racecar
       rescue => e
         desc = "#{topic}/#{partition}"
         logger.error "Failed to process #{desc} at #{offsets}: #{e}"
-        config.error_handler.call(e)
 
         pause = pauses[topic][partition]
         logger.warn "Pausing partition #{desc} for #{pause.backoff_interval} seconds"
