@@ -364,6 +364,26 @@ RSpec.describe Racecar::Runner do
       expect(processor.messages.map(&:value)).to eq ["hello world"]
     end
 
+    it "calls error handler when an exception is raised" do
+      error = StandardError.new("surprise")
+      info = {
+        consumer_class: 'TestConsumer',
+        topic: 'greetings',
+        partition: 0,
+        offset: 0,
+        create_time: nil,
+        key: nil,
+        value: error,
+        headers: nil
+      }
+
+      expect(config.error_handler).to receive(:call).at_least(:once).with(error, info)
+
+      kafka.deliver_message(error, topic: "greetings")
+
+      runner.run
+    end
+
     context 'with instrumentation enabled' do
       let(:message_instrumentation) do
         {
@@ -454,6 +474,24 @@ RSpec.describe Racecar::Runner do
       runner.run
 
       expect(processor.messages.map(&:value)).to eq ["hello world"]
+    end
+
+    it "calls error handler when an exception is raised" do
+      error = StandardError.new("surprise")
+      info = {
+        consumer_class: 'TestBatchConsumer',
+        topic: 'greetings',
+        partition: 0,
+        first_offset: 0,
+        last_offset: 0,
+        message_count: 1,
+      }
+
+      expect(config.error_handler).to receive(:call).at_least(:once).with(error, info)
+
+      kafka.deliver_message(error, topic: "greetings")
+
+      runner.run
     end
 
     context 'with instrumentation enabled' do
