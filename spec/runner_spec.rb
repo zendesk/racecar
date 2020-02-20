@@ -484,6 +484,7 @@ RSpec.describe Racecar::Runner do
         partition: 0,
         first_offset: 0,
         last_offset: 0,
+        last_create_time: nil,
         message_count: 1,
       }
 
@@ -502,6 +503,7 @@ RSpec.describe Racecar::Runner do
           partition:      0,
           first_offset:   0,
           last_offset:    0,
+          last_create_time: nil,
           message_count:  1
         }
       end

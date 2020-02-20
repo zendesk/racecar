@@ -188,6 +188,7 @@ module Racecar
         partition:      first.partition,
         first_offset:   first.offset,
         last_offset:    last.offset,
+        last_create_time: last.timestamp,
         message_count:  messages.size
       }
 

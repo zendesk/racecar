@@ -98,6 +98,7 @@ RSpec.describe Racecar::Datadog::ConsumerSubscriber do
         partition:      1,
         first_offset:   3,
         last_offset:    10,
+        last_create_time: Time.now,
         message_count:  20,
       )
     end
