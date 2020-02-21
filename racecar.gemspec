@@ -27,6 +27,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rake", "> 10.0"
   spec.add_development_dependency "rspec", "~> 3.0"
   spec.add_development_dependency "timecop"
-  spec.add_development_dependency "dogstatsd-ruby", ">= 3.0.0", "< 4.7.0"
+  spec.add_development_dependency "dogstatsd-ruby", ">= 4.0.0", "< 5.0.0"
   spec.add_development_dependency "activesupport", ">= 4.0", "< 6.1"
 end

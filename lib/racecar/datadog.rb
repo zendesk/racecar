@@ -26,7 +26,7 @@ module Racecar
       end
 
       def host
-        @host ||= default_host
+        @host
       end
 
       def host=(host)
@@ -35,7 +35,7 @@ module Racecar
       end
 
       def port
-        @port ||= default_port
+        @port
       end
 
       def port=(port)
@@ -62,22 +62,6 @@ module Racecar
       end
 
       private
-
-      def default_host
-        if ::Datadog::Statsd.const_defined?(:Connection)
-          ::Datadog::Statsd::Connection::DEFAULT_HOST
-        else
-          ::Datadog::Statsd::DEFAULT_HOST
-        end
-      end
-
-      def default_port
-        if ::Datadog::Statsd.const_defined?(:Connection)
-          ::Datadog::Statsd::Connection::DEFAULT_PORT
-        else
-          ::Datadog::Statsd::DEFAULT_PORT
-        end
-      end
 
       def clear
         @statsd && @statsd.close
