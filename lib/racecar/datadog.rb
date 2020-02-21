@@ -126,6 +126,8 @@ module Racecar
       def process_batch(event)
         offset = event.payload.fetch(:last_offset)
         messages = event.payload.fetch(:message_count)
+        last_create_time = event.payload.fetch(:last_create_time)
+        time_lag = last_create_time && ((Time.now - last_create_time) * 1000).to_i
         tags = default_tags(event)
 
         if event.payload.key?(:exception)
@@ -136,6 +138,10 @@ module Racecar
         end
 
         gauge("consumer.offset", offset, tags: tags)
+
+        if time_lag
+          gauge("consumer.time_lag", time_lag, tags: tags)
+        end
       end
 
       def join_group(event)
