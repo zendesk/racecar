@@ -102,7 +102,12 @@ module Racecar
         opts.on("-r", "--require STRING", "Require a library before starting the consumer") do |lib|
           $LOAD_PATH.unshift(Dir.pwd) unless load_path_modified
           load_path_modified = true
-          require lib
+          begin
+            require lib
+          rescue => e
+            $stderr.puts "=> #{lib} failed to load: #{e.message}"
+            exit
+          end
         end
 
         opts.on("-l", "--log STRING", "Log to the specified file") do |logfile|
