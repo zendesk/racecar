@@ -27,4 +27,13 @@ RSpec.describe Racecar::Cli do
 
     Racecar::Cli.main(args)
   end
+
+  it "outputs a helpful message and exits if the required library fails to load" do
+    args = ["--require", "./spec/support/bad_library.rb", "BadLibrary::BadConsumer"]
+    expected_output = "=> ./spec/support/bad_library.rb failed to load: BadLibrary failed to load\n"
+
+    expect {
+      Racecar::Cli.main(args)
+    }.to raise_error(SystemExit).and output(expected_output).to_stderr
+  end
 end
