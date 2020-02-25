@@ -76,6 +76,9 @@ module Racecar
     desc "Path to CRL for verifying broker's certificate validity"
     string :ssl_crl_location
 
+    desc "Path to the certificate used for authentication"
+    string :ssl_certificate_location
+
     desc "Path to client's keystore (PKCS#12) used for authentication"
     string :ssl_keystore_location
 
@@ -215,6 +218,7 @@ module Racecar
         "security.protocol" => security_protocol,
         "ssl.ca.location" => ssl_ca_location,
         "ssl.crl.location" => ssl_crl_location,
+        "ssl.certificate.location" => ssl_certificate_location,
         "ssl.keystore.location" => ssl_keystore_location,
         "ssl.keystore.password" => ssl_keystore_password,
         "sasl.mechanism" => sasl_mechanism,

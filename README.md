@@ -286,6 +286,7 @@ The memory usage limit is roughly estimated as `max_bytes * min_message_queue_si
 * `security_protocol` – Protocol used to communicate with brokers (`:ssl`)
 * `ssl_ca_location` – File or directory path to CA certificate(s) for verifying the broker's key
 * `ssl_crl_location` – Path to CRL for verifying broker's certificate validity
+* `ssl_certificate_location` – Path to the certificate
 * `ssl_keystore_location` – Path to client's keystore (PKCS#12) used for authentication
 * `ssl_keystore_password` – Client's keystore (PKCS#12) password
 
