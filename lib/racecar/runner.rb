@@ -166,16 +166,16 @@ module Racecar
       }
 
       @instrumenter.instrument("start_process_message", instrumentation_payload)
-      @instrumenter.instrument("process_message", instrumentation_payload) do
-        with_pause(message.topic, message.partition, message.offset..message.offset) do
-          begin
+      with_pause(message.topic, message.partition, message.offset..message.offset) do
+        begin
+          @instrumenter.instrument("process_message", instrumentation_payload) do
             processor.process(Racecar::Message.new(message))
             processor.deliver!
             consumer.store_offset(message)
-          rescue => e
-            config.error_handler.call(e, instrumentation_payload)
-            raise e
           end
+        rescue => e
+          config.error_handler.call(e, instrumentation_payload)
+          raise e
         end
       end
     end
