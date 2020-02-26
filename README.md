@@ -288,6 +288,9 @@ The memory usage limit is roughly estimated as `max_bytes * min_message_queue_si
 * `ssl_crl_location` – Path to CRL for verifying broker's certificate validity
 * `ssl_keystore_location` – Path to client's keystore (PKCS#12) used for authentication
 * `ssl_keystore_password` – Client's keystore (PKCS#12) password
+* `ssl_certificate_location` – Path to the certificate
+* `ssl_key_location` – Path to client's certificate used for authentication
+* `ssl_key_password` – Client's certificate password
 
 #### SASL encryption, authentication & authorization
 
