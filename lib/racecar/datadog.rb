@@ -121,6 +121,7 @@ module Racecar
           count("consumer.messages", messages, tags: tags)
         end
 
+        histogram("consumer.batch_size", messages, tags: tags)
         gauge("consumer.offset", offset, tags: tags)
 
         if time_lag
