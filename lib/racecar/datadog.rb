@@ -89,7 +89,7 @@ module Racecar
       def process_message(event)
         offset = event.payload.fetch(:offset)
         create_time = event.payload.fetch(:create_time)
-        time_lag = create_time && ((Time.now - create_time) * 1000).to_i
+        time_lag = create_time && ((Time.now - (create_time * 1000)).to_i
         tags = default_tags(event)
 
         if event.payload.key?(:exception)
