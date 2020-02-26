@@ -79,11 +79,11 @@ module Racecar
     desc "Path to the certificate used for authentication"
     string :ssl_certificate_location
 
-    desc "Path to client's keystore (PKCS#12) used for authentication"
-    string :ssl_keystore_location
+    desc "Path to client's certificate used for authentication"
+    string :ssl_key_location
 
-    desc "Client's keystore (PKCS#12) password"
-    string :ssl_keystore_password
+    desc "Client's certificate password"
+    string :ssl_key_password
 
     desc "SASL mechanism to use for authentication"
     string :sasl_mechanism, allowed_values: %w{GSSAPI PLAIN SCRAM-SHA-256 SCRAM-SHA-512}
@@ -219,8 +219,8 @@ module Racecar
         "ssl.ca.location" => ssl_ca_location,
         "ssl.crl.location" => ssl_crl_location,
         "ssl.certificate.location" => ssl_certificate_location,
-        "ssl.keystore.location" => ssl_keystore_location,
-        "ssl.keystore.password" => ssl_keystore_password,
+        "ssl.key.location" => ssl_key_location,
+        "ssl.key.password" => ssl_key_password,
         "sasl.mechanism" => sasl_mechanism,
         "sasl.kerberos.service.name" => sasl_kerberos_service_name,
         "sasl.kerberos.principal" => sasl_kerberos_principal,
