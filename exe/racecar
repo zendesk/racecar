@@ -13,6 +13,8 @@ rescue SignalException => e
     raise
   end
 rescue
+  # Exceptions are printed to STDERR and sent to the error handler
+  # in `Racecar::Cli#run`, so we don't need to do anything here.
   exit(1)
 else
   exit(0)
