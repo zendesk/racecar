@@ -3,6 +3,7 @@ require "logger"
 require "fileutils"
 require "racecar/rails_config_file_loader"
 require "racecar/daemon"
+require 'pry'
 
 module Racecar
   class Cli
@@ -13,7 +14,12 @@ module Racecar
     def initialize(args)
       @parser = build_parser
       @parser.parse!(args)
-      @consumer_name = args.first or raise Racecar::Error, "no consumer specified"
+
+      if args.empty?
+        raise Racecar::Error, "no consumer specified"
+      else
+        @consumer_names = args
+      end
     end
 
     def config
@@ -21,21 +27,13 @@ module Racecar
     end
 
     def run
-      $stderr.puts "=> Starting Racecar consumer #{consumer_name}..."
+      $stderr.puts "=> Starting Racecar consumer #{consumer_names.join(', ')}..."
 
       RailsConfigFileLoader.load! unless config.without_rails?
 
       if File.exist?("config/racecar.rb")
         require "./config/racecar"
       end
-
-      # Find the consumer class by name.
-      consumer_class = Kernel.const_get(consumer_name)
-
-      # Load config defined by the consumer class itself.
-      config.load_consumer_class(consumer_class)
-
-      config.validate!
 
       if config.logfile
         $stderr.puts "=> Logging to #{config.logfile}"
@@ -58,9 +56,24 @@ module Racecar
         $stderr.puts "=> Ctrl-C to shutdown consumer"
       end
 
-      processor = consumer_class.new
+      consumer_names.each do |consumer_name|
+        # Find the consumer class by name.
+        consumer_class = Kernel.const_get(consumer_name)
 
-      Racecar.run(processor)
+        # conf = config.dup
+
+        # # Load config defined by the consumer class itself.
+        # conf.load_consumer_class(consumer_class)
+
+        # conf.validate!
+
+        processor = consumer_class.new
+
+        $stderr.puts "Starting consumer #{processor.class}"
+        Racecar.run(processor)
+      end
+
+      Racecar.threads.each(&:join)
     rescue => e
       $stderr.puts "=> Crashed: #{e.class}: #{e}\n#{e.backtrace.join("\n")}"
 
@@ -71,7 +84,7 @@ module Racecar
 
     private
 
-    attr_reader :consumer_name
+    attr_reader :consumer_names
 
     def daemonize!
       daemon = Daemon.new(File.expand_path(config.pidfile))

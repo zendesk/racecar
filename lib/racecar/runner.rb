@@ -42,7 +42,7 @@ module Racecar
     end
 
     def run
-      install_signal_handlers if config.standalone
+      install_signal_handlers unless config.threaded
 
       @stop_requested = false
 
@@ -77,13 +77,14 @@ module Racecar
         end
       end
 
-      logger.info "Gracefully shutting down"
+      logger.info "Gracefully shutting down #{processor.class}"
       processor.deliver!
       processor.teardown
       consumer.commit
       @instrumenter.instrument('leave_group') do
         consumer.close
       end
+      logger.info "Graceful shutdown of #{processor.class} completed"
     end
 
     def stop

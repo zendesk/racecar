@@ -51,36 +51,55 @@ module Racecar
     @mutex ||= Mutex.new
   end
 
-  def self.install_at_exit
+  def self.install_signal_handlers
     return if @installed
 
+    # Stop the consumers on SIGINT, SIGQUIT or SIGTERM.
+    trap("QUIT") { stop }
+    trap("INT")  { stop }
+    trap("TERM") { stop }
+
+    # Print the consumer config to STDERR on USR1.
+    trap("USR1") { $stderr.puts config.inspect }
     @installed = true
-    at_exit { stop }
   end
 
   def self.runners
     @runners ||= []
   end
 
+  def self.threads
+    @threads ||= []
+  end
+
   def self.run(processor)
-    unless config.standalone
-      # Ensure thread-safe at_exit installation
-      mutex.synchronize { install_at_exit }
-  
-      # Load the config specific to this processor.
-      configuration = config.dup
-      configuration.load_consumer_class(processor.class)
-      configuration.validate!
+    if config.threaded
+      run_threaded(processor)
+    else
+      @runners << Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter).tap(&:run)
     end
+  end
 
-    configuration ||= config
+  def self.run_threaded(processor)
+    # Ensure signal-handlers installation.
+    install_signal_handlers
 
-    runners << Runner.new(
-      processor,
-      config: configuration,
-      logger: logger,
-      instrumenter: instrumenter,
-    ).tap(&:run)
+    # Load the config specific to this processor.
+    configuration = mutex.synchronize { config.dup }
+    configuration.load_consumer_class(processor.class)
+    configuration.validate!
+
+    thr = Thread.new do
+      runner = Runner.new(
+        processor,
+        config: configuration,
+        logger: logger,
+        instrumenter: instrumenter,
+      )
+      mutex.synchronize { runners << runner }
+      runner.run
+    end
+    mutex.synchronize { threads << thr }
   end
 
   def self.stop

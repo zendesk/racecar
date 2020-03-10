@@ -148,8 +148,8 @@ module Racecar
     desc "Whether to boot Rails when starting the consumer"
     boolean :without_rails, default: false
 
-    desc "Run the racecar process as a standalone process or use threads within a existing process"
-    boolean :standalone, default: true
+    desc "Run the racecar process with multiple threads and one thread per consumer"
+    boolean :threaded, default: false
 
     # The error handler must be set directly on the object.
     attr_reader :error_handler
@@ -205,7 +205,8 @@ module Racecar
     end
 
     def rdkafka_consumer
-      consumer_config = consumer.map do |param|
+    # TODO: Investigate the intermittent nil values in consumer.
+      consumer_config = consumer.compact.map do |param|
         param.split("=", 2).map(&:strip)
       end.to_h
       consumer_config.merge!(rdkafka_security_config)
@@ -213,7 +214,7 @@ module Racecar
     end
 
     def rdkafka_producer
-      producer_config = producer.map do |param|
+      producer_config = producer.compact.map do |param|
         param.split("=", 2).map(&:strip)
       end.to_h
       producer_config.merge!(rdkafka_security_config)
