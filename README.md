@@ -467,7 +467,7 @@ Racecar.config.on_error do |exception, info|
 end
 ```
 
-It is highly recommended that you set up an error handler.
+It is highly recommended that you set up an error handler. Please note that the `info` object contains different keys and values depending on whether you are using `process` or `process_batch`. See the `instrumentation_payload` object in the `process` and `process_batch` methods in the `Runner` class for the complete list.
 
 
 ### Logging
