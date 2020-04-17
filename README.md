@@ -129,7 +129,8 @@ If you want to process whole _batches_ of messages at a time, simply rename your
 class ArchiveEventsConsumer < Racecar::Consumer
   subscribes_to "events"
 
-  def process_batch(messages)
+  def process_batch(batch)
+    messages = batch.messages
     file_name = [
       messages.first.topic, # the topic this batch of messages came from.
       messages.first.partition, # the partition this batch of messages came from.
