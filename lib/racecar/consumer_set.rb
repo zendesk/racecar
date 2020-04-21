@@ -174,7 +174,7 @@ module Racecar
         "client.id"               => @config.client_id,
         "enable.partition.eof"    => false,
         "fetch.max.bytes"         => @config.max_bytes,
-        "fetch.message.max.bytes" => subscription.max_bytes_per_partition,
+        "message.max.bytes"       => subscription.max_bytes_per_partition,
         "fetch.wait.max.ms"       => @config.max_wait_time * 1000,
         "group.id"                => @config.group_id,
         "heartbeat.interval.ms"   => @config.heartbeat_interval * 1000,
