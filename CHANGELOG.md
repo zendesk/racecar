@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+* Require ruby-kafka v1.0 or higher.
+* Add error handling for required libraries (#149).
+
+## racecar v1.0.1
+
+* Add `--without-rails` option to boot consumer without Rails (#139).
+
 ## racecar v1.0.0
 
 Unchanged from v0.5.0.
