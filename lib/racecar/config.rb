@@ -28,6 +28,9 @@ module Racecar
     desc "The maxium number of messages that get consumed within one batch"
     integer :fetch_messages, default: 1000
 
+    desc "Minimum number of bytes the broker responds with"
+    integer :fetch_min_bytes, default: 1
+
     desc "Automatically store offset of last message provided to application"
     boolean :synchronous_commits, default: false
 
