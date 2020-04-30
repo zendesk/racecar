@@ -58,17 +58,23 @@ module Racecar
       @delivery_handles ||= []
       message_size = payload.respond_to?(:bytesize) ? payload.bytesize : 0
       instrumentation_payload = {
-        value:        payload,
-        headers:      headers,
-        key:          key,
-        topic:        topic,
+        value: payload,
+        headers: headers,
+        key: key,
+        topic: topic,
         message_size: message_size,
-        create_time:  Time.now,
-        buffer_size:  @delivery_handles.size
+        create_time: Time.now,
+        buffer_size: @delivery_handles.size,
       }
 
       @instrumenter.instrument("produce_message", instrumentation_payload) do
-        @delivery_handles << @producer.produce(topic: topic, payload: payload, key: key, timestamp: create_time, headers: headers)
+        @delivery_handles << @producer.produce(
+          topic: topic,
+          payload: payload,
+          key: key,
+          timestamp: create_time,
+          headers: headers,
+        )
       end
     end
 
