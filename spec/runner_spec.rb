@@ -154,7 +154,7 @@ class FakeProducer
     @delivery_callback = nil
   end
 
-  def produce(payload:, topic:, key:, timestamp: nil, headers: nil)
+  def produce(payload:, topic:, key:, partition_key: nil, timestamp: nil, headers: nil)
     @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0, timestamp, headers)
     FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback)
   end
