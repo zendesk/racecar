@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## racecar v1.1.0
+
 * Require ruby-kafka v1.0 or higher.
 * Add error handling for required libraries (#149).
 
