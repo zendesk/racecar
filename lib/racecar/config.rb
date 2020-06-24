@@ -171,6 +171,10 @@ module Racecar
       if max_pause_timeout && !pause_with_exponential_backoff?
         raise ConfigError, "`max_pause_timeout` only makes sense when `pause_with_exponential_backoff` is enabled"
       end
+
+      if ssl_client_cert_key_password && !ssl_client_cert_key
+        raise ConfigError, "`ssl_client_cert_key_passowrd` must be used in conjunction with `ssl_client_cert_key`"
+      end
     end
 
     def load_consumer_class(consumer_class)
