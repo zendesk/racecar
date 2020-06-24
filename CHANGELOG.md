@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Support for `ssl_client_cert_key_password`
+
 ## racecar v1.1.0
 
 * Require ruby-kafka v1.0 or higher.
