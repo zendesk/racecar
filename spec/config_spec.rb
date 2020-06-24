@@ -19,6 +19,12 @@ RSpec.describe Racecar::Config do
     }.to raise_exception(KingKonf::ConfigError)
   end
 
+  it "accepts ssl_client_cert_key_password" do
+    expect {
+      config.ssl_client_cert_key_password = "foobar"
+    }.not_to raise_exception
+  end
+
   describe "#load_env" do
     it "sets the brokers from RACECAR_BROKERS" do
       ENV["RACECAR_BROKERS"] = "hansel,gretel"

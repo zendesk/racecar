@@ -73,6 +73,9 @@ module Racecar
     desc "A valid SSL client certificate key"
     string :ssl_client_cert_key
 
+    desc "The password for the SSL client certificate key"
+    string :ssl_client_cert_key_password
+
     desc "Support for using the CA certs installed on your system by default for SSL. More info, see: https://github.com/zendesk/ruby-kafka/pull/521"
     boolean :ssl_ca_certs_from_system, default: false
 
