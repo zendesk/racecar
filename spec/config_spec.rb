@@ -159,7 +159,7 @@ RSpec.describe Racecar::Config do
       expect {
         # config.ssl_client_cert_key = "somekey"
         config.validate!
-      }.to raise_exception(Racecar::ConfigError, "`ssl_client_cert_key_passowrd` must be used in conjunction with `ssl_client_cert_key`")
+      }.to raise_exception(Racecar::ConfigError, "`ssl_client_cert_key_password` must be used in conjunction with `ssl_client_cert_key`")
 
       expect {
         config.ssl_client_cert_key = "somekey"

@@ -173,7 +173,7 @@ module Racecar
       end
 
       if ssl_client_cert_key_password && !ssl_client_cert_key
-        raise ConfigError, "`ssl_client_cert_key_passowrd` must be used in conjunction with `ssl_client_cert_key`"
+        raise ConfigError, "`ssl_client_cert_key_password` must be used in conjunction with `ssl_client_cert_key`"
       end
     end
 
