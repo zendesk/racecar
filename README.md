@@ -294,6 +294,7 @@ The memory usage limit is roughly estimated as `max_bytes * max_fetch_queue_size
 * `ssl_ca_cert_file_path` - The path to a valid SSL certificate authority file.
 * `ssl_client_cert` – A valid SSL client certificate, as a string.
 * `ssl_client_cert_key` – A valid SSL client certificate key, as a string.
+* `ssl_client_cert_key_password` – The password for the client cert key, as a string (optional).
 
 #### SASL encryption, authentication & authorization
 

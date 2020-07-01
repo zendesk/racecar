@@ -19,6 +19,12 @@ RSpec.describe Racecar::Config do
     }.to raise_exception(KingKonf::ConfigError)
   end
 
+  it "accepts ssl_client_cert_key_password" do
+    expect {
+      config.ssl_client_cert_key_password = "foobar"
+    }.not_to raise_exception
+  end
+
   describe "#load_env" do
     it "sets the brokers from RACECAR_BROKERS" do
       ENV["RACECAR_BROKERS"] = "hansel,gretel"
@@ -145,6 +151,20 @@ RSpec.describe Racecar::Config do
       expect {
         config.validate!
       }.to raise_exception(Racecar::ConfigError, "`max_pause_timeout` only makes sense when `pause_with_exponential_backoff` is enabled")
+    end
+
+    it "raises an exception when if ssl_client_cert_key_password is provided when ssl_client_cert_key is not provided" do
+      config.ssl_client_cert_key_password = "password"
+
+      expect {
+        # config.ssl_client_cert_key = "somekey"
+        config.validate!
+      }.to raise_exception(Racecar::ConfigError, "`ssl_client_cert_key_password` must be used in conjunction with `ssl_client_cert_key`")
+
+      expect {
+        config.ssl_client_cert_key = "somekey"
+        config.validate!
+      }.not_to raise_exception
     end
   end
 
