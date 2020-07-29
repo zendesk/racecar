@@ -61,8 +61,10 @@ module Racecar
       # Main loop
       loop do
         break if @stop_requested
-        resume_paused_partitions
+        @instrumenter.instrument("start_main_loop", instrumentation_payload)
         @instrumenter.instrument("main_loop", instrumentation_payload) do
+          resume_paused_partitions
+
           case process_method
           when :batch then
             msg_per_part = consumer.batch_poll(config.max_wait_time).group_by(&:partition)

@@ -415,6 +415,14 @@ RSpec.describe Racecar::Runner do
         runner.run
       end
 
+      it 'instruments the start of main_loop' do
+        expect(instrumenter).
+          to receive(:instrument).
+          with("start_main_loop", hash_including(loop_instrumentation))
+
+        runner.run
+      end
+
       it 'instruments the start of processing a message' do
         expect(instrumenter).
           to receive(:instrument).
