@@ -163,16 +163,36 @@ RSpec.describe Racecar::ConsumerSet do
       describe "#batch_poll" do
         it "honors timeout on subsequent polls" do
           Timecop.freeze do
-            allow(consumer_set).to receive(:poll) do
+            allow(consumer_set).to receive(:poll_current_consumer) do
               Timecop.freeze(Time.now + 0.1)
               :fake_msg
             end
 
             consumer_set.batch_poll(150)
 
-            expect(consumer_set).to have_received(:poll).ordered.with(150)
-            expect(consumer_set).to have_received(:poll).ordered.with(50)
-            expect(consumer_set).to have_received(:poll).twice
+            expect(consumer_set).to have_received(:poll_current_consumer).ordered.with(150)
+            expect(consumer_set).to have_received(:poll_current_consumer).ordered.with(50)
+            expect(consumer_set).to have_received(:poll_current_consumer).twice
+          end
+        end
+
+        it "retries even if time limit is exceeded" do
+          # first poll takes 100ms, leaving 1ms for the next one. This is too short for
+          # any retry within the time limit. We make that second poll fail and assert that
+          # it still gets retried.
+
+          Timecop.freeze do
+            count = 0
+            allow(consumer_set).to receive(:poll_current_consumer) do
+              count += 1
+              Timecop.freeze(Time.now + 0.1)
+              raise Rdkafka::RdkafkaError.new(10) if count == 2
+              :fake_msg
+            end
+
+            consumer_set.batch_poll(101)
+
+            expect(consumer_set).to have_received(:poll_current_consumer).thrice
           end
         end
 
