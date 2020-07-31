@@ -126,12 +126,12 @@ module Racecar
 
       poll_current_consumer(max_wait_time_ms)
     rescue Rdkafka::RdkafkaError => e
-      @logger.error "(try #{try}): Error for topic subscription #{current_subscription}: #{e}"
-
       remain_ms = remaining_time_ms(max_wait_time_ms, started_at)
       wait_ms = 100 * (2**try) # 100ms, 200ms, 400ms, …
 
       try += 1
+      @logger.error "(try #{try}): Error for topic subscription #{current_subscription}: #{e}"
+
       raise if try >= MIN_POLL_TRIES && wait_ms >= remain_ms
       raise if try >= MAX_POLL_TRIES
 
