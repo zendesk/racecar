@@ -21,6 +21,7 @@ The framework is based on [rdkafka-ruby](https://github.com/appsignal/rdkafka-ru
     7. [Handling errors](#handling-errors)
     8. [Logging](#logging)
     9. [Operations](#operations)
+    10. [Upgrading from v1 to v2](#upgrading-from-v1-to-v2)
 3. [Development](#development)
 4. [Contributing](#contributing)
 5. [Support and Discussion](#support-and-discussion)
@@ -482,6 +483,11 @@ In order to make Racecar log its own operations to a log file, set the `logfile`
 In order to gracefully shut down a Racecar consumer process, send it the `SIGTERM` signal. Most process supervisors such as Runit and Kubernetes send this signal when shutting down a process, so using those systems will make things easier.
 
 In order to introspect the configuration of a consumer process, send it the `SIGUSR1` signal. This will make Racecar print its configuration to the standard error file descriptor associated with the consumer process, so you'll need to know where that is written to.
+
+
+### Upgrading from v1 to v2
+
+In order to safely upgrade from Racecar v1 to v2, you need to completely shut down your consumer group before starting it up again with the v2 Racecar dependency. In general, you should avoid rolling deploys for consumers groups, so it is likely the case that this will just work for you, but it's a good idea to check first.
 
 
 ## Development
