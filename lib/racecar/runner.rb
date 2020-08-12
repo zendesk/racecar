@@ -33,6 +33,7 @@ module Racecar
         sasl_scram_username: config.sasl_scram_username,
         sasl_scram_password: config.sasl_scram_password,
         sasl_scram_mechanism: config.sasl_scram_mechanism,
+        sasl_oauth_token_provider: config.sasl_oauth_token_provider,
         sasl_over_ssl: config.sasl_over_ssl,
         ssl_ca_certs_from_system: config.ssl_ca_certs_from_system,
         ssl_verify_hostname: config.ssl_verify_hostname

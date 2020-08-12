@@ -25,6 +25,12 @@ RSpec.describe Racecar::Config do
     }.not_to raise_exception
   end
 
+  it "accepts sasl_oauth_token_provider" do
+    expect {
+      config.sasl_oauth_token_provider = Class.new
+    }.not_to raise_exception
+  end
+
   describe "#load_env" do
     it "sets the brokers from RACECAR_BROKERS" do
       ENV["RACECAR_BROKERS"] = "hansel,gretel"
