@@ -4,6 +4,9 @@ module Racecar
   class Config < KingKonf::Config
     env_prefix :racecar
 
+    desc "The OAUTHBEARER token provider class"
+    attr_accessor :sasl_oauth_token_provider
+
     desc "A list of Kafka brokers in the cluster that you're consuming from"
     list :brokers, default: ["localhost:9092"]
 
@@ -102,9 +105,6 @@ module Racecar
 
     desc "The SCRAM mechanism to use, either `sha256` or `sha512`"
     string :sasl_scram_mechanism, allowed_values: ["sha256", "sha512"]
-
-    desc "The OAUTHBEARER token provider class"
-    string :sasl_oauth_token_provider
 
     desc "Whether to use SASL over SSL."
     boolean :sasl_over_ssl, default: true
