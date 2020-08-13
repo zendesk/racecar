@@ -141,6 +141,9 @@ module Racecar
 
     attr_accessor :subscriptions, :logger
 
+    # The OAUTHBEARER token provider class.
+    attr_accessor :sasl_oauth_token_provider
+
     def initialize(env: ENV)
       super(env: env)
       @error_handler = proc {}

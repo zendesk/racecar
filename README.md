@@ -317,6 +317,15 @@ If using SCRAM:
 * `sasl_scram_password` – The password used to authenticate.
 * `sasl_scram_mechanism` – The SCRAM mechanism to use, either `sha256` or `sha512`.
 
+If using OAUTHBEARER:
+
+* `sasl_oauth_token_provider`- In order to authenticate using OAUTHBEARER, you must set the client with an instance of a class that implements a token method (the interface is described in Kafka::Sasl::OAuth) which returns an ID/Access token.
+This mechanism is supported in kafka >= 2.0.0 as of KIP-255.
+
+See more at [here](https://github.com/zendesk/ruby-kafka/tree/master#oauthbearer).
+
+NOTE: `sasl_oauth_token_provider` only works using the `config/racecar.rb` configuration file.
+
 #### Producing messages
 
 These settings are related to consumers that _produce messages to Kafka_.
