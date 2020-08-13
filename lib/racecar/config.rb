@@ -4,9 +4,6 @@ module Racecar
   class Config < KingKonf::Config
     env_prefix :racecar
 
-    desc "The OAUTHBEARER token provider class"
-    attr_accessor :sasl_oauth_token_provider
-
     desc "A list of Kafka brokers in the cluster that you're consuming from"
     list :brokers, default: ["localhost:9092"]
 
@@ -143,6 +140,9 @@ module Racecar
     attr_reader :error_handler
 
     attr_accessor :subscriptions, :logger
+
+    # The OAUTHBEARER token provider class.
+    attr_accessor :sasl_oauth_token_provider
 
     def initialize(env: ENV)
       super(env: env)
