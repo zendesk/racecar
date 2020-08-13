@@ -320,11 +320,11 @@ If using SCRAM:
 If using OAUTHBEARER:
 
 * `sasl_oauth_token_provider`- In order to authenticate using OAUTHBEARER, you must set the client with an instance of a class that implements a token method (the interface is described in Kafka::Sasl::OAuth) which returns an ID/Access token.
-This mechanism is supported in kafka >= 2.0.0 as of KIP-255
+This mechanism is supported in kafka >= 2.0.0 as of KIP-255.
 
-See more at [https://github.com/zendesk/ruby-kafka/tree/master#oauthbearer](https://github.com/zendesk/ruby-kafka/tree/master#oauthbearer)
+See more at [here](https://github.com/zendesk/ruby-kafka/tree/master#oauthbearer).
 
-NOTE: `sasl_oauth_token_provider` only works using `config/racecar.rb` configuration file.
+NOTE: `sasl_oauth_token_provider` only works using the `config/racecar.rb` configuration file.
 
 #### Producing messages
 
