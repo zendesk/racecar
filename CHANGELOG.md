@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-* Support for `ssl_client_cert_key_password`
+## racecar v1.2.0
+
+* Support for `ssl_client_cert_key_password` (#173).
+* Support for `OAUTHBEARER` authentication (`sasl_oauth_token_provider`) (#178).
 
 ## racecar v1.1.0
 
