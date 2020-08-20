@@ -156,6 +156,10 @@ module Racecar
 
     attr_accessor :subscriptions, :logger
 
+    def max_wait_time_ms
+      max_wait_time * 1000
+    end
+
     def initialize(env: ENV)
       super(env: env)
       @error_handler = proc {}

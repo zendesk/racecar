@@ -65,12 +65,12 @@ module Racecar
         @instrumenter.instrument("main_loop", instrumentation_payload) do
           case process_method
           when :batch then
-            msg_per_part = consumer.batch_poll(config.max_wait_time).group_by(&:partition)
+            msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
             msg_per_part.each_value do |messages|
               process_batch(messages)
             end
           when :single then
-            message = consumer.poll(config.max_wait_time)
+            message = consumer.poll(config.max_wait_time_ms)
             process(message) if message
           end
         end
