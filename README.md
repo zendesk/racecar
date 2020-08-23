@@ -1,5 +1,3 @@
-**IMPORTANT:** The `master` branch is unstable, working towards a v2 release that breaks a lot of stuff. Use the `v1-stable` branch if you want to suggest changes.
-
 # Racecar
 
 Racecar is a friendly and easy-to-approach Kafka consumer framework. It allows you to write small applications that process messages stored in Kafka topics while optionally integrating with your Rails models.
