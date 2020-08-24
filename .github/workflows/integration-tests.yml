@@ -1,15 +1,10 @@
 name: Integration Tests
 
-on:
-  push:
-    branches: [ "**" ]
-  pull_request:
-    branches: [ "**" ]
+on: [push]
 
 jobs:
   build:
     runs-on: [self-hosted,zendesk-stable]
-
     steps:
     - uses: zendesk/checkout@v2
     - uses: zendesk/setup-ruby@v1
