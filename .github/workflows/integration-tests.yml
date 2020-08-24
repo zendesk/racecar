@@ -11,13 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-
-    - name: Set up Ruby
-      uses: actions/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.ruby-version }}
-
+    - uses: zendesk/checkout@v2
+    - uses: zendesk/setup-ruby@v1
+    - name: ${{ matrix.task }}
     - name: Build and test with RSpec
       run: |
         gem install bundler --no-document
