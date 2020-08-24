@@ -1,0 +1,25 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Ruby
+      uses: actions/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby-version }}
+
+    - name: Build and test with RSpec
+      run: |
+        gem install bundler --no-document
+        bundle install --jobs 4 --retry 3
+        bundle exec rspec --format documentation --require spec_helper --color --tag integration
