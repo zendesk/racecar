@@ -2,7 +2,7 @@
 
 ## racecar v2.0.0
 
-* Replace `ruby-kafka` with `rdkafka-ruby` as the low-level library underneath Racecar.
+* Replace `ruby-kafka` with `rdkafka-ruby` as the low-level library underneath Racecar (#91).
 * Fix `max_wait_time` usage (#179).
 * Removed config option `sasl_over_ssl`.
 * [Racecar::Consumer] Do not pause consuming partitions on exception.
