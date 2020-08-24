@@ -13,7 +13,6 @@ jobs:
     steps:
     - uses: zendesk/checkout@v2
     - uses: zendesk/setup-ruby@v1
-    - name: ${{ matrix.task }}
     - name: Build and test with RSpec
       run: |
         gem install bundler --no-document
