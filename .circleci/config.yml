@@ -1,0 +1,56 @@
+version: 2.1
+orbs:
+  ruby: circleci/ruby@0.1.2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/ruby:2.6.3-stretch-node
+    executor: ruby/default
+    steps:
+      - checkout
+      - run:
+          name: Which bundler?
+          command: bundle -v
+      - ruby/bundle-install
+      - run: bundle exec rspec --exclude-pattern='spec/integration/*_spec.rb'
+  integration-tests:
+    docker:
+      - image: circleci/ruby:2.6.3-stretch-node
+      - image: wurstmeister/zookeeper
+      - image: wurstmeister/kafka:2.11-2.0.0
+        environment:
+          KAFKA_ADVERTISED_HOST_NAME: localhost
+          KAFKA_ADVERTISED_PORT: 9092
+          KAFKA_PORT: 9092
+          KAFKA_ZOOKEEPER_CONNECT: localhost:2181
+          KAFKA_DELETE_TOPIC_ENABLE: true
+      - image: wurstmeister/kafka:2.11-2.0.0
+        environment:
+          KAFKA_ADVERTISED_HOST_NAME: localhost
+          KAFKA_ADVERTISED_PORT: 9093
+          KAFKA_PORT: 9093
+          KAFKA_ZOOKEEPER_CONNECT: localhost:2181
+          KAFKA_DELETE_TOPIC_ENABLE: true
+      - image: wurstmeister/kafka:2.11-2.0.0
+        environment:
+          KAFKA_ADVERTISED_HOST_NAME: localhost
+          KAFKA_ADVERTISED_PORT: 9094
+          KAFKA_PORT: 9094
+          KAFKA_ZOOKEEPER_CONNECT: localhost:2181
+          KAFKA_DELETE_TOPIC_ENABLE: true
+    executor: ruby/default
+    steps:
+      - checkout
+      - run:
+          name: Which bundler?
+          command: bundle -v
+      - ruby/bundle-install
+      - run: bundle exec rspec --pattern='spec/integration/*_spec.rb'
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - build
+      - integration-tests
