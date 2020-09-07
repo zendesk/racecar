@@ -374,10 +374,23 @@ RSpec.describe Racecar::Runner do
         create_time: nil,
         key: nil,
         value: error,
-        headers: nil
+        headers: nil,
+        retries_count: anything
       }
 
       expect(config.error_handler).to receive(:call).at_least(:once).with(error, info)
+
+      kafka.deliver_message(error, topic: "greetings")
+
+      runner.run
+    end
+
+    it "keeps track of the number of retries when a message causes an exception" do
+      error = StandardError.new("surprise")
+
+      [0, 1, 2, anything].each do |arg|
+        expect(config.error_handler).to receive(:call).at_least(:once).with(error, hash_including(retries_count: arg)).ordered
+      end
 
       kafka.deliver_message(error, topic: "greetings")
 
@@ -486,9 +499,22 @@ RSpec.describe Racecar::Runner do
         last_offset: 0,
         last_create_time: nil,
         message_count: 1,
+        retries_count: anything
       }
 
       expect(config.error_handler).to receive(:call).at_least(:once).with(error, info)
+
+      kafka.deliver_message(error, topic: "greetings")
+
+      runner.run
+    end
+
+    it "keeps track of the number of retries when a message causes an exception" do
+      error = StandardError.new("surprise")
+
+      [0, 1, 2, anything].each do |arg|
+        expect(config.error_handler).to receive(:call).at_least(:once).with(error, hash_including(retries_count: arg)).ordered
+      end
 
       kafka.deliver_message(error, topic: "greetings")
 
