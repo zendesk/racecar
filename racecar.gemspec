@@ -24,6 +24,7 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency "rdkafka",   "~> 0.8.0.beta.1"
 
   spec.add_development_dependency "bundler", [">= 1.13", "< 3"]
+  spec.add_development_dependency "pry"
   spec.add_development_dependency "rake", "> 10.0"
   spec.add_development_dependency "rspec", "~> 3.0"
   spec.add_development_dependency "timecop"
