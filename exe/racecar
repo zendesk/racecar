@@ -19,7 +19,7 @@ module Racecar
     rescue Exception => e
       $stderr.puts "=> Crashed: #{e.class}: #{e}\n#{e.backtrace.join("\n")}"
 
-      # Racecar.config.error_handler.call(e)
+      Racecar.config.error_handler.call(e)
 
       exit(1)
     else

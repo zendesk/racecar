@@ -26,8 +26,12 @@ RSpec.describe "exe/racecar" do
       ::ARGV = @orig_argv
     end
 
-    it "displays exception and exits with status 1" do
+    it "displays exception, calls exit_handler, and exits with failure status" do
       expect($stderr).to receive(:puts).with(/=> Crashed: LoadError: cannot load such file -- missing\n.*cli\.rb/)
+
+      expect(Racecar.config.error_handler).to receive(:call) do |e|
+        expect(e).to be_kind_of(LoadError)
+      end
 
       load "./exe/racecar"
 
