@@ -11,6 +11,7 @@ module Racecar
       @default_payload = default_payload
 
       @backend = if defined?(ActiveSupport::Notifications)
+        require 'concurrent/utility/monotonic_time'
         ActiveSupport::Notifications
       else
         NullInstrumenter
