@@ -18,7 +18,7 @@ RSpec.describe "exe/racecar" do
     before do
       @orig_argv = ::ARGV
       Object.send(:remove_const, 'ARGV')
-      ::ARGV = ['--require', 'missing']
+      ::ARGV = ["--require", "./spec/support/bad_library.rb"]
     end
 
     after do
@@ -26,11 +26,12 @@ RSpec.describe "exe/racecar" do
       ::ARGV = @orig_argv
     end
 
-    it "displays exception, calls exit_handler, and exits with failure status" do
-      expect($stderr).to receive(:puts).with(/=> Crashed: LoadError: cannot load such file -- missing\n.*cli\.rb/)
+    it "displays exception with causes, calls exit_handler, and exits with failure status" do
+      expect($stderr).to receive(:puts).
+        with(/=> Crashed: StandardError: BadLibrary failed to load\n--- Caused by: ---\nArgumentError: may not be nil\n.*bad_library\.rb/)
 
       expect(Racecar.config.error_handler).to receive(:call) do |e|
-        expect(e).to be_kind_of(LoadError)
+        expect(e).to be_kind_of(StandardError)
       end
 
       load "./exe/racecar"

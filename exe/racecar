@@ -17,13 +17,25 @@ module Racecar
     rescue SystemExit
       raise
     rescue Exception => e
-      $stderr.puts "=> Crashed: #{e.class}: #{e}\n#{e.backtrace.join("\n")}"
+      $stderr.puts "=> Crashed: #{exception_with_causes(e)}\n#{e.backtrace.join("\n")}"
 
       Racecar.config.error_handler.call(e)
 
       exit(1)
     else
       exit(0)
+    end
+
+    private
+
+    def exception_with_causes(e)
+      result = +"#{e.class}: #{e}"
+      if e.cause
+        result << "\n"
+        result << "--- Caused by: ---\n"
+        result << exception_with_causes(e.cause)
+      end
+      result
     end
   end
 end
