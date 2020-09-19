@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # only needed when ruby < 2.4 and not using active support
 
 unless {}.respond_to? :compact

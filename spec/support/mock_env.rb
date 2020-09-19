@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module MockEnv
   def with_env(env_name, value)
     initial_state = ENV[env_name]

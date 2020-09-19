@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "optparse"
 require "racecar/rails_config_file_loader"
 require "racecar/daemon"

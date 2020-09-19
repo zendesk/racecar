@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rdkafka"
 require "racecar/pause"
 require "racecar/message"

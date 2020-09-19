@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "optparse"
 require "logger"
 require "fileutils"
@@ -106,13 +108,13 @@ module Racecar
         end
 
         Racecar::Config.variables.each do |variable|
-          opt_name = "--" << variable.name.to_s.gsub("_", "-")
+          opt_name = +"--#{variable.name.to_s.gsub('_', '-')}"
           opt_name << " #{variable.type.upcase}" unless variable.boolean?
 
           desc = variable.description || "N/A"
 
           if variable.default
-            desc << " (default: #{variable.default.inspect})"
+            desc += " (default: #{variable.default.inspect})"
           end
 
           opts.on(opt_name, desc) do |value|
