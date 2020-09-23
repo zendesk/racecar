@@ -26,6 +26,8 @@
 * [Instrumentation] if processors define a `statistics_callback`, it will be called once every second for every subscription or producer connection. The first argument will be a Hash, for contents see [librdkafka STATISTICS.md](https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md).
 * Add current directory to `$LOAD_PATH` only when `--require` option is used (#117).
 * Remove manual heartbeat support, see [Long-running message processing section in README](README.md#long-running-message-processing).
+* Rescue exceptions--then log and pass to `on_error`--at the outermost level of `exe/racecar`, so that exceptions raised outside `Cli.run` are not silently discarded (#186).
+* When exceptions with a `cause` are logged, recursively log the `cause` detail, separated by `--- Caused by: ---\n`.
 
 ## racecar v1.0.0
 
