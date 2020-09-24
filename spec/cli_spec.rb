@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "racecar/cli"
 
 RSpec.describe Racecar::Cli do

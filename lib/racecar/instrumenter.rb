@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Racecar
   ##
   # Common API for instrumentation to standardize

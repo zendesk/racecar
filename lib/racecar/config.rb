@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "king_konf"
 
 module Racecar
@@ -196,8 +198,8 @@ module Racecar
         group_id_prefix,
 
         # MyFunnyConsumer => my-funny-consumer
-        consumer_class.name.gsub(/[a-z][A-Z]/) {|str| str[0] << "-" << str[1] }.downcase,
-      ].compact.join("")
+        consumer_class.name.gsub(/[a-z][A-Z]/) { |str| "#{str[0]}-#{str[1]}" }.downcase,
+      ].compact.join
 
       self.subscriptions = consumer_class.subscriptions
       self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time

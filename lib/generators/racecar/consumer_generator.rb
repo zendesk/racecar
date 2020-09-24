@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Racecar
   module Generators
     class ConsumerGenerator < Rails::Generators::NamedBase

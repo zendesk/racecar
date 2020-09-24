@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 RSpec.describe Racecar::Instrumenter do
   describe '#instrument' do
     let(:instrumenter) { Racecar::Instrumenter.new }

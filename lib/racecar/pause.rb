@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Racecar
   class Pause
     attr_reader :pauses_count

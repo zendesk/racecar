@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Racecar
   class Consumer
     Subscription = Struct.new(:topic, :start_from_beginning, :max_bytes_per_partition, :additional_config)

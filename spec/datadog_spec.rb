@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "racecar/datadog"
 RSpec.describe Racecar::Datadog::StatsdSubscriber do
   describe '#emit' do

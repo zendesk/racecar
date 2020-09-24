@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "securerandom"
 require "racecar/cli"
 require "racecar/ctl"
