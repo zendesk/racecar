@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Bump rdkafka to 0.8.0 (#191)
+
 ## racecar v2.0.0
 
 * Replace `ruby-kafka` with `rdkafka-ruby` as the low-level library underneath Racecar (#91).
