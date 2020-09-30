@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## racecar v2.1.0
+
 * Bump rdkafka to 0.8.0 (#191)
 
 ## racecar v2.0.0
