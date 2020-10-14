@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* [Bugfix] Close RdKafka consumer in ConsumerSet#reset_current_consumer to prevent memory leak (#196)
+
 ## racecar v2.1.0
 
 * Bump rdkafka to 0.8.0 (#191)
