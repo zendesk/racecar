@@ -275,12 +275,13 @@ RSpec.describe Racecar::ConsumerSet do
       consumer_set.send(:select_next_consumer)
     end
 
-    it "#reset_current_consumer does what it says" do
+    it "#reset_current_consumer removes the reference to the Rdkafka consumer" do
       3.times do
         consumer_set.current
         consumer_set.send(:select_next_consumer)
       end
       consumer_set.send(:select_next_consumer)
+      allow(rdconsumer2).to receive(:close)
 
       expect do
         consumer_set.send(:reset_current_consumer)
@@ -289,12 +290,23 @@ RSpec.describe Racecar::ConsumerSet do
       }.from(rdconsumer2).to(nil)
     end
 
+    it "#reset_current_consumer closes the Rdkafka consumer" do
+      3.times do
+        consumer_set.current
+        consumer_set.send(:select_next_consumer)
+      end
+      consumer_set.send(:select_next_consumer)
+      expect(rdconsumer2).to receive(:close).once
+      consumer_set.send(:reset_current_consumer)
+    end
+
     it "#current recreates resetted consumers" do
       3.times do
         consumer_set.current
         consumer_set.send(:select_next_consumer)
       end
       consumer_set.send(:select_next_consumer)
+      allow(consumer_set.current).to receive(:close)
       consumer_set.send(:reset_current_consumer)
 
       expect(consumer_set.current).not_to be_nil
