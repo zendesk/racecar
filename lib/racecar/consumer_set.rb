@@ -142,7 +142,12 @@ module Racecar
     end
 
     def reset_current_consumer
-      @consumers[@consumer_id_iterator.peek] = nil
+      current_consumer_id = @consumer_id_iterator.peek
+      @logger.info "Resetting consumer with id: #{current_consumer_id}"
+
+      consumer = @consumers[current_consumer_id]
+      consumer.close unless consumer.nil?
+      @consumers[current_consumer_id] = nil
     end
 
     def maybe_select_next_consumer
