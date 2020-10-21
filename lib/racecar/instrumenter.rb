@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Racecar
   ##
   # Common API for instrumentation to standardize
@@ -11,6 +13,8 @@ module Racecar
       @default_payload = default_payload
 
       @backend = if defined?(ActiveSupport::Notifications)
+        # ActiveSupport needs `concurrent-ruby` but doesn't `require` it.
+        require 'concurrent/utility/monotonic_time'
         ActiveSupport::Notifications
       else
         NullInstrumenter

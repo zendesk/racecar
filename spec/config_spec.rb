@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "ostruct"
 require "racecar/config"
 
@@ -120,6 +122,14 @@ RSpec.describe Racecar::Config do
 
       expect(config.max_wait_time).to eq 10
       expect(config.group_id).to eq "cats"
+    end
+  end
+
+  describe '#max_wait_time_ms' do
+    before { config.max_wait_time = 12 }
+
+    it 'returns max_wait_time in milliseconds' do
+      expect(config.max_wait_time_ms).to eq(12_000)
     end
   end
 

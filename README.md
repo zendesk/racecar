@@ -1,5 +1,3 @@
-**IMPORTANT:** The `master` branch is unstable, working towards a v2 release that breaks a lot of stuff. Use the `v1-stable` branch if you want to suggest changes.
-
 # Racecar
 
 Racecar is a friendly and easy-to-approach Kafka consumer framework. It allows you to write small applications that process messages stored in Kafka topics while optionally integrating with your Rails models.
@@ -21,6 +19,7 @@ The framework is based on [rdkafka-ruby](https://github.com/appsignal/rdkafka-ru
     7. [Handling errors](#handling-errors)
     8. [Logging](#logging)
     9. [Operations](#operations)
+    10. [Upgrading from v1 to v2](#upgrading-from-v1-to-v2)
 3. [Development](#development)
 4. [Contributing](#contributing)
 5. [Support and Discussion](#support-and-discussion)
@@ -51,9 +50,7 @@ This will add a config file in `config/racecar.yml`.
 
 ## Usage
 
-Racecar is built for simplicity of development and operation. If you need more flexibility, it's quite straightforward to build your own Kafka consumer executables using [ruby-kafka](https://github.com/zendesk/ruby-kafka#consuming-messages-from-kafka) directly.
-
-First, a short introduction to the Kafka consumer concept as well as some basic background on Kafka.
+Racecar is built for simplicity of development and operation. First, a short introduction to the Kafka consumer concept as well as some basic background on Kafka.
 
 Kafka stores messages in so-called _partitions_ which are grouped into _topics_. Within a partition, each message gets a unique offset.
 
@@ -227,7 +224,7 @@ You can set message headers by passing a `headers:` option with a Hash of header
 
 Racecar provides a flexible way to configure your consumer in a way that feels at home in a Rails application. If you haven't already, run `bundle exec rails generate racecar:install` in order to generate a config file. You'll get a separate section for each Rails environment, with the common configuration values in a shared `common` section.
 
-**Note:** many of these configuration keys correspond directly to similarly named concepts in [ruby-kafka](https://github.com/zendesk/ruby-kafka); for more details on low-level operations, read that project's documentation.
+**Note:** many of these configuration keys correspond directly to similarly named concepts in [rdkafka-ruby](https://github.com/appsignal/rdkafka-ruby); for more details on low-level operations, read that project's documentation.
 
 It's also possible to configure Racecar using environment variables. For any given configuration key, there should be a corresponding environment variable with the prefix `RACECAR_`, in upper case. For instance, in order to configure the client id, set `RACECAR_CLIENT_ID=some-id` in the process in which the Racecar consumer is launched. You can set `brokers` by passing a comma-separated list, e.g. `RACECAR_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092`.
 
@@ -274,7 +271,7 @@ All timeouts are defined in number of seconds.
 
 Kafka is _really_ good at throwing data at consumers, so you may want to tune these variables in order to avoid ballooning your process' memory or saturating your network capacity.
 
-Racecar uses ruby-kafka under the hood, which fetches messages from the Kafka brokers in a background thread. This thread pushes fetch responses, possible containing messages from many partitions, into a queue that is read by the processing thread (AKA your code). The main way to control the fetcher thread is to control the size of those responses and the size of the queue.
+Racecar uses [rdkafka-ruby](https://github.com/appsignal/rdkafka-ruby) under the hood, which fetches messages from the Kafka brokers in a background thread. This thread pushes fetch responses, possible containing messages from many partitions, into a queue that is read by the processing thread (AKA your code). The main way to control the fetcher thread is to control the size of those responses and the size of the queue.
 
 * `max_bytes` — Maximum amount of data the broker shall return for a Fetch request.
 * `min_message_queue_size` — The minimum number of messages in the local consumer queue.
@@ -314,7 +311,7 @@ These settings are related to consumers that _produce messages to Kafka_.
 
 #### Datadog monitoring
 
-Racecar supports configuring ruby-kafka's [Datadog](https://www.datadoghq.com/) monitoring integration. If you're running a normal Datadog agent on your host, you just need to set `datadog_enabled` to `true`, as the rest of the settings come with sane defaults.
+Racecar supports [Datadog](https://www.datadoghq.com/) monitoring integration. If you're running a normal Datadog agent on your host, you just need to set `datadog_enabled` to `true`, as the rest of the settings come with sane defaults.
 
 * `datadog_enabled` – Whether Datadog monitoring is enabled (defaults to `false`).
 * `datadog_host` – The host running the Datadog agent.
@@ -484,6 +481,11 @@ In order to gracefully shut down a Racecar consumer process, send it the `SIGTER
 In order to introspect the configuration of a consumer process, send it the `SIGUSR1` signal. This will make Racecar print its configuration to the standard error file descriptor associated with the consumer process, so you'll need to know where that is written to.
 
 
+### Upgrading from v1 to v2
+
+In order to safely upgrade from Racecar v1 to v2, you need to completely shut down your consumer group before starting it up again with the v2 Racecar dependency. In general, you should avoid rolling deploys for consumers groups, so it is likely the case that this will just work for you, but it's a good idea to check first.
+
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rspec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
@@ -496,9 +498,9 @@ Bug reports and pull requests are welcome on [GitHub](https://github.com/zendesk
 
 ## Support and Discussion
 
-If you've discovered a bug, please file a [Github issue](https://github.com/zendesk/racecar/issues/new), and make sure to include all the relevant information, including the version of Racecar, ruby-kafka, and Kafka that you're using.
+If you've discovered a bug, please file a [Github issue](https://github.com/zendesk/racecar/issues/new), and make sure to include all the relevant information, including the version of Racecar, rdkafka-ruby, and Kafka that you're using.
 
-If you have other questions, or would like to discuss best practises, how to contribute to the project, or any other ruby-kafka related topic, [join our Slack team](https://ruby-kafka-slack.herokuapp.com/)!
+If you have other questions, or would like to discuss best practises, or how to contribute to the project, [join our Slack team](https://ruby-kafka-slack.herokuapp.com/)!
 
 
 ## Copyright and license

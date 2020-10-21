@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "optparse"
 require "logger"
 require "fileutils"
@@ -6,18 +8,16 @@ require "racecar/daemon"
 
 module Racecar
   class Cli
-    def self.main(args)
-      new(args).run
+    class << self
+      def main(args)
+        new(args).run
+      end
     end
 
     def initialize(args)
       @parser = build_parser
       @parser.parse!(args)
       @consumer_name = args.first or raise Racecar::Error, "no consumer specified"
-    end
-
-    def config
-      Racecar.config
     end
 
     def run
@@ -61,17 +61,15 @@ module Racecar
       processor = consumer_class.new
 
       Racecar.run(processor)
-    rescue => e
-      $stderr.puts "=> Crashed: #{e.class}: #{e}\n#{e.backtrace.join("\n")}"
-
-      config.error_handler.call(e)
-
-      raise
     end
 
     private
 
     attr_reader :consumer_name
+
+    def config
+      Racecar.config
+    end
 
     def daemonize!
       daemon = Daemon.new(File.expand_path(config.pidfile))
@@ -102,12 +100,7 @@ module Racecar
         opts.on("-r", "--require STRING", "Require a library before starting the consumer") do |lib|
           $LOAD_PATH.unshift(Dir.pwd) unless load_path_modified
           load_path_modified = true
-          begin
-            require lib
-          rescue => e
-            $stderr.puts "=> #{lib} failed to load: #{e.message}"
-            exit
-          end
+          require lib
         end
 
         opts.on("-l", "--log STRING", "Log to the specified file") do |logfile|
@@ -115,13 +108,13 @@ module Racecar
         end
 
         Racecar::Config.variables.each do |variable|
-          opt_name = "--" << variable.name.to_s.gsub("_", "-")
+          opt_name = +"--#{variable.name.to_s.gsub('_', '-')}"
           opt_name << " #{variable.type.upcase}" unless variable.boolean?
 
           desc = variable.description || "N/A"
 
           if variable.default
-            desc << " (default: #{variable.default.inspect})"
+            desc += " (default: #{variable.default.inspect})"
           end
 
           opts.on(opt_name, desc) do |value|

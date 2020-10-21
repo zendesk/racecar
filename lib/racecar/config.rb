@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "king_konf"
 
 module Racecar
@@ -156,6 +158,10 @@ module Racecar
 
     attr_accessor :subscriptions, :logger
 
+    def max_wait_time_ms
+      max_wait_time * 1000
+    end
+
     def initialize(env: ENV)
       super(env: env)
       @error_handler = proc {}
@@ -192,8 +198,8 @@ module Racecar
         group_id_prefix,
 
         # MyFunnyConsumer => my-funny-consumer
-        consumer_class.name.gsub(/[a-z][A-Z]/) {|str| str[0] << "-" << str[1] }.downcase,
-      ].compact.join("")
+        consumer_class.name.gsub(/[a-z][A-Z]/) { |str| "#{str[0]}-#{str[1]}" }.downcase,
+      ].compact.join
 
       self.subscriptions = consumer_class.subscriptions
       self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time

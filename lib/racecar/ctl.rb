@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "optparse"
 require "racecar/rails_config_file_loader"
 require "racecar/daemon"
@@ -98,7 +100,8 @@ module Racecar
         "client.id":         Racecar.config.client_id,
       }.merge(Racecar.config.rdkafka_producer)).producer
 
-      producer.produce(payload: message.value, key: message.key, topic: message.topic).wait
+      handle = producer.produce(payload: message.value, key: message.key, topic: message.topic)
+      handle.wait(max_wait_timeout: 5)
 
       $stderr.puts "=> Delivered message to Kafka cluster"
     end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ProducingConsumer < Racecar::Consumer
   subscribes_to "messages", start_from_beginning: false
 

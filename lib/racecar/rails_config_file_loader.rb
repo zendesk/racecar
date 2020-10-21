@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Racecar
   module RailsConfigFileLoader
     def self.load!

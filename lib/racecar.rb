@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "logger"
 
 require "racecar/instrumenter"
@@ -6,6 +8,7 @@ require "racecar/consumer"
 require "racecar/consumer_set"
 require "racecar/runner"
 require "racecar/config"
+require "racecar/version"
 require "ensure_hash_compact"
 
 module Racecar

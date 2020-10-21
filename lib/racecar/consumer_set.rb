@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10
@@ -174,7 +176,12 @@ module Racecar
     end
 
     def reset_current_consumer
-      @consumers[@consumer_id_iterator.peek] = nil
+      current_consumer_id = @consumer_id_iterator.peek
+      @logger.info "Resetting consumer with id: #{current_consumer_id}"
+
+      consumer = @consumers[current_consumer_id]
+      consumer.close unless consumer.nil?
+      @consumers[current_consumer_id] = nil
     end
 
     def maybe_select_next_consumer
@@ -205,7 +212,7 @@ module Racecar
         "fetch.max.bytes"         => @config.max_bytes,
         "message.max.bytes"       => subscription.max_bytes_per_partition,
         "fetch.min.bytes"         => @config.fetch_min_bytes,
-        "fetch.wait.max.ms"       => @config.max_wait_time * 1000,
+        "fetch.wait.max.ms"       => @config.max_wait_time_ms,
         "group.id"                => @config.group_id,
         "heartbeat.interval.ms"   => @config.heartbeat_interval * 1000,
         "max.poll.interval.ms"    => @config.max_poll_interval * 1000,

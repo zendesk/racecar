@@ -1,30 +1,41 @@
 # Changelog
 
+## Unreleased
+
+* [Bugfix] Close RdKafka consumer in ConsumerSet#reset_current_consumer to prevent memory leak (#196)
+
+## racecar v2.1.0
+
+* Bump rdkafka to 0.8.0 (#191)
+
 ## racecar v2.0.0
 
-* Replace `ruby-kafka` with `rdkafka-ruby`
-* Removed config option `sasl_over_ssl`
-* [Racecar::Consumer] Do not pause consuming partitions on exception
-* [Racecar::Consumer] `topic`, `payload` and `key` are mandadory to method `produce`
-* [Racecar::Consumer] `process_batch` retrieves an array of messages instead of batch object
-* [Racecar::Consumer] Remove `offset_retention_time`
-* [Racecar::Consumer] Allow providing `additional_config` for subscriptions
-* [Racecar::Consumer] Provide access to `producer` and `consumer`
-* [Racecar::Consumer] Enforce delivering messages with method `deliver!`
-* [Racecar::Consumer] instead of raising when a partition EOF is reached, the result can be queried through `consumer.last_poll_read_partition_eof?`
-* [Racecar::Config] Remove `offset_retention_time`, `connect_timeout` and `offset_commit_threshold`
-* [Racecar::Config] Pass config to `rdkafka-ruby` via `producer` and `consumer`
-* [Racecar::Config] Replace `max_fetch_queue_size` with `min_message_queue_size`
-* [Racecar::Config] Add `synchronous_commits` to control blocking of `consumer.commit` (default `false`)
-* [Racecar::Config] Add `security_protocol` to control protocol between client and broker
-* [Racecar::Config] SSL configuration via `ssl_ca_location`, `ssl_crl_location`, `ssl_keystore_location` and `ssl_keystore_password`
-* [Racecar::Config] SASL configuration via `sasl_mechanism`, `sasl_kerberos_service_name`, `sasl_kerberos_principal`, `sasl_kerberos_kinit_cmd`, `sasl_kerberos_keytab`, `sasl_kerberos_min_time_before_relogin`, `sasl_username` and `sasl_password`
+* Replace `ruby-kafka` with `rdkafka-ruby` as the low-level library underneath Racecar (#91).
+* Fix `max_wait_time` usage (#179).
+* Removed config option `sasl_over_ssl`.
+* [Racecar::Consumer] Do not pause consuming partitions on exception.
+* [Racecar::Consumer] `topic`, `payload` and `key` are mandadory to method `produce`.
+* [Racecar::Consumer] `process_batch` retrieves an array of messages instead of batch object.
+* [Racecar::Consumer] Remove `offset_retention_time`.
+* [Racecar::Consumer] Allow providing `additional_config` for subscriptions.
+* [Racecar::Consumer] Provide access to `producer` and `consumer`.
+* [Racecar::Consumer] Enforce delivering messages with method `deliver!`.
+* [Racecar::Consumer] instead of raising when a partition EOF is reached, the result can be queried through `consumer.last_poll_read_partition_eof?`.
+* [Racecar::Config] Remove `offset_retention_time`, `connect_timeout` and `offset_commit_threshold`.
+* [Racecar::Config] Pass config to `rdkafka-ruby` via `producer` and `consumer`.
+* [Racecar::Config] Replace `max_fetch_queue_size` with `min_message_queue_size`.
+* [Racecar::Config] Add `synchronous_commits` to control blocking of `consumer.commit` (default `false`).
+* [Racecar::Config] Add `security_protocol` to control protocol between client and broker.
+* [Racecar::Config] SSL configuration via `ssl_ca_location`, `ssl_crl_location`, `ssl_keystore_location` and `ssl_keystore_password`.
+* [Racecar::Config] SASL configuration via `sasl_mechanism`, `sasl_kerberos_service_name`, `sasl_kerberos_principal`, `sasl_kerberos_kinit_cmd`, `sasl_kerberos_keytab`, `sasl_kerberos_min_time_before_relogin`, `sasl_username` and `sasl_password`.
 * [Instrumentation] `produce_message.racecar` sent whenever a produced message is queued. Payload includes `topic`, `key`, `value` and `create_time`.
 * [Instrumentation] `acknowledged_message.racecar` send whenever a produced message was successfully received by Kafka. Payload includes `offset` and `partition`, but no message details.
-* [Instrumentation] `rdkafka-ruby` does not yet provide instrumentation [rdkafka-ruby#54](https://github.com/appsignal/rdkafka-ruby/issues/54)
-* [Instrumentation] if processors define a `statistics_callback`, it will be called once every second for every subscription or producer connection. The first argument will be a Hash, for contents see [librdkafka STATISTICS.md](https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md)
+* [Instrumentation] `rdkafka-ruby` does not yet provide instrumentation [rdkafka-ruby#54](https://github.com/appsignal/rdkafka-ruby/issues/54).
+* [Instrumentation] if processors define a `statistics_callback`, it will be called once every second for every subscription or producer connection. The first argument will be a Hash, for contents see [librdkafka STATISTICS.md](https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md).
 * Add current directory to `$LOAD_PATH` only when `--require` option is used (#117).
-* Remove manual heartbeat support, see [Long-running message processing section in README](README.md#long-running-message-processing)
+* Remove manual heartbeat support, see [Long-running message processing section in README](README.md#long-running-message-processing).
+* Rescue exceptions--then log and pass to `on_error`--at the outermost level of `exe/racecar`, so that exceptions raised outside `Cli.run` are not silently discarded (#186).
+* When exceptions with a `cause` are logged, recursively log the `cause` detail, separated by `--- Caused by: ---\n`.
 
 ## racecar v1.0.0
 

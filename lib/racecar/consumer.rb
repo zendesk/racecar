@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Racecar
   class Consumer
     Subscription = Struct.new(:topic, :start_from_beginning, :max_bytes_per_partition, :additional_config)
@@ -54,7 +56,7 @@ module Racecar
     protected
 
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
-    def produce(payload, topic:, key:, partition_key: nil, headers: nil, create_time: nil)
+    def produce(payload, topic:, key: nil, partition_key: nil, headers: nil, create_time: nil)
       @delivery_handles ||= []
       message_size = payload.respond_to?(:bytesize) ? payload.bytesize : 0
       instrumentation_payload = {

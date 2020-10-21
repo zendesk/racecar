@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Racecar
   # Ignores all instrumentation events.
   class NullInstrumenter

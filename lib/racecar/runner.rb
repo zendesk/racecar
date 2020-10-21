@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rdkafka"
 require "racecar/pause"
 require "racecar/message"
@@ -65,12 +67,12 @@ module Racecar
         @instrumenter.instrument("main_loop", instrumentation_payload) do
           case process_method
           when :batch then
-            msg_per_part = consumer.batch_poll(config.max_wait_time).group_by(&:partition)
+            msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
             msg_per_part.each_value do |messages|
               process_batch(messages)
             end
           when :single then
-            message = consumer.poll(config.max_wait_time)
+            message = consumer.poll(config.max_wait_time_ms)
             process(message) if message
           end
         end
@@ -166,7 +168,7 @@ module Racecar
       }
 
       @instrumenter.instrument("start_process_message", instrumentation_payload)
-      with_pause(message.topic, message.partition, message.offset..message.offset) do
+      with_pause(message.topic, message.partition, message.offset..message.offset) do |pause|
         begin
           @instrumenter.instrument("process_message", instrumentation_payload) do
             processor.process(Racecar::Message.new(message))
@@ -174,6 +176,7 @@ module Racecar
             consumer.store_offset(message)
           end
         rescue => e
+          instrumentation_payload[:retries_count] = pause.pauses_count
           config.error_handler.call(e, instrumentation_payload)
           raise e
         end
@@ -194,12 +197,13 @@ module Racecar
 
       @instrumenter.instrument("start_process_batch", instrumentation_payload)
       @instrumenter.instrument("process_batch", instrumentation_payload) do
-        with_pause(first.topic, first.partition, first.offset..last.offset) do
+        with_pause(first.topic, first.partition, first.offset..last.offset) do |pause|
           begin
             processor.process_batch(messages.map {|message| Racecar::Message.new(message) })
             processor.deliver!
             consumer.store_offset(messages.last)
           rescue => e
+            instrumentation_payload[:retries_count] = pause.pauses_count
             config.error_handler.call(e, instrumentation_payload)
             raise e
           end
@@ -208,17 +212,17 @@ module Racecar
     end
 
     def with_pause(topic, partition, offsets)
-      return yield if config.pause_timeout == 0
+      pause = pauses[topic][partition]
+      return yield pause if config.pause_timeout == 0
 
       begin
-        yield
+        yield pause
         # We've successfully processed a batch from the partition, so we can clear the pause.
         pauses[topic][partition].reset!
       rescue => e
         desc = "#{topic}/#{partition}"
         logger.error "Failed to process #{desc} at #{offsets}: #{e}"
 
-        pause = pauses[topic][partition]
         logger.warn "Pausing partition #{desc} for #{pause.backoff_interval} seconds"
         consumer.pause(topic, partition, offsets.first)
         pause.pause!
