@@ -490,6 +490,8 @@ In order to safely upgrade from Racecar v1 to v2, you need to completely shut do
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rspec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
+The integration tests run against a Kafka instance that is not automatically started from within `rspec`. You can set one up using the provided `docker-compose.yml` by running `docker-compose up`.
+
 
 ## Contributing
 
