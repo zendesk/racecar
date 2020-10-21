@@ -1,6 +1,5 @@
 module Racecar
   class ConsumerSet
-    MIN_POLL_TRIES = 2
     MAX_POLL_TRIES = 10
 
     def initialize(config, logger, instrumenter = NullInstrumenter)
@@ -10,6 +9,8 @@ module Racecar
 
       @consumers = []
       @consumer_id_iterator = (0...@config.subscriptions.size).cycle
+
+      @previous_retries = 0
 
       @last_poll_read_nil_message = false
     end
@@ -25,9 +26,9 @@ module Racecar
     #
     # The messages are from a single topic, but potentially from more than one partition.
     #
-    # Any errors during polling are retried in an exponential backoff fashion, roughly
-    # honoring the given time limit. It will try at least MIN_POLL_TRIES times,
-    # regardless of the given time limit.
+    # Any errors during polling are retried in an exponential backoff fashion. If an error
+    # occurs, but there is no time left for a backoff and retry, it will return the
+    # already collected messages and only retry on the next call.
     def batch_poll(max_wait_time_ms = @config.max_wait_time, max_messages = @config.fetch_messages)
       started_at = Time.now
       remain_ms = max_wait_time_ms
@@ -35,10 +36,10 @@ module Racecar
       messages = []
 
       while remain_ms > 0 && messages.size < max_messages
+        remain_ms = remaining_time_ms(max_wait_time_ms, started_at)
         msg = poll_with_retries(remain_ms)
         break if msg.nil?
         messages << msg
-        remain_ms = remaining_time_ms(max_wait_time_ms, started_at)
       end
 
       messages
@@ -113,29 +114,33 @@ module Racecar
     private
 
     # polls a single message from the current consumer, retrying errors with exponential
-    # backoff. It will always try at least MIN_POLL_TRIES times. If time remains, it
-    # will attempt more retries before re-raising the exception, up to MAX_POLL_TRIES.
-    #
-    # Since the time limit for a single message poll is fixed to max_wait_time_ms, the
-    # function can take up to 2*max_wait_time_ms in error scenarios. This happens when a
-    # retry is attempted with only 1ms time left. In other words: a full retry is valued
-    # higher than honoring the time limit.
+    # backoff. The sleep time is capped by max_wait_time_ms. If there's enough time budget
+    # left, it will retry before returning. If there isn't, the retry will only occur on
+    # the next call. It tries up to MAX_POLL_TRIES before passing on the exception.
     def poll_with_retries(max_wait_time_ms)
-      try ||= 0
+      try ||= @previous_retries
+      @previous_retries = 0
       started_at ||= Time.now
-
-      poll_current_consumer(max_wait_time_ms)
-    rescue Rdkafka::RdkafkaError => e
       remain_ms = remaining_time_ms(max_wait_time_ms, started_at)
-      wait_ms = 100 * (2**try) # 100ms, 200ms, 400ms, …
 
+      wait_ms = try == 0 ? 0 : 50 * (2**try) # 0ms, 100ms, 200ms, 400ms, …
+      if wait_ms >= max_wait_time_ms && remain_ms > 1
+        sleep (max_wait_time_ms-1)/1000.0
+        remain_ms = 1
+      elsif wait_ms >= remain_ms
+        @logger.error "Only #{remain_ms}ms left, but want to wait for #{wait_ms}ms before poll. Will retry on next call."
+        @previous_retries = try
+        return nil
+      elsif wait_ms > 0
+        sleep wait_ms/1000.0
+        remain_ms -= wait_ms
+      end
+
+      poll_current_consumer(remain_ms)
+    rescue Rdkafka::RdkafkaError => e
       try += 1
-      @logger.error "(try #{try}): Error for topic subscription #{current_subscription}: #{e}"
-
-      raise if try >= MIN_POLL_TRIES && wait_ms >= remain_ms
+      @logger.error "(try #{try}/#{MAX_POLL_TRIES}): Error for topic subscription #{current_subscription}: #{e}"
       raise if try >= MAX_POLL_TRIES
-
-      sleep wait_ms/1000.0
       retry
     end
 
