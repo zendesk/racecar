@@ -127,6 +127,7 @@ module Racecar
 
       wait_ms = try == 0 ? 0 : 50 * (2**try) # 0ms, 100ms, 200ms, 400ms, …
       if wait_ms >= max_wait_time_ms && remain_ms > 1
+        @logger.debug "Capping #{wait_ms}ms to #{max_wait_time_ms-1}ms."
         sleep (max_wait_time_ms-1)/1000.0
         remain_ms = 1
       elsif wait_ms >= remain_ms
@@ -141,6 +142,7 @@ module Racecar
       poll_current_consumer(remain_ms)
     rescue Rdkafka::RdkafkaError => e
       try += 1
+      @instrumenter.instrument("poll_retry", try: try, rdkafka_time_limit: remain_ms, exception: e)
       @logger.error "(try #{try}/#{MAX_POLL_TRIES}): Error for topic subscription #{current_subscription}: #{e}"
       raise if try >= MAX_POLL_TRIES
       retry

@@ -17,7 +17,8 @@ RSpec.describe Racecar::ConsumerSet do
   let(:rdconsumer)          { double("rdconsumer", subscribe: true) }
   let(:rdconfig)            { double("rdconfig", consumer: rdconsumer) }
   let(:logger)              { Logger.new(StringIO.new) }
-  let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger) }
+  let(:instrumenter)        { Racecar::NullInstrumenter }
+  let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger, instrumenter) }
   let(:max_poll_exceeded_error) { Rdkafka::RdkafkaError.new(-147) }
 
   def message_generator(messages)
@@ -135,6 +136,20 @@ RSpec.describe Racecar::ConsumerSet do
           expect(consumer_set).to have_received(:sleep).ordered.with(12.8)
           expect(consumer_set).to have_received(:sleep).ordered.with(25.6)
           expect(rdconsumer).to have_received(:poll).exactly(Racecar::ConsumerSet::MAX_POLL_TRIES).times
+        end
+
+        it "instruments errors" do
+          allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
+          allow(rdconsumer).to receive(:subscription)
+          allow(instrumenter).to receive(:instrument).and_call_original
+
+          expect { consumer_set.poll(2**31) }.to raise_error(Rdkafka::RdkafkaError)
+
+          expect(instrumenter).to have_received(:instrument).with("poll_retry",
+            try: kind_of(Integer),
+            rdkafka_time_limit: kind_of(Integer),
+            exception: kind_of(Rdkafka::RdkafkaError)
+          ).exactly(Racecar::ConsumerSet::MAX_POLL_TRIES).times
         end
 
         it "retries over multiple calls" do
