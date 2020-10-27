@@ -17,7 +17,8 @@ RSpec.describe Racecar::ConsumerSet do
   let(:rdconsumer)          { double("rdconsumer", subscribe: true) }
   let(:rdconfig)            { double("rdconfig", consumer: rdconsumer) }
   let(:logger)              { Logger.new(StringIO.new) }
-  let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger) }
+  let(:instrumenter)        { Racecar::NullInstrumenter }
+  let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger, instrumenter) }
   let(:max_poll_exceeded_error) { Rdkafka::RdkafkaError.new(-147) }
 
   def message_generator(messages)
@@ -119,12 +120,6 @@ RSpec.describe Racecar::ConsumerSet do
           expect(consumer_set.poll(100)).to be nil
         end
 
-        it "raises other Rdkafka errors" do
-          allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
-          allow(rdconsumer).to receive(:subscription)
-          expect { consumer_set.poll(100) }.to raise_error(Rdkafka::RdkafkaError)
-        end
-
         it "retries with exponential backoff" do
           allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
           allow(rdconsumer).to receive(:subscription)
@@ -143,13 +138,29 @@ RSpec.describe Racecar::ConsumerSet do
           expect(rdconsumer).to have_received(:poll).exactly(Racecar::ConsumerSet::MAX_POLL_TRIES).times
         end
 
-        it "honors timeout on retries" do
+        it "instruments errors" do
+          allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
+          allow(rdconsumer).to receive(:subscription)
+          allow(instrumenter).to receive(:instrument).and_call_original
+
+          expect { consumer_set.poll(2**31) }.to raise_error(Rdkafka::RdkafkaError)
+
+          expect(instrumenter).to have_received(:instrument).with("poll_retry",
+            try: kind_of(Integer),
+            rdkafka_time_limit: kind_of(Integer),
+            exception: kind_of(Rdkafka::RdkafkaError)
+          ).exactly(Racecar::ConsumerSet::MAX_POLL_TRIES).times
+        end
+
+        it "retries over multiple calls" do
           allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
           allow(rdconsumer).to receive(:subscription)
 
-          expect { consumer_set.poll(1000) }.to raise_error(Rdkafka::RdkafkaError)
+          # -2 because the first call tries twice, since we are freezing time
+          (Racecar::ConsumerSet::MAX_POLL_TRIES - 2).times { consumer_set.poll(50) }
+          expect { consumer_set.poll(50) }.to raise_error(Rdkafka::RdkafkaError)
 
-          expect(rdconsumer).to have_received(:poll).exactly(4).times
+          expect(rdconsumer).to have_received(:poll).exactly(Racecar::ConsumerSet::MAX_POLL_TRIES).times
         end
 
         it "skips retries if rescue block was too slow" do
@@ -158,23 +169,24 @@ RSpec.describe Racecar::ConsumerSet do
             Timecop.freeze(Time.now + 1)
           end
 
-          expect { consumer_set.poll(1000) }.to raise_error(Rdkafka::RdkafkaError)
+          expect(consumer_set.poll(1000)).to eq nil
+          expect(logger).to have_received(:error).with(/Will retry on next call/)
         end
       end
 
       describe "#batch_poll" do
         it "honors timeout on subsequent polls" do
           Timecop.freeze do
-            allow(consumer_set).to receive(:poll) do
+            allow(consumer_set).to receive(:poll_current_consumer) do
               Timecop.freeze(Time.now + 0.1)
               :fake_msg
             end
 
             consumer_set.batch_poll(150)
 
-            expect(consumer_set).to have_received(:poll).ordered.with(150)
-            expect(consumer_set).to have_received(:poll).ordered.with(50)
-            expect(consumer_set).to have_received(:poll).twice
+            expect(consumer_set).to have_received(:poll_current_consumer).ordered.with(150)
+            expect(consumer_set).to have_received(:poll_current_consumer).ordered.with(50)
+            expect(consumer_set).to have_received(:poll_current_consumer).twice
           end
         end
 

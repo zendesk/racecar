@@ -189,6 +189,47 @@ RSpec.describe Racecar::Datadog::ConsumerSubscriber do
     end
   end
 
+  describe '#poll_retry' do
+    let(:event_with_known_error_code) do
+      create_event(
+        'poll_retry',
+        client_id:      'racecar',
+        group_id:       'test_group',
+        exception:      Rdkafka::RdkafkaError.new(10),
+      )
+    end
+    let(:event_with_unknown_error_code) do
+      create_event(
+        'poll_retry',
+        client_id:      'racecar',
+        group_id:       'test_group',
+        exception:      Rdkafka::RdkafkaError.new(10243534),
+      )
+    end
+    let(:metric_tags) do
+      %w[
+          client:racecar
+          group_id:test_group
+        ]
+    end
+
+    it 'increments using error name for known errors' do
+      expect(statsd).
+        to receive(:increment).
+        with('consumer.poll.rdkafka_error.msg_size_too_large', tags: metric_tags)
+
+      subscriber.poll_retry(event_with_known_error_code)
+    end
+
+    it 'increments using error code for unknown errors' do
+      expect(statsd).
+        to receive(:increment).
+        with('consumer.poll.rdkafka_error.err_10243534', tags: metric_tags)
+
+      subscriber.poll_retry(event_with_unknown_error_code)
+    end
+  end
+
   describe '#main_loop' do
     let(:event) do
       create_event(

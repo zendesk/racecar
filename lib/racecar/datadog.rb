@@ -157,6 +157,15 @@ module Racecar
         end
       end
 
+      def poll_retry(event)
+        tags = {
+          client: event.payload.fetch(:client_id),
+          group_id: event.payload.fetch(:group_id),
+        }
+        rdkafka_error_code = event.payload.fetch(:exception).code.to_s.gsub(/\W/, '')
+        increment("consumer.poll.rdkafka_error.#{rdkafka_error_code}", tags: tags)
+      end
+
       def main_loop(event)
         tags = {
           client: event.payload.fetch(:client_id),
