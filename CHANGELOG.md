@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## racecar v2.1.1
+
 * [Bugfix] Close RdKafka consumer in ConsumerSet#reset_current_consumer to prevent memory leak (#196)
 * [Bugfix] `poll`/`batch_poll` would not retry in edge cases and raise immediately. They still honor the `max_wait_time` setting, but might return no messages instead and only retry on their next call. ([#177](https://github.com/zendesk/racecar/pull/177))
 
