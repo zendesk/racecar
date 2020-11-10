@@ -390,9 +390,17 @@ RSpec.describe Racecar::Runner do
     it "keeps track of the number of retries when a message causes an exception" do
       error = StandardError.new("surprise")
 
-      [0, 1, 2, anything].each do |arg|
-        expect(config.error_handler).to receive(:call).at_least(:once).with(error, hash_including(retries_count: arg)).ordered
+      [0, 1, 2].each do |retries_count|
+        expect(config.error_handler).to receive(:call)
+          .once.with(error, hash_including(retries_count: retries_count)).ordered
+        expect(Racecar::Message).to receive(:new)
+          .once.with(anything, retries_count: retries_count).and_call_original
       end
+
+      expect(config.error_handler).to receive(:call)
+        .at_least(:once).with(error, hash_including(retries_count: anything))
+      expect(Racecar::Message).to receive(:new)
+        .at_least(:once).with(anything, retries_count: anything).and_call_original
 
       kafka.deliver_message(error, topic: "greetings")
 
@@ -514,9 +522,17 @@ RSpec.describe Racecar::Runner do
     it "keeps track of the number of retries when a message causes an exception" do
       error = StandardError.new("surprise")
 
-      [0, 1, 2, anything].each do |arg|
-        expect(config.error_handler).to receive(:call).at_least(:once).with(error, hash_including(retries_count: arg)).ordered
+      [0, 1, 2].each do |retries_count|
+        expect(config.error_handler).to receive(:call)
+          .once.with(error, hash_including(retries_count: retries_count)).ordered
+        expect(Racecar::Message).to receive(:new)
+          .once.with(anything, retries_count: retries_count).and_call_original
       end
+
+      expect(config.error_handler).to receive(:call)
+        .at_least(:once).with(error, hash_including(retries_count: anything))
+      expect(Racecar::Message).to receive(:new)
+        .at_least(:once).with(anything, retries_count: anything).and_call_original
 
       kafka.deliver_message(error, topic: "greetings")
 

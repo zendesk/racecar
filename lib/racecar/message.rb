@@ -6,8 +6,11 @@ module Racecar
   class Message
     extend Forwardable
 
-    def initialize(rdkafka_message)
+    attr_reader :retries_count
+
+    def initialize(rdkafka_message, retries_count: nil)
       @rdkafka_message = rdkafka_message
+      @retries_count   = retries_count
     end
 
     def_delegators :@rdkafka_message, :topic, :partition, :offset, :key, :headers
