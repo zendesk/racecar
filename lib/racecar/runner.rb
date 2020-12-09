@@ -171,7 +171,7 @@ module Racecar
       with_pause(message.topic, message.partition, message.offset..message.offset) do |pause|
         begin
           @instrumenter.instrument("process_message", instrumentation_payload) do
-            processor.process(Racecar::Message.new(message))
+            processor.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
             processor.deliver!
             consumer.store_offset(message)
           end
@@ -199,7 +199,10 @@ module Racecar
       @instrumenter.instrument("process_batch", instrumentation_payload) do
         with_pause(first.topic, first.partition, first.offset..last.offset) do |pause|
           begin
-            processor.process_batch(messages.map {|message| Racecar::Message.new(message) })
+            racecar_messages = messages.map do |message|
+              Racecar::Message.new(message, retries_count: pause.pauses_count)
+            end
+            processor.process_batch(racecar_messages)
             processor.deliver!
             consumer.store_offset(messages.last)
           rescue => e
