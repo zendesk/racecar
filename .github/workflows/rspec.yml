@@ -9,16 +9,16 @@ jobs:
 
     strategy:
       matrix:
-        ruby-version: ["2.5.x", "2.6.x"]
+        ruby-version: ["2.5", "2.6"]
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Set up Ruby 2.6
-      uses: actions/setup-ruby@v1
+    - uses: zendesk/checkout@v2
+    - name: Set up Ruby
+      uses: zendesk/setup-ruby@v1.58.0
       with:
         ruby-version: ${{ matrix.ruby-version }}
     - name: Build and test with RSpec
       run: |
         gem install bundler --no-document
         bundle install --jobs 4 --retry 3
-        bundle exec rspec --format documentation --require spec_helper --color
+        bundle exec rspec --format documentation --require spec_helper --color --exclude-pattern='spec/integration/*_spec.rb'
