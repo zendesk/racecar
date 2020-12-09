@@ -9,12 +9,12 @@ jobs:
 
     strategy:
       matrix:
-        ruby-version: ["2.5.x", "2.6.x"]
+        ruby-version: ["2.5", "2.6"]
 
     steps:
-    - uses: zendesk/checkout@v1
+    - uses: zendesk/checkout@v2
     - name: Set up Ruby
-      uses: zendesk/setup-ruby@v1
+      uses: zendesk/setup-ruby@v1.58.0
       with:
         ruby-version: ${{ matrix.ruby-version }}
     - name: Build and test with RSpec
