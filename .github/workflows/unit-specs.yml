@@ -1,4 +1,4 @@
-name: Execute Specs
+name: Unit Specs
 
 on: [push]
 
