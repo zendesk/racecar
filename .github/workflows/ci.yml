@@ -18,7 +18,6 @@ jobs:
         ruby-version: ${{ matrix.ruby-version }}
     - name: Build and test with RSpec
       run: |
-        gem install bundler --no-document
         bundle install --jobs 4 --retry 3
         bundle exec rspec --format documentation --require spec_helper --color --exclude-pattern='spec/integration/*_spec.rb'
 
@@ -57,6 +56,5 @@ jobs:
       env:
         RACECAR_BROKERS: localhost:9092
       run: |
-        gem install bundler --no-document
         bundle install --jobs 4 --retry 3
         bundle exec rspec --format documentation --require spec_helper --color spec/integration/*_spec.rb
