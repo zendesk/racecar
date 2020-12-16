@@ -1,0 +1,43 @@
+name: Integration Specs
+
+on: [push]
+
+jobs:
+  integration-specs:
+    runs-on: ubuntu-latest
+
+    services:
+      zookeeper:
+        image: confluentinc/cp-zookeeper
+        ports:
+          - 2181:2181
+        env:
+          ZOOKEEPER_CLIENT_PORT: 2181
+
+      kafka:
+        image: confluentinc/cp-kafka
+        ports:
+          - 9092:9092
+          - 29092:29092
+        options: --health-cmd "kafka-topics --list --bootstrap-server=localhost:9092" --health-interval 10s --health-timeout 5s --health-retries 5
+        env:
+          KAFKA_BROKER_ID: 1
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+          KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+    steps:
+    - uses: zendesk/checkout@v2
+    - name: Set up Ruby
+      uses: zendesk/setup-ruby@v1.58.0
+      with:
+        ruby-version: 2.7
+    - name: Build and test with RSpec
+      env:
+        RACECAR_BROKERS: localhost:9092
+      run: |
+        gem install bundler --no-document
+        bundle install --jobs 4 --retry 3
+        bundle exec rspec --format documentation --require spec_helper --color spec/integration/*_spec.rb
