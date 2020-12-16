@@ -1,8 +1,27 @@
-name: Integration Specs
+name: CI
 
 on: [push]
 
 jobs:
+  unit-specs:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ruby-version: ["2.5", "2.6"]
+
+    steps:
+    - uses: zendesk/checkout@v2
+    - name: Set up Ruby
+      uses: zendesk/setup-ruby@v1.58.0
+      with:
+        ruby-version: ${{ matrix.ruby-version }}
+        bundler-cache: true
+    - name: Build and test with RSpec
+      run: |
+        bundle install --jobs 4 --retry 3
+        bundle exec rspec --format documentation --require spec_helper --color --exclude-pattern='spec/integration/*_spec.rb'
+
   integration-specs:
     runs-on: ubuntu-latest
 
@@ -34,10 +53,10 @@ jobs:
       uses: zendesk/setup-ruby@v1.58.0
       with:
         ruby-version: 2.7
+        bundler-cache: true
     - name: Build and test with RSpec
       env:
         RACECAR_BROKERS: localhost:9092
       run: |
-        gem install bundler --no-document
         bundle install --jobs 4 --retry 3
         bundle exec rspec --format documentation --require spec_helper --color spec/integration/*_spec.rb
