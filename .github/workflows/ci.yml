@@ -16,6 +16,7 @@ jobs:
       uses: zendesk/setup-ruby@v1.58.0
       with:
         ruby-version: ${{ matrix.ruby-version }}
+        bundler-cache: true
     - name: Build and test with RSpec
       run: |
         bundle install --jobs 4 --retry 3
@@ -52,6 +53,7 @@ jobs:
       uses: zendesk/setup-ruby@v1.58.0
       with:
         ruby-version: 2.7
+        bundler-cache: true
     - name: Build and test with RSpec
       env:
         RACECAR_BROKERS: localhost:9092
