@@ -54,7 +54,7 @@ module Racecar
     desc "How long to wait when trying to communicate with a Kafka broker"
     float :socket_timeout, default: 30
 
-    desc "How long to allow the Kafka brokers to wait before returning messages"
+    desc "How long to allow the Kafka brokers to wait before returning messages (in seconds)"
     float :max_wait_time, default: 1
 
     desc "Maximum amount of data the broker shall return for a Fetch request"
