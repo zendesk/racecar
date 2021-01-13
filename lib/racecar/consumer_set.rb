@@ -130,6 +130,9 @@ module Racecar
         @logger.debug "Capping #{wait_ms}ms to #{max_wait_time_ms-1}ms."
         sleep (max_wait_time_ms-1)/1000.0
         remain_ms = 1
+      elsif try == 0 && remain_ms == 0
+        @logger.debug "No time remains for polling messages. Will try on next call."
+        return nil
       elsif wait_ms >= remain_ms
         @logger.error "Only #{remain_ms}ms left, but want to wait for #{wait_ms}ms before poll. Will retry on next call."
         @previous_retries = try

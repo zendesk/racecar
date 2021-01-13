@@ -190,6 +190,17 @@ RSpec.describe Racecar::ConsumerSet do
           end
         end
 
+        it "does not report errors for zero time remain edge cases" do
+          Timecop.freeze do
+            allow(logger).to receive(:error)
+            allow(consumer_set).to receive(:remaining_time_ms).and_return(0)
+
+            consumer_set.batch_poll(150)
+
+            expect(logger).not_to have_received(:error)
+          end
+        end
+
         it "forwards to Rdkafka (as poll)" do
           config.fetch_messages = 3
           expect(rdconsumer).to receive(:poll).exactly(3).times.with(100).and_return(:msg1, :msg2, :msg3)
