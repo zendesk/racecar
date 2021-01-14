@@ -17,7 +17,7 @@ module Racecar
       @last_poll_read_nil_message = false
     end
 
-    def poll(max_wait_time_ms = @config.max_wait_time)
+    def poll(max_wait_time_ms = @config.max_wait_time_ms)
       batch_poll(max_wait_time_ms, 1).first
     end
 
@@ -31,7 +31,7 @@ module Racecar
     # Any errors during polling are retried in an exponential backoff fashion. If an error
     # occurs, but there is no time left for a backoff and retry, it will return the
     # already collected messages and only retry on the next call.
-    def batch_poll(max_wait_time_ms = @config.max_wait_time, max_messages = @config.fetch_messages)
+    def batch_poll(max_wait_time_ms = @config.max_wait_time_ms, max_messages = @config.fetch_messages)
       started_at = Time.now
       remain_ms = max_wait_time_ms
       maybe_select_next_consumer
