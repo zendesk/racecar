@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## racecar v2.2.0
+
 * [Racecar::ConsumerSet] **breaking change** `Racecar::ConsumerSet`'s functions `poll` and `batch_pall` expect the max wait values to be given in milliseconds. The defaults were using `config.max_wait_time`, which is in seconds. If you do not directly use `Racecar::ConsumerSet`, or always call its `poll` and `batch_poll` functions by specfiying the max wait time (the first argument), then this breaking change does not affect you. ([#214](https://github.com/zendesk/racecar/pull/214))
 
 ## racecar v2.1.1
