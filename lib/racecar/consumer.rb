@@ -34,13 +34,22 @@ module Racecar
 
     def configure(producer:, consumer:, instrumenter: NullInstrumenter)
       @producer = producer
+      @delivery_handles = []
+
       @consumer = consumer
       @instrumenter = instrumenter
     end
 
     def teardown; end
 
-    # Delivers messages that got produced.
+    # Blocks until all messages produced so far have been successfully published. There
+    # are two scenarios where the function raises:
+    # Rdkafka::AbstractHandle::WaitTimeoutError: reached the default timeout of 60s. You
+    #     can call deliver! again to wait longer.
+    # Rdkafka::RdkafkaError: delivery failed for the reason in the exception. Some of
+    #     them include permanent failures, e.g. "msg_timed_out" which librdkafka sets
+    #     after failing to deliver the message within "message.timeout.ms". The caller
+    #     must handle these edge cases or run into head of line blocking.
     def deliver!
       @delivery_handles ||= []
       if @delivery_handles.any?

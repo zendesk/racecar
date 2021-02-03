@@ -79,11 +79,14 @@ module Racecar
       end
 
       logger.info "Gracefully shutting down"
-      processor.deliver!
-      processor.teardown
-      consumer.commit
-      @instrumenter.instrument('leave_group') do
-        consumer.close
+      begin
+        processor.deliver!
+        processor.teardown
+        consumer.commit
+      ensure
+        @instrumenter.instrument('leave_group') do
+          consumer.close
+        end
       end
     end
 
@@ -176,6 +179,7 @@ module Racecar
             consumer.store_offset(message)
           end
         rescue => e
+          instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
           instrumentation_payload[:retries_count] = pause.pauses_count
           config.error_handler.call(e, instrumentation_payload)
           raise e
@@ -206,12 +210,33 @@ module Racecar
             processor.deliver!
             consumer.store_offset(messages.last)
           rescue => e
+            instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
             instrumentation_payload[:retries_count] = pause.pauses_count
             config.error_handler.call(e, instrumentation_payload)
             raise e
           end
         end
       end
+    end
+
+    # librdkafka will continue to try to deliver already queued messages, even if ruby-rdkafka
+    # raised before that. This method detects any unrecoverable errors and resets the producer
+    # as a last ditch effort.
+    # The function returns true if there were unrecoverable errors, or false otherwise.
+    def reset_producer_on_unrecoverable_delivery_errors(error)
+      return false unless error.is_a?(Rdkafka::RdkafkaError)
+      return false unless error.code == :msg_timed_out # -192
+
+      logger.error 'Not all produced messages could be sent successfully within "message.timeout.ms". Resetting producer to force a new connection. If the issue persists, ensure the brokers are reachable and healthy.'
+      @producer.close
+      @producer = nil
+      processor.configure(
+        producer:     producer,
+        consumer:     consumer,
+        instrumenter: @instrumenter,
+      )
+
+      true
     end
 
     def with_pause(topic, partition, offsets)
