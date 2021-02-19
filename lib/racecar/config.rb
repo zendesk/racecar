@@ -153,6 +153,9 @@ module Racecar
     desc "Whether to boot Rails when starting the consumer"
     boolean :without_rails, default: false
 
+    desc "Maximum number of threads to run the application with. Each will spawn its own consumer"
+    integer :max_concurrency, default: 1
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
