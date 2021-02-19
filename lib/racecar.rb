@@ -7,6 +7,7 @@ require "racecar/null_instrumenter"
 require "racecar/consumer"
 require "racecar/consumer_set"
 require "racecar/runner"
+require "racecar/concurrent_runner"
 require "racecar/config"
 require "racecar/version"
 require "ensure_hash_compact"
@@ -52,5 +53,14 @@ module Racecar
 
   def self.run(processor)
     Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter).run
+  end
+
+  def self.run_concurrent(consumer_class)
+    ConcurrentRunner.new(
+      consumer_class: consumer_class,
+      config: config,
+      logger: logger,
+      instrumenter: instrumenter
+    ).run
   end
 end
