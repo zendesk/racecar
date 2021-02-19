@@ -58,9 +58,13 @@ module Racecar
         $stderr.puts "=> Ctrl-C to shutdown consumer"
       end
 
-      processor = consumer_class.new
-
-      Racecar.run(processor)
+      if config.max_concurrency > 1
+        Racecar.run_concurrent(consumer_class)
+      else
+        processor = consumer_class.new
+        Racecar.run(processor)
+      end
+      nil
     end
 
     private
