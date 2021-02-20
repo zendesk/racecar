@@ -8,9 +8,10 @@ module Racecar
   class Runner
     attr_reader :processor, :config, :logger
 
-    def initialize(processor, config:, logger:, instrumenter: NullInstrumenter)
+    def initialize(processor, config:, logger:, instrumenter: NullInstrumenter, disable_signal_handlers: false)
       @processor, @config, @logger = processor, config, logger
       @instrumenter = instrumenter
+      @disable_signal_handlers = disable_signal_handlers
       @stop_requested = false
       Rdkafka::Config.logger = logger
 
@@ -44,7 +45,7 @@ module Racecar
     end
 
     def run
-      install_signal_handlers
+      install_signal_handlers unless disable_signal_handlers
       @stop_requested = false
 
       # Configure the consumer with a producer so it can produce messages and
@@ -93,7 +94,7 @@ module Racecar
 
     private
 
-    attr_reader :pauses
+    attr_reader :pauses, :disable_signal_handlers
 
     def process_method
       @process_method ||= begin
