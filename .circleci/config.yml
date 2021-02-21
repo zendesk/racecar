@@ -46,7 +46,7 @@ jobs:
           name: Which bundler?
           command: bundle -v
       - ruby/bundle-install
-      - run: bundle exec rspec --pattern='spec/integration/*_spec.rb'
+      - run: bundle exec rspec spec/integration/*_spec.rb
 
 workflows:
   version: 2

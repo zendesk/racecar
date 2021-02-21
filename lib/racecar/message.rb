@@ -26,5 +26,9 @@ module Racecar
     def ==(other)
       @rdkafka_message == other.instance_variable_get(:@rdkafka_message)
     end
+
+    def inspect
+      "#{topic}/#{partition}:#{offset}"
+    end
   end
 end
