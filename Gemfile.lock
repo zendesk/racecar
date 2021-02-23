@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    racecar (2.1.1)
+    racecar (2.2.0)
       king_konf (~> 1.0.0)
       rdkafka (~> 0.8.0)
 
@@ -18,7 +18,7 @@ GEM
     concurrent-ruby (1.1.7)
     diff-lcs (1.4.4)
     dogstatsd-ruby (4.8.2)
-    ffi (1.13.1)
+    ffi (1.14.2)
     i18n (1.8.5)
       concurrent-ruby (~> 1.0)
     king_konf (1.0.0)
