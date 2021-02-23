@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* [Racecar::Consumer] When messages fail to deliver, an extended error with hints is now raised. Instead of `Rdkafka::RdkafkaError` you'll get a `Racecar::MessageDeliveryError` instead. ([#219](https://github.com/zendesk/racecar/pull/219)). If you have set a `Racecar.config.error_handler`, it might need to be updated.
+* [Racecar::Consumer] When message delivery times out, Racecar will reset the producer in an attempt to fix some of the potential causes for this error. ([#219](https://github.com/zendesk/racecar/pull/219))
+
 ## racecar v2.2.0
 
 * [Racecar::ConsumerSet] **breaking change** `Racecar::ConsumerSet`'s functions `poll` and `batch_pall` expect the max wait values to be given in milliseconds. The defaults were using `config.max_wait_time`, which is in seconds. If you do not directly use `Racecar::ConsumerSet`, or always call its `poll` and `batch_poll` functions by specfiying the max wait time (the first argument), then this breaking change does not affect you. ([#214](https://github.com/zendesk/racecar/pull/214))
