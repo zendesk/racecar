@@ -5,37 +5,21 @@ require "open3"
 module IntegrationHelper
   def self.included(klass)
     klass.instance_eval do
-      let!(:polling_thread) do
-        Thread.new do
-          Thread.current.abort_on_exception = true
-          rdkafka_consumer.each do |message|
-            puts "Received message #{message}"
-            incoming_messages << message
-          end
-        end
-      end
-
-      let(:rdkafka_consumer) { rdkafka_config.consumer }
-      let(:rdkafka_producer) { rdkafka_config.producer }
-
-      let(:rdkafka_config) do
-        Rdkafka::Config.new({
-          "bootstrap.servers": kafka_brokers,
-          "client.id":         Racecar.config.client_id,
-          "group.id":          "racecar-tests"
-        }.merge(Racecar.config.rdkafka_consumer))
-      end
-
-      after do
-        polling_thread.kill
-        incoming_messages.clear
-        rdkafka_consumer.unsubscribe
-        rdkafka_producer.close
-      end
+      after { incoming_messages.clear }
     end
   end
 
+  def rdkafka_config
+    @rdkafka_config ||= Rdkafka::Config.new({
+      "bootstrap.servers": kafka_brokers,
+      "client.id":         Racecar.config.client_id,
+      "group.id":          "racecar-tests",
+      "auto.offset.reset": "beginning"
+    }.merge(Racecar.config.rdkafka_consumer))
+  end
+
   def publish_messages!(topic, messages)
+    rdkafka_producer = rdkafka_config.producer
     messages.map do |m|
       rdkafka_producer.produce(
         topic: topic,
@@ -44,16 +28,33 @@ module IntegrationHelper
         partition: m.fetch(:partition)
       )
     end.each(&:wait)
+    rdkafka_producer.close
 
-    puts "Published messages to topic: #{topic}; messages: #{messages}"
+    $stderr.puts "Published messages to topic: #{topic}; messages: #{messages}"
   end
 
   def create_topic(topic:, partitions: 1)
-    puts "Creating topic #{topic}"
+    $stderr.puts "Creating topic #{topic}"
     msg, process = run_kafka_command("kafka-topics --bootstrap-server #{kafka_brokers} --create "\
                                      "--topic #{topic} --partitions #{partitions} --replication-factor 1")
-    unless process.exitstatus.zero?
-      raise "Kafka topic creation exited with status #{process.exitstatus}, message: #{msg}"
+    return if process.exitstatus.zero?
+
+    raise "Kafka topic creation exited with status #{process.exitstatus}, message: #{msg}"
+  end
+
+  def wait_for_messages(topic:, expected_message_count:)
+    rdkafka_consumer = rdkafka_config.consumer
+    rdkafka_consumer.subscribe(topic)
+
+    attempts = 0
+
+    while incoming_messages.count < expected_message_count &&
+        attempts < 20
+      $stderr.puts "Waiting for messages..."
+      if (message = rdkafka_consumer.poll(1000))
+        $stderr.puts "Received message #{message}"
+        incoming_messages << message
+      end
     end
   end
 
@@ -61,21 +62,10 @@ module IntegrationHelper
     rebalance_attempt = 1
 
     until members_count(group_id, topic) == expected_members_count
-      puts "Waiting for rebalance..."
+      $stderr.puts "Waiting for rebalance..."
       sleep 2 * rebalance_attempt
       raise "Did not rebalance in time" if rebalance_attempt > 5
       rebalance_attempt += 1
-    end
-  end
-
-  def wait_for_messages(topic:, expected_message_count:)
-    attempt = 1
-
-    until incoming_messages.count == expected_message_count
-      puts "Waiting for message..."
-      sleep 2 * attempt
-      raise "Did not receive messages in time" if attempt > 5
-      attempt += 1
     end
   end
 
@@ -89,14 +79,14 @@ module IntegrationHelper
 
   def delete_all_test_topics
     message, process = run_kafka_command(
-      "kafka-topics --bootstrap-server localhost:9092 --delete --topic '#{input_topic_prefix}-.*'"
+      "kafka-topics --bootstrap-server #{kafka_brokers} --delete --topic '#{input_topic_prefix}-.*'"
     )
-    puts "Input topics deletion exited with status #{process.exitstatus}, message: #{message}"
+    $stderr.puts "Input topics deletion exited with status #{process.exitstatus}, message: #{message}"
 
     message, process = run_kafka_command(
-      "kafka-topics --bootstrap-server localhost:9092 --delete --topic '#{output_topic_prefix}-.*'"
+      "kafka-topics --bootstrap-server #{kafka_brokers} --delete --topic '#{output_topic_prefix}-.*'"
     )
-    puts "Output topics deletion exited with status #{process.exitstatus}, message: #{message}"
+    $stderr.puts "Output topics deletion exited with status #{process.exitstatus}, message: #{message}"
   end
 
   def incoming_messages
@@ -104,10 +94,6 @@ module IntegrationHelper
   end
 
   private
-
-  def run_kafka_command(command)
-    Open3.capture2e("docker-compose exec -T broker #{command}")
-  end
 
   def kafka_brokers
     Racecar.config.brokers.join(",")
@@ -125,6 +111,16 @@ module IntegrationHelper
     consumer_group_partitions_and_member_ids(group_id, topic).uniq { |data| data.fetch(:member_id) }.count
   end
 
+  def in_background(cleanup_callback:, &block)
+    Thread.new do
+      begin
+        block.call
+      ensure
+        cleanup_callback.call
+      end
+    end
+  end
+
   def consumer_group_partitions_and_member_ids(group_id, topic)
     message, process = run_kafka_command(
       "kafka-consumer-groups --bootstrap-server #{kafka_brokers} --describe --group #{group_id}"
@@ -133,7 +129,17 @@ module IntegrationHelper
       raise "Kafka consumer group inspection exited with status #{process.exitstatus}, message: #{message}"
     end
 
-    message.scan(/^#{topic}\ +(?<partition>\d+)\ +\S+\ +\S+\ +\S+\ +(?<member_id>\S+)\ /)
-           .map { |partition, member_id| { partition: partition, member_id: member_id } }
+    return [] if message.match?(/consumer.+(is rebalancing|does not exist|has no active members)/i)
+
+    message
+      .scan(/^#{group_id}\ +#{topic}\ +(?<partition>\d+)\ +\S+\ +\S+\ +\S+\ +(?<member_id>\S+)\ /)
+      .map { |partition, member_id| { partition: partition, member_id: member_id } }
+      .tap do |partitions|
+        raise("Unexpected command output, please review regexp matcher:\n\n #{message}") if partitions.empty?
+      end
+  end
+
+  def run_kafka_command(command)
+    Open3.capture2e("docker exec -t $(docker ps | grep broker | awk '{print $1}') #{command}")
   end
 end
