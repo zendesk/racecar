@@ -3,6 +3,7 @@
 require "optparse"
 require "racecar/rails_config_file_loader"
 require "racecar/daemon"
+require "racecar/message_delivery_error"
 
 module Racecar
   class Ctl
@@ -96,12 +97,17 @@ module Racecar
       Racecar.config.validate!
 
       producer = Rdkafka::Config.new({
-        "bootstrap.servers": Racecar.config.brokers.join(","),
-        "client.id":         Racecar.config.client_id,
+        "bootstrap.servers":  Racecar.config.brokers.join(","),
+        "client.id":          Racecar.config.client_id,
+        "message.timeout.ms": Racecar.config.message_timeout * 1000,
       }.merge(Racecar.config.rdkafka_producer)).producer
 
       handle = producer.produce(payload: message.value, key: message.key, topic: message.topic)
-      handle.wait(max_wait_timeout: 5)
+      begin
+        handle.wait(max_wait_timeout: Racecar.config.message_timeout)
+      rescue Rdkafka::RdkafkaError => e
+        raise MessageDeliveryError.new(e, handle)
+      end
 
       $stderr.puts "=> Delivered message to Kafka cluster"
     end

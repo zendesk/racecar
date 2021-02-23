@@ -266,6 +266,7 @@ All timeouts are defined in number of seconds.
 * `pause_with_exponential_backoff` – Set to `true` if you want to double the `pause_timeout` on each consecutive failure of a particular partition.
 * `socket_timeout` – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
 * `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 1 second.
+* `message_timeout` – How long to try to deliver a produced message before finally giving up. Default is 5 minutes. Transient errors are automatically retried. If a message delivery fails, the current read message batch is retried.
 
 #### Memory & network usage
 

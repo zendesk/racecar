@@ -192,9 +192,13 @@ class FakeDeliveryHandle
     @msg.public_send(key)
   end
 
-  def wait
+  def wait(max_wait_timeout: 60, wait_timeout: 0.1)
     @kafka.produced_messages << @msg
     @delivery_callback.call(self) if @delivery_callback
+  end
+
+  def create_result
+    Rdkafka::Producer::DeliveryReport.new(partition, offset)
   end
 
   def offset
@@ -275,10 +279,15 @@ RSpec.shared_examples "delivery error handling" do
   it "handles unrecoverable delivery errors" do
     allow_any_instance_of(FakeDeliveryHandle).to receive(:wait).and_raise(msg_timed_out)
 
-
-    info = hash_including({unrecoverable_delivery_error: true})
-    expect(config.error_handler).to receive(:call).at_least(:once).with(msg_timed_out, info)
-    expect(processor).to receive(:configure).at_least(:twice).and_call_original
+    expect(config.error_handler).to receive(:call)
+      .at_least(:once)
+      .with(
+        instance_of(Racecar::MessageDeliveryError),
+        hash_including({unrecoverable_delivery_error: true})
+      )
+    expect(processor).to receive(:configure)
+      .at_least(:twice)
+      .and_call_original
 
     kafka.deliver_message("3", topic: "numbers")
 

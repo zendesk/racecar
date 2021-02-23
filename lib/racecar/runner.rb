@@ -3,6 +3,7 @@
 require "rdkafka"
 require "racecar/pause"
 require "racecar/message"
+require "racecar/message_delivery_error"
 
 module Racecar
   class Runner
@@ -53,6 +54,7 @@ module Racecar
         producer:     producer,
         consumer:     consumer,
         instrumenter: @instrumenter,
+        config:       @config,
       )
 
       instrumentation_payload = {
@@ -132,6 +134,7 @@ module Racecar
         "bootstrap.servers"      => config.brokers.join(","),
         "client.id"              => config.client_id,
         "statistics.interval.ms" => 1000,
+        "message.timeout.ms"     => config.message_timeout * 1000,
       }
       producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
       producer_config.merge!(config.rdkafka_producer)
@@ -224,16 +227,18 @@ module Racecar
     # as a last ditch effort.
     # The function returns true if there were unrecoverable errors, or false otherwise.
     def reset_producer_on_unrecoverable_delivery_errors(error)
-      return false unless error.is_a?(Rdkafka::RdkafkaError)
+      return false unless error.is_a?(Racecar::MessageDeliveryError)
       return false unless error.code == :msg_timed_out # -192
 
-      logger.error 'Not all produced messages could be sent successfully within "message.timeout.ms". Resetting producer to force a new connection. If the issue persists, ensure the brokers are reachable and healthy.'
+      logger.error error.to_s
+      logger.error "Racecar will reset the producer to force a new broker connection."
       @producer.close
       @producer = nil
       processor.configure(
         producer:     producer,
         consumer:     consumer,
         instrumenter: @instrumenter,
+        config:       @config,
       )
 
       true
