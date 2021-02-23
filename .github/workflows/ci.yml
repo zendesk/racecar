@@ -16,7 +16,7 @@ jobs:
     steps:
     - uses: zendesk/checkout@v2
     - name: Set up Ruby
-      uses: zendesk/setup-ruby@v1.58.0
+      uses: zendesk/setup-ruby@v1.64.1
       with:
         ruby-version: ${{ matrix.ruby-version }}
         bundler-cache: true
@@ -51,7 +51,7 @@ jobs:
     steps:
     - uses: zendesk/checkout@v2
     - name: Set up Ruby
-      uses: zendesk/setup-ruby@v1.58.0
+      uses: zendesk/setup-ruby@v1.64.1
       with:
         ruby-version: 2.7
         bundler-cache: true
