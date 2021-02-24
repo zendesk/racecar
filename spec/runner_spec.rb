@@ -78,6 +78,18 @@ class TestProducingConsumer < Racecar::Consumer
   end
 end
 
+class TestProducingBatchConsumer < Racecar::Consumer
+  subscribes_to "numbers"
+
+  def process_batch(messages)
+    messages.each do |message|
+      value = Integer(message.value) * 2
+
+      produce value, topic: "doubled", key: value, create_time: 123
+    end
+  end
+end
+
 class TestNilConsumer < Racecar::Consumer
   subscribes_to "greetings"
 end
@@ -164,6 +176,9 @@ class FakeProducer
   def delivery_callback=(handler)
     @delivery_callback = handler
   end
+
+  def close
+  end
 end
 
 class FakeDeliveryHandle
@@ -177,9 +192,13 @@ class FakeDeliveryHandle
     @msg.public_send(key)
   end
 
-  def wait
+  def wait(max_wait_timeout: 60, wait_timeout: 0.1)
     @kafka.produced_messages << @msg
     @delivery_callback.call(self) if @delivery_callback
+  end
+
+  def create_result
+    Rdkafka::Producer::DeliveryReport.new(partition, offset)
   end
 
   def offset
@@ -251,6 +270,28 @@ RSpec.shared_examples "offset handling" do |topic|
     runner.run rescue nil
 
     expect(consumers.first.committed_offset).to eq "not set yet"
+  end
+end
+
+RSpec.shared_examples "delivery error handling" do
+  let(:msg_timed_out) { Rdkafka::RdkafkaError.new(-192) }
+
+  it "handles unrecoverable delivery errors" do
+    allow_any_instance_of(FakeDeliveryHandle).to receive(:wait).and_raise(msg_timed_out)
+
+    expect(config.error_handler).to receive(:call)
+      .at_least(:once)
+      .with(
+        instance_of(Racecar::MessageDeliveryError),
+        hash_including({unrecoverable_delivery_error: true})
+      )
+    expect(processor).to receive(:configure)
+      .at_least(:twice)
+      .and_call_original
+
+    kafka.deliver_message("3", topic: "numbers")
+
+    runner.run
   end
 end
 
@@ -377,7 +418,8 @@ RSpec.describe Racecar::Runner do
         key: nil,
         value: error,
         headers: nil,
-        retries_count: anything
+        retries_count: anything,
+        unrecoverable_delivery_error: false,
       }
 
       expect(config.error_handler).to receive(:call).at_least(:once).with(error, info)
@@ -509,7 +551,8 @@ RSpec.describe Racecar::Runner do
         last_offset: 0,
         last_create_time: nil,
         message_count: 1,
-        retries_count: anything
+        retries_count: anything,
+        unrecoverable_delivery_error: false,
       }
 
       expect(config.error_handler).to receive(:call).at_least(:once).with(error, info)
@@ -614,6 +657,7 @@ RSpec.describe Racecar::Runner do
     let(:processor) { TestProducingConsumer.new }
 
     include_examples "offset handling", "numbers"
+    include_examples "delivery error handling"
 
     it "delivers the messages to Kafka", focus: true do
       kafka.deliver_message("2", topic: "numbers")
@@ -648,6 +692,11 @@ RSpec.describe Racecar::Runner do
       expect(instrumenter).to have_received(:instrument)
         .with("acknowledged_message", {partition: 0, offset: 0})
     end
+  end
+
+  context "with a batch consumer that produces messages" do
+    let(:processor) { TestProducingBatchConsumer.new }
+    include_examples "delivery error handling"
   end
 
   context "#stop" do

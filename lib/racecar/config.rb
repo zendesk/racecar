@@ -57,6 +57,9 @@ module Racecar
     desc "How long to allow the Kafka brokers to wait before returning messages (in seconds)"
     float :max_wait_time, default: 1
 
+    desc "How long to try to deliver a produced message before finally giving up (in seconds)"
+    float :message_timeout, default: 5*60
+
     desc "Maximum amount of data the broker shall return for a Fetch request"
     integer :max_bytes, default: 10485760
 

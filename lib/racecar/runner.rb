@@ -3,6 +3,7 @@
 require "rdkafka"
 require "racecar/pause"
 require "racecar/message"
+require "racecar/message_delivery_error"
 
 module Racecar
   class Runner
@@ -53,6 +54,7 @@ module Racecar
         producer:     producer,
         consumer:     consumer,
         instrumenter: @instrumenter,
+        config:       @config,
       )
 
       instrumentation_payload = {
@@ -79,11 +81,14 @@ module Racecar
       end
 
       logger.info "Gracefully shutting down"
-      processor.deliver!
-      processor.teardown
-      consumer.commit
-      @instrumenter.instrument('leave_group') do
-        consumer.close
+      begin
+        processor.deliver!
+        processor.teardown
+        consumer.commit
+      ensure
+        @instrumenter.instrument('leave_group') do
+          consumer.close
+        end
       end
     end
 
@@ -129,6 +134,7 @@ module Racecar
         "bootstrap.servers"      => config.brokers.join(","),
         "client.id"              => config.client_id,
         "statistics.interval.ms" => 1000,
+        "message.timeout.ms"     => config.message_timeout * 1000,
       }
       producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
       producer_config.merge!(config.rdkafka_producer)
@@ -176,6 +182,7 @@ module Racecar
             consumer.store_offset(message)
           end
         rescue => e
+          instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
           instrumentation_payload[:retries_count] = pause.pauses_count
           config.error_handler.call(e, instrumentation_payload)
           raise e
@@ -206,12 +213,35 @@ module Racecar
             processor.deliver!
             consumer.store_offset(messages.last)
           rescue => e
+            instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
             instrumentation_payload[:retries_count] = pause.pauses_count
             config.error_handler.call(e, instrumentation_payload)
             raise e
           end
         end
       end
+    end
+
+    # librdkafka will continue to try to deliver already queued messages, even if ruby-rdkafka
+    # raised before that. This method detects any unrecoverable errors and resets the producer
+    # as a last ditch effort.
+    # The function returns true if there were unrecoverable errors, or false otherwise.
+    def reset_producer_on_unrecoverable_delivery_errors(error)
+      return false unless error.is_a?(Racecar::MessageDeliveryError)
+      return false unless error.code == :msg_timed_out # -192
+
+      logger.error error.to_s
+      logger.error "Racecar will reset the producer to force a new broker connection."
+      @producer.close
+      @producer = nil
+      processor.configure(
+        producer:     producer,
+        consumer:     consumer,
+        instrumenter: @instrumenter,
+        config:       @config,
+      )
+
+      true
     end
 
     def with_pause(topic, partition, offsets)
