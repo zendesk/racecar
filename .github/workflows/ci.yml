@@ -38,4 +38,4 @@ jobs:
     - name: Build and test with RSpec
       env:
         RACECAR_BROKERS: localhost:9092
-      run: bundle exec rspec --format documentation --require spec_helper --color spec/integration/*_spec.rb
+      run: timeout --kill-after 120 90 bundle exec rspec --format documentation --require spec_helper --color spec/integration/*_spec.rb
