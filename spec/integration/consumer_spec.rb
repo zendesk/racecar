@@ -13,6 +13,82 @@ class NoProcessConsumer < Racecar::Consumer
 end
 
 RSpec.describe "running a Racecar consumer", type: :integration do
+  context "produce" do
+    let(:instrumenter) { Racecar::NullInstrumenter }
+    let(:rdkafka_delivery_handle) { Rdkafka::Producer::DeliveryHandle.new }
+    let(:rdkafka_producer) { instance_double(Rdkafka::Producer, produce: rdkafka_delivery_handle, close: nil) }
+    let(:consumer) do
+      Racecar::Consumer.new.tap do |c|
+        c.configure(producer: rdkafka_producer, consumer: nil, instrumenter: instrumenter)
+      end
+    end
+
+    before { Timecop.freeze }
+    after { Timecop.return }
+
+    it "instruments" do
+      allow(instrumenter).to receive(:instrument).and_call_original
+
+      consumer.send(:produce, "a_payload",
+        topic: "a_topic",
+        key: "a_key",
+        partition_key: "a_part_key",
+        headers: "some_headers",
+        create_time: Time.parse("2000-01-01")
+      )
+
+      expect(instrumenter).to have_received(:instrument).with(
+        "produce_message",
+        buffer_size:   0,
+        create_time:   Time.now,
+        headers:       "some_headers",
+        key:           "a_key",
+        message_size:  "a_payload".size,
+        partition_key: "a_part_key",
+        topic:         "a_topic",
+        value:         "a_payload",
+      )
+    end
+
+    it "passes correct fields to rdkakfa" do
+      timestamp = Time.parse("2000-01-01")
+
+      consumer.send(:produce, "a_payload",
+        topic: "a_topic",
+        key: "a_key",
+        partition_key: "a_part_key",
+        headers: "some_headers",
+        create_time: timestamp
+      )
+
+      expect(rdkafka_producer).to have_received(:produce).with(
+        timestamp:     timestamp,
+        headers:       "some_headers",
+        key:           "a_key",
+        partition_key: "a_part_key",
+        topic:         "a_topic",
+        payload:       "a_payload",
+      )
+    end
+
+    it "creates sensible message delivery handles" do
+      timestamp = Time.parse("2000-01-01")
+
+      consumer.send(:produce, "a_payload",
+        topic: "a_topic",
+        key: "a_key",
+        partition_key: "a_part_key",
+        headers: "some_headers",
+        create_time: timestamp
+      )
+
+      handles = consumer.instance_variable_get(:@message_delivery_handles)
+      expect(handles.size).to eq 1
+      expect(handles.first).to be_kind_of Racecar::MessageDeliveryHandle
+      expect(handles.first.topic).to eq "a_topic"
+    end
+  end
+
   context "when an error occurs trying to start the runner" do
     context "when there are no subscriptions" do
       it "raises an exception" do

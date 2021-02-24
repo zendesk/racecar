@@ -1,22 +1,17 @@
 # frozen_string_literal: true
 
+require "racecar/message_delivery_handle"
+
 module Racecar
   # MessageDeliveryError wraps an Rdkafka error and tries to give
   # specific hints on how to debug or resolve the error within the
   # Racecar context.
   class MessageDeliveryError < StandardError
-    # partition_from_delivery_handle takes an rdkafka delivery handle
-    # and returns a human readable version of the partition. It handles
-    # the case where the partition is unknown.
-    def self.partition_from_delivery_handle(delivery_handle)
-      partition = delivery_handle&.create_result&.partition
-      # -1 is rdkafka-ruby's default value, which gets eventually set by librdkafka
-      return "no yet known" if partition.nil? || partition == -1
-      partition.to_s
-    end
-
     def initialize(rdkafka_error, delivery_handle)
       raise rdkafka_error unless rdkafka_error.is_a?(Rdkafka::RdkafkaError)
+      if !delivery_handle.is_a?(Racecar::MessageDeliveryHandle)
+        raise TypeError, "expected a Racecar::MessageDeliveryHandle, got #{delivery_handle.class}"
+      end
 
       @rdkafka_error = rdkafka_error
       @delivery_handle = delivery_handle
@@ -66,10 +61,8 @@ module Racecar
         EOM
 
       when :unknown_topic_or_part # 3
-        partition = self.class.partition_from_delivery_handle(@delivery_handle)
-
         <<~EOM
-          Could not deliver message, since the targeted topic or partition (#{partition}) does not exist.
+          Could not deliver message, since the targeted topic (#{@delivery_handle.topic}) or partition (#{@delivery_handle.partition_text}) does not exist.
 
           Check that there are no typos, or that the broker's "auto.create.topics.enable" is enabled. For freshly created topics with auto create enabled, this may appear in the beginning (race condition on creation and publishing).
 
@@ -92,7 +85,7 @@ module Racecar
 
       when :topic_authorization_failed # 29
         <<~EOM
-          Failed to deliver message because of insufficient authorization to write into the topic.
+          Failed to deliver message because of insufficient authorization to write into the topic "#{@delivery_handle.topic}".
 
           Double check that it is not a race condition on topic creation. If it isn't, verify the ACLs are correct.
 

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "racecar/message_delivery_error"
+require "racecar/message_delivery_handle"
 
 module Racecar
   class Consumer
@@ -36,7 +37,7 @@ module Racecar
 
     def configure(producer:, consumer:, instrumenter: NullInstrumenter, config: Racecar.config)
       @producer = producer
-      @delivery_handles = []
+      @message_delivery_handles = []
 
       @consumer = consumer
 
@@ -52,12 +53,12 @@ module Racecar
     # (e.g. downtime, configuration issue) or specific to the message being sent. The
     # caller must handle the latter cases or run into head of line blocking.
     def deliver!
-      @delivery_handles ||= []
-      if @delivery_handles.any?
-        instrumentation_payload = { delivered_message_count: @delivery_handles.size }
+      @message_delivery_handles ||= []
+      if @message_delivery_handles.any?
+        instrumentation_payload = { delivered_message_count: @message_delivery_handles.size }
 
         @instrumenter.instrument('deliver_messages', instrumentation_payload) do
-          @delivery_handles.each do |handle|
+          @message_delivery_handles.each do |handle|
             # rdkafka-ruby checks every wait_timeout seconds if the message was
             # successfully delivered, up to max_wait_timeout seconds before raising
             # Rdkafka::AbstractHandle::WaitTimeoutError. librdkafka will (re)try to
@@ -69,25 +70,24 @@ module Racecar
             # changing the interface).
             handle.wait(max_wait_timeout: 60, wait_timeout: 0.1)
           rescue Rdkafka::AbstractHandle::WaitTimeoutError => e
-            partition = MessageDeliveryError.partition_from_delivery_handle(handle)
             # ideally we could use the logger passed to the Runner, but it is not
             # available here. The runner sets it for Rdkafka, though, so we can use
             # that instead.
-            @config.logger.debug "Still trying to deliver message to (partition #{partition})... (will try up to Racecar.config.message_timeout)"
+            @config.logger.debug "Still trying to deliver message to (partition #{handle.partition_text})... (will try up to Racecar.config.message_timeout)"
             retry
           rescue Rdkafka::RdkafkaError => e
             raise MessageDeliveryError.new(e, handle)
           end
         end
       end
-      @delivery_handles.clear
+      @message_delivery_handles.clear
     end
 
     protected
 
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
     def produce(payload, topic:, key: nil, partition_key: nil, headers: nil, create_time: nil)
-      @delivery_handles ||= []
+      @message_delivery_handles ||= []
       message_size = payload.respond_to?(:bytesize) ? payload.bytesize : 0
       instrumentation_payload = {
         value: payload,
@@ -97,18 +97,19 @@ module Racecar
         topic: topic,
         message_size: message_size,
         create_time: Time.now,
-        buffer_size: @delivery_handles.size,
+        buffer_size: @message_delivery_handles.size,
       }
 
       @instrumenter.instrument("produce_message", instrumentation_payload) do
-        @delivery_handles << @producer.produce(
+        params = {
           topic: topic,
-          payload: payload,
           key: key,
           partition_key: partition_key,
           timestamp: create_time,
           headers: headers,
-        )
+        }
+        handle = @producer.produce(payload: payload, **params)
+        @message_delivery_handles << MessageDeliveryHandle.new(handle, **params)
       end
     end
 
