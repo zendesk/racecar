@@ -49,6 +49,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
 
     let(:run_in_background!) do
       Thread.new do
+        @runner_pid = Process.pid
         Thread.current.abort_on_exception = true
         Racecar::Cli.new([consumer_class.name.to_s]).run
       end
@@ -67,7 +68,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
       run_in_background!
     end
 
-    after { Process.kill("INT", 0) }
+    after { Process.kill("INT", @runner_pid) }
 
     after(:all) { delete_all_test_topics }
 
