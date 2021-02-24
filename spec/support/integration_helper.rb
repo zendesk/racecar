@@ -50,8 +50,8 @@ module IntegrationHelper
 
   def create_topic(topic:, partitions: 1)
     puts "Creating topic #{topic}"
-    msg, process = Open3.capture2e("kafka-topics --bootstrap-server #{kafka_brokers} --create "\
-                                   "--topic #{topic} --partitions #{partitions} --replication-factor 1")
+    msg, process = run_kafka_command("kafka-topics --bootstrap-server #{kafka_brokers} --create "\
+                                     "--topic #{topic} --partitions #{partitions} --replication-factor 1")
     return if process.exitstatus.zero?
 
     puts "Kafka topic creation exited with status #{process.exitstatus}, message: #{msg}"
@@ -88,12 +88,12 @@ module IntegrationHelper
   end
 
   def delete_all_test_topics
-    message, process = Open3.capture2e(
+    message, process = run_kafka_command(
       "kafka-topics --bootstrap-server localhost:9092 --delete --topic '#{input_topic_prefix}-.*'"
     )
     puts "Input topics deletion exited with status #{process.exitstatus}, message: #{message}"
 
-    message, process = Open3.capture2e(
+    message, process = run_kafka_command(
       "kafka-topics --bootstrap-server localhost:9092 --delete --topic '#{output_topic_prefix}-.*'"
     )
     puts "Output topics deletion exited with status #{process.exitstatus}, message: #{message}"
@@ -104,6 +104,10 @@ module IntegrationHelper
   end
 
   private
+
+  def run_kafka_command(command)
+    Open3.capture2e("docker-compose exec -T broker #{command}")
+  end
 
   def kafka_brokers
     Racecar.config.brokers.join(",")
@@ -122,7 +126,7 @@ module IntegrationHelper
   end
 
   def consumer_group_partitions_and_member_ids(group_id, topic)
-    message, process = Open3.capture2e(
+    message, process = run_kafka_command(
       "kafka-consumer-groups --bootstrap-server #{kafka_brokers} --describe --group #{group_id}"
     )
     unless process.exitstatus.zero?
