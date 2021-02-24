@@ -1,9 +1,6 @@
 name: CI
 
-on:
-  push:
-    branches:
-      - '**'
+on: [pull_request, push]
 
 jobs:
   unit-specs:
