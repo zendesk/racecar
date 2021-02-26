@@ -48,10 +48,10 @@ module IntegrationHelper
 
     attempts = 0
 
-    while incoming_messages.count < expected_message_count &&
-        attempts < 20
+    while incoming_messages.count < expected_message_count && attempts < 20
       $stderr.puts "Waiting for messages..."
-      if (message = rdkafka_consumer.poll(1000))
+
+      while (message = rdkafka_consumer.poll(1000))
         $stderr.puts "Received message #{message}"
         incoming_messages << message
       end
@@ -140,6 +140,10 @@ module IntegrationHelper
   end
 
   def run_kafka_command(command)
-    Open3.capture2e("docker exec -t $(docker ps | grep broker | awk '{print $1}') #{command}")
+    maybe_sudo = "sudo " if ENV["DOCKER_SUDO"] == "true"
+
+    Open3.capture2e(
+      "#{maybe_sudo}docker exec -t $(#{maybe_sudo}docker ps | grep broker | awk '{print $1}') #{command}"
+    )
   end
 end
