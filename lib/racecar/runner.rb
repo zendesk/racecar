@@ -90,6 +90,8 @@ module Racecar
           consumer.close
         end
       end
+    ensure
+      producer.close
     end
 
     def stop
