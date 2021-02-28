@@ -25,9 +25,11 @@ GEM
     method_source (1.0.0)
     mini_portile2 (2.5.0)
     minitest (5.14.2)
+    prometheus-client (2.1.0)
     pry (0.13.1)
       coderay (~> 1.1)
       method_source (~> 1.0)
+    rack (2.2.3)
     rake (13.0.1)
     rdkafka (0.8.1)
       ffi (~> 1.9)
@@ -59,8 +61,10 @@ DEPENDENCIES
   activesupport (>= 4.0, < 6.1)
   bundler (>= 1.13, < 3)
   dogstatsd-ruby (>= 4.0.0, < 5.0.0)
+  prometheus-client (>= 2.1.0)
   pry
   racecar!
+  rack
   rake (> 10.0)
   rspec (~> 3.0)
   timecop

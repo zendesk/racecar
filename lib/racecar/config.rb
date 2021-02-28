@@ -150,6 +150,18 @@ module Racecar
     desc "Tags that should always be set on Datadog metrics"
     list :datadog_tags
 
+    desc "Enable Prometheus metrics"
+    boolean :prometheus_enabled, default: false
+
+    desc "The endpoint of the Prometheus client"
+    string :prometheus_endpoint
+
+    desc "The registry instance of the Prometheus client"
+    string :prometheus_registry
+
+    desc "The port of the Prometheus client"
+    integer :prometheus_port
+
     desc "Whether to check the server certificate is valid for the hostname"
     boolean :ssl_verify_hostname, default: true
 

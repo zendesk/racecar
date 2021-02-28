@@ -30,4 +30,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "timecop"
   spec.add_development_dependency "dogstatsd-ruby", ">= 4.0.0", "< 5.0.0"
   spec.add_development_dependency "activesupport", ">= 4.0", "< 6.1"
+  spec.add_development_dependency "prometheus-client", ">= 2.1.0"
+  spec.add_development_dependency "rack"
 end
