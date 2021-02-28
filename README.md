@@ -320,6 +320,17 @@ Racecar supports [Datadog](https://www.datadoghq.com/) monitoring integration. I
 * `datadog_namespace` – The namespace to use for Datadog metrics.
 * `datadog_tags` – Tags that should always be set on Datadog metrics.
 
+#### Prometheus monitoring
+
+Racecar supports [Prometheus](https://www.prometheus.io/) monitoring integration. If you are scraping data from other applications, you just need to set `prometheus_enabled` to `true` and have `prometheus-client` gem on your dependencies, as the rest of the settings come with sane defaults.
+
+* `prometheus_enabled` – Whether prometheus monitoring is enabled (defaults to `false`) or not.
+* `prometheus_endpoint` – The server metrics endpoint that is used to fetch prometheus data.
+* `prometheus_registry` – The prometheus client instance.
+* `prometheus_port` – The port use on the server.
+
+After prometheus is enabled, you could instrument your consumers or listen the racecar events with a subscriber as it is in the following [example](examples/racecar_subscriber.rb).
+
 #### Consumers Without Rails ####
 
 By default, if Rails is detected, it will be automatically started when the consumer is started. There are cases where you might not want or need Rails. You can pass the `--without-rails` option when starting the consumer and Rails won't be started.
