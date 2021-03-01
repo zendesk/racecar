@@ -1,4 +1,4 @@
-version: '2'
+version: '2.1'
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:5.5.1
