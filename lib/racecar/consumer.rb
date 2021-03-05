@@ -9,7 +9,7 @@ module Racecar
     class << self
       attr_accessor :max_wait_time
       attr_accessor :group_id
-      attr_accessor :producer, :consumer
+      attr_accessor :producer, :consumer, :parallel_workers
 
       def subscriptions
         @subscriptions ||= []
@@ -27,7 +27,15 @@ module Racecar
       # @param additional_config [Hash] Configuration properties for consumer.
       #   See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
       # @return [nil]
-      def subscribes_to(*topics, start_from_beginning: true, max_bytes_per_partition: 1048576, additional_config: {})
+      def subscribes_to(
+        *topics,
+        start_from_beginning: true,
+        max_bytes_per_partition: 1048576,
+        additional_config: {},
+        parallel_workers: nil
+      )
+        self.parallel_workers = parallel_workers
+
         topics.each do |topic|
           subscriptions << Subscription.new(topic, start_from_beginning, max_bytes_per_partition, additional_config)
         end
