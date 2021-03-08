@@ -133,7 +133,7 @@ module Racecar
       producer_config = {
         "bootstrap.servers"      => config.brokers.join(","),
         "client.id"              => config.client_id,
-        "statistics.interval.ms" => 1000,
+        "statistics.interval.ms" => config.statistics_interval_ms,
         "message.timeout.ms"     => config.message_timeout * 1000,
       }
       producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?

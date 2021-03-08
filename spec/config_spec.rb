@@ -175,4 +175,50 @@ RSpec.describe Racecar::Config do
       expect(config.inspect.split("\n")).to include %(client_id = "elvis")
     end
   end
+
+  describe "#statistics_interval_ms" do
+    before do
+      # If we set this for real, it can't then be unset (at least not without delving into
+      # the guts of Rdkafka)
+      allow(Rdkafka::Config).to receive(:statistics_callback).and_return(stats_callback)
+    end
+
+    context "when there is no statistics_callback defined in the rdkafka config" do
+      let(:stats_callback) { nil }
+
+      context "when statistics_interval is not set" do
+        it "returns 0" do
+          expect(config.statistics_interval_ms).to eq(0)
+        end
+      end
+
+      context "when statistics_interval is set" do
+        before { config.statistics_interval = 5 }
+
+        it "returns 0" do
+          expect(config.statistics_interval_ms).to eq(0)
+        end
+      end
+    end
+
+    context "when there is a statistics_callback defined in the rdkafka config" do
+      let(:stats_callback) do
+        ->(stats) { puts "Nice, a stats callback" }
+      end
+
+      context "when statistics_interval is not set" do
+        it "returns 1000 by default" do
+          expect(config.statistics_interval_ms).to eq(1000)
+        end
+      end
+
+      context "when statistics_interval is set" do
+        before { config.statistics_interval = 5 }
+
+        it "returns the interval in ms" do
+          expect(config.statistics_interval_ms).to eq(5000)
+        end
+      end
+    end
+  end
 end
