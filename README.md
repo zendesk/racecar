@@ -267,6 +267,7 @@ All timeouts are defined in number of seconds.
 * `socket_timeout` – How long to wait when trying to communicate with a Kafka broker. Default is 30 seconds.
 * `max_wait_time` – How long to allow the Kafka brokers to wait before returning messages. A higher number means larger batches, at the cost of higher latency. Default is 1 second.
 * `message_timeout` – How long to try to deliver a produced message before finally giving up. Default is 5 minutes. Transient errors are automatically retried. If a message delivery fails, the current read message batch is retried.
+* `statistics_interval` – How frequently librdkafka should publish statistics about its consumers and producers; you must also add a `statistics_callback` method to your processor, otherwise the stats are disabled. The default is 1 second, however this can be quite memory hungry, so you may want to tune this and monitor.
 
 #### Memory & network usage
 
