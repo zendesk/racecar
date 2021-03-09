@@ -52,9 +52,9 @@ module IntegrationHelper
     puts "Creating topic #{topic}"
     msg, process = run_kafka_command("kafka-topics --bootstrap-server #{kafka_brokers} --create "\
                                      "--topic #{topic} --partitions #{partitions} --replication-factor 1")
-    return if process.exitstatus.zero?
-
-    puts "Kafka topic creation exited with status #{process.exitstatus}, message: #{msg}"
+    unless process.exitstatus.zero?
+      raise "Kafka topic creation exited with status #{process.exitstatus}, message: #{msg}"
+    end
   end
 
   def wait_for_assignments(group_id:, topic:, expected_members_count:)
