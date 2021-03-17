@@ -224,7 +224,7 @@ module Racecar
         "queued.min.messages"     => @config.min_message_queue_size,
         "session.timeout.ms"      => @config.session_timeout * 1000,
         "socket.timeout.ms"       => @config.socket_timeout * 1000,
-        "statistics.interval.ms"  => 1000, # 1s is the highest granularity offered
+        "statistics.interval.ms"  => @config.statistics_interval_ms
       }
       config.merge! @config.rdkafka_consumer
       config.merge! subscription.additional_config
