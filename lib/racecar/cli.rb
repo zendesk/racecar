@@ -50,6 +50,10 @@ module Racecar
         configure_datadog
       end
 
+      if config.prometheus_enabled
+        configure_prometheus
+      end
+
       $stderr.puts "=> Wrooooom!"
 
       if config.daemonize
@@ -150,6 +154,18 @@ module Racecar
         datadog.namespace = config.datadog_namespace unless config.datadog_namespace.nil?
         datadog.tags      = config.datadog_tags unless config.datadog_tags.nil?
       end
+    end
+
+    def configure_prometheus
+      require_relative './prometheus'
+
+      Prometheus.configure do |prometheus|
+        prometheus.endpoint = config.prometheus_endpoint if config.prometheus_endpoint
+        prometheus.registry = config.prometheus_registry if config.prometheus_registry
+        prometheus.port     = config.prometheus_port if config.prometheus_port
+      end
+
+      Prometheus.run
     end
   end
 end
