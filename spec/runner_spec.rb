@@ -623,24 +623,6 @@ RSpec.describe Racecar::Runner do
         runner.run
       end
     end
-
-    it "batches per partition" do
-      kafka.deliver_message("hello", topic: "greetings", partition: 0)
-      kafka.deliver_message("world", topic: "greetings", partition: 1)
-      kafka.deliver_message("!", topic: "greetings", partition: 1)
-
-      payload = a_hash_including(
-        :partition,
-        :first_offset,
-        consumer_class: "TestBatchConsumer",
-        topic: "greetings"
-      )
-
-      expect(processor).to receive(:process_batch).with([Racecar::Message.new(kafka.received_messages["greetings"][0])])
-      expect(processor).to receive(:process_batch).with(kafka.received_messages["greetings"][1, 2].map {|message| Racecar::Message.new(message) })
-
-      runner.run
-    end
   end
 
   context "with a consumer class with neither a #process or a #process_batch method" do
@@ -650,6 +632,22 @@ RSpec.describe Racecar::Runner do
       kafka.deliver_message("hello world", topic: "greetings")
 
       expect { runner.run }.to raise_error(NotImplementedError)
+    end
+  end
+
+  context "with a consumer class with an invalid #process_batch method signature" do
+    class TestInvalidConsumer < Racecar::Consumer
+      subscribes_to "greetings"
+
+      def process_batch(batch, hello); end
+    end
+
+    let(:processor) { TestInvalidConsumer.new }
+
+    it "raises NotImplementedError" do
+      kafka.deliver_message("hello world", topic: "greetings")
+
+      expect { runner.run }.to raise_error(Racecar::Error, "Invalid method signature for `process_batch`. The method must take exactly 1 argument.")
     end
   end
 

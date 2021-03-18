@@ -103,10 +103,20 @@ module Racecar
     def process_method
       @process_method ||= begin
         case
-        when processor.respond_to?(:process_batch) then :batch
-        when processor.respond_to?(:process) then :single
+        when processor.respond_to?(:process_batch)
+          if processor.method(:process_batch).arity != 1
+            raise Racecar::Error, "Invalid method signature for `process_batch`. The method must take exactly 1 argument."
+          end
+
+          :batch
+        when processor.respond_to?(:process)
+          if processor.method(:process).arity != 1
+            raise Racecar::Error, "Invalid method signature for `process`. The method must take exactly 1 argument."
+          end
+
+          :single
         else
-          raise NotImplementedError, "Consumer class must implement process or process_batch method"
+          raise NotImplementedError, "Consumer class `#{processor.class}` must implement a `process` or `process_batch` method"
         end
       end
     end
