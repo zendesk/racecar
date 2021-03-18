@@ -653,6 +653,22 @@ RSpec.describe Racecar::Runner do
     end
   end
 
+  context "with a consumer class with an invalid #process_batch method signature" do
+    class TestInvalidConsumer < Racecar::Consumer
+      subscribes_to "greetings"
+
+      def process_batch(batch, hello); end
+    end
+
+    let(:processor) { TestInvalidConsumer.new }
+
+    it "raises NotImplementedError" do
+      kafka.deliver_message("hello world", topic: "greetings")
+
+      expect { runner.run }.to raise_error(Racecar::Error, "Invalid method signature for `process_batch`. The method must take exactly 1 argument.")
+    end
+  end
+
   context "with a consumer that produces messages" do
     let(:processor) { TestProducingConsumer.new }
 
