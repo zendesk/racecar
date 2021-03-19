@@ -181,7 +181,7 @@ class FakeProducer
   end
 end
 
-class FakeDeliveryHandle
+class FakeDeliveryHandle < Rdkafka::Producer::DeliveryHandle
   def initialize(kafka, msg, delivery_callback)
     @kafka = kafka
     @msg = msg

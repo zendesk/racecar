@@ -4,6 +4,7 @@ require "optparse"
 require "racecar/rails_config_file_loader"
 require "racecar/daemon"
 require "racecar/message_delivery_error"
+require "racecar/message_delivery_handle"
 
 module Racecar
   class Ctl
@@ -106,7 +107,8 @@ module Racecar
       begin
         handle.wait(max_wait_timeout: Racecar.config.message_timeout)
       rescue Rdkafka::RdkafkaError => e
-        raise MessageDeliveryError.new(e, handle)
+        wrapped_handle = MessageDeliveryHandle.new(handle, key: message.key, topic: message.topic, key: nil, partition_key: nil , timestamp: nil, headers: nil)
+        raise MessageDeliveryError.new(e, wrapped_handle)
       end
 
       $stderr.puts "=> Delivered message to Kafka cluster"
