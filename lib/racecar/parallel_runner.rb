@@ -94,9 +94,9 @@ module Racecar
       terminate_workers
 
       workers.map(&:pid).each do |pid|
-        $stderr.puts "=> Waiting for worker with pid #{pid} to exit"
+        logger.debug "=> Waiting for worker with pid #{pid} to exit"
         Process.waitpid(pid)
-        $stderr.puts "=> Worker with pid #{pid} shutdown"
+        logger.debug "=> Worker with pid #{pid} shutdown"
       end
 
       exception_found = !first_read.empty?
