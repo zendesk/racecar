@@ -5,6 +5,7 @@
 * [Racecar::Consumer] When messages fail to deliver, an extended error with hints is now raised. Instead of `Rdkafka::RdkafkaError` you'll get a `Racecar::MessageDeliveryError` instead. ([#219](https://github.com/zendesk/racecar/pull/219)). If you have set a `Racecar.config.error_handler`, it might need to be updated.
 * [Racecar::Consumer] When message delivery times out, Racecar will reset the producer in an attempt to fix some of the potential causes for this error. ([#219](https://github.com/zendesk/racecar/pull/219))
 * Validate the `process` and `process_batch` method signature on consumer classes when initializing (#236)
+* Add Ruby 3.0 compatibility (#237)
 
 ## racecar v2.2.0
 
