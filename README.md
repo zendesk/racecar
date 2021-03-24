@@ -321,6 +321,8 @@ Racecar supports [Datadog](https://www.datadoghq.com/) monitoring integration. I
 * `datadog_namespace` – The namespace to use for Datadog metrics.
 * `datadog_tags` – Tags that should always be set on Datadog metrics.
 
+Furthermore, there's a [standard Datadog dashboard configution file](https://raw.githubusercontent.com/zendesk/racecar/master/extra/datadog-dashboard.json) that you can import to get started with a Racecar dashboard for all of your consumers.
+
 #### Consumers Without Rails ####
 
 By default, if Rails is detected, it will be automatically started when the consumer is started. There are cases where you might not want or need Rails. You can pass the `--without-rails` option when starting the consumer and Rails won't be started.
