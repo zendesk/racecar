@@ -8,6 +8,7 @@
 * Add Ruby 3.0 compatibility (#237)
 * Introduce parallel runner, which forks a number of independent consumers, allowing partitions to be processed in parallel. ([#222](https://github.com/zendesk/racecar/pull/222))
 * [Racecar::Runner] Ensure producer is closed, whether it closes or errors. ([#222](https://github.com/zendesk/racecar/pull/222))
+* Configure `statistics_interval` directly in the config. Disable statistics when no callback is defined ([#232](https://github.com/zendesk/racecar/pull/232))
 
 ## racecar v2.2.0
 
