@@ -74,8 +74,9 @@ RSpec.describe "running a Racecar consumer", type: :integration do
     before do
       create_topic(topic: input_topic, partitions: topic_partitions)
 
-      consumer_class.subscribes_to(input_topic, parallel_workers: parallelism)
+      consumer_class.subscribes_to(input_topic)
       consumer_class.output_topic = output_topic
+      consumer_class.parallel_workers = parallelism
 
       publish_messages!(input_topic, input_messages)
     end

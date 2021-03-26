@@ -31,11 +31,8 @@ module Racecar
         *topics,
         start_from_beginning: true,
         max_bytes_per_partition: 1048576,
-        additional_config: {},
-        parallel_workers: nil
+        additional_config: {}
       )
-        self.parallel_workers = parallel_workers
-
         topics.each do |topic|
           subscriptions << Subscription.new(topic, start_from_beginning, max_bytes_per_partition, additional_config)
         end

@@ -97,7 +97,9 @@ If you want to process different partitions in parallel, and don't want to deplo
 The number of parallel workers is configured per consumer class; you may only want to take advantage of this for busier consumers:
 ```ruby
 class ParallelProcessingConsumer < Racecar::Consumer
-  subscribes_to "some-topic", parallel_workers: 5
+  subscribes_to "some-topic"
+
+  self.parallel_workers = 5
 
   def process(message)
     ...
