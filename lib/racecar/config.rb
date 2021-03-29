@@ -167,7 +167,7 @@ module Racecar
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
-    attr_accessor :subscriptions, :logger
+    attr_accessor :subscriptions, :logger, :parallel_workers
 
     def statistics_interval_ms
       if Rdkafka::Config.statistics_callback
@@ -220,6 +220,7 @@ module Racecar
         consumer_class.name.gsub(/[a-z][A-Z]/) { |str| "#{str[0]}-#{str[1]}" }.downcase,
       ].compact.join
 
+      self.parallel_workers = consumer_class.parallel_workers
       self.subscriptions = consumer_class.subscriptions
       self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time
       self.pidfile ||= "#{group_id}.pid"

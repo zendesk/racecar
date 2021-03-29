@@ -59,8 +59,8 @@ module Racecar
       end
 
       processor = consumer_class.new
-
       Racecar.run(processor)
+      nil
     end
 
     private

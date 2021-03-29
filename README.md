@@ -83,6 +83,30 @@ Now run your consumer with `bundle exec racecar TapDanceConsumer`.
 
 Note: if you're not using Rails, you'll have to add the file yourself. No-one will judge you for copy-pasting it.
 
+#### Running consumers in parallel (experimental)
+
+Warning - limited battle testing in production environments; use at your own risk!
+
+If you want to process different partitions in parallel, and don't want to deploy a number of instances matching the total partitions of the topic, you can specify the number of workers to spin up - that number of processes will be forked, and each will register its own consumer in the group. Some things to note:
+- This would make no difference on a single partitioned topic - only one consumer would ever be assigned a partition. A couple of example configurations to process all partitions in parallel (we'll assume a 15 partition topic):
+  - Parallel workers set to 3, 5 separate instances / replicas running in your container orchestrator
+  - Parallel workers set to 5, 3 separate instances / replicas running in your container orchestrator
+- Since we're forking new processes, the memory demands are a little higher
+  - From some initial testing, running 5 parallel workers requires no more than double the memory of running a Racecar consumer without parallelism. 
+
+The number of parallel workers is configured per consumer class; you may only want to take advantage of this for busier consumers:
+```ruby
+class ParallelProcessingConsumer < Racecar::Consumer
+  subscribes_to "some-topic"
+
+  self.parallel_workers = 5
+
+  def process(message)
+    ...
+  end
+end
+```
+
 #### Initializing consumers
 
 You can optionally add an `initialize` method if you need to do any set-up work before processing messages, e.g.
@@ -496,6 +520,16 @@ After checking out the repo, run `bin/setup` to install dependencies. Then, run 
 
 The integration tests run against a Kafka instance that is not automatically started from within `rspec`. You can set one up using the provided `docker-compose.yml` by running `docker-compose up`.
 
+### Running RSpec within Docker
+
+There can be behavioural inconsistencies between running the specs on your machine, and in the CI pipeline. Due to this, there is now a Dockerfile included in the project, which is based on the CircleCI ruby 2.7.2 image. This could easily be extended with more Dockerfiles to cover different Ruby versions if desired. In order to run the specs via Docker:
+
+- Uncomment the `tests` service from the docker-compose.yml
+- Bring up the stack with `docker-compose up -d`
+- Execute the entire suite with `docker-compose run --rm tests rspec`
+- Execute a single spec or directory with `docker-compose run --rm tests rspec spec/integration/consumer_spec.rb`
+
+Please note - your code directory is mounted as a volume, so you can make code changes without needing to rebuild
 
 ## Contributing
 

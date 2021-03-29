@@ -1,9 +1,8 @@
 version: '2.1'
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:5.5.1
-    hostname: zookeeper
-    container_name: zookeeper
     ports:
       - "2181:2181"
     environment:
@@ -15,8 +14,6 @@ services:
 
   broker:
     image: confluentinc/cp-kafka:5.5.1
-    hostname: broker
-    container_name: broker
     depends_on:
       - zookeeper
     ports:
@@ -44,3 +41,25 @@ services:
         condition: service_healthy
       zookeeper:
         condition: service_healthy
+
+
+  # If you want to run the tests locally with Docker, comment in the tests service.
+  # The behaviour, especially of the integration tests, can differ somewhat compared
+  # to running it on your machine.
+
+  # tests:
+  #   build:
+  #     context: .
+  #   depends_on:
+  #     wait-for-healthy-services:
+  #       condition: service_started
+  #   environment:
+  #     RACECAR_BROKERS: broker:29092
+  #     DOCKER_SUDO: 'true'
+  #   # When bringing up the stack, we just let the container exit. For running the
+  #   # specs, we'll use commands like `docker-compose run tests rspec`
+  #   command: ["echo", "ready"]
+  #   volumes:
+  #     # The line below allows us to run docker commands from the container itself
+  #     - "/var/run/docker.sock:/var/run/docker.sock"
+  #     - .:/app
