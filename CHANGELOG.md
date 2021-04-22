@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## racecar v1.2.1
+
 * Require king_konf v1.0 or higher.
 
 ## racecar v1.2.0
