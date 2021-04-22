@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Require king_konf v1.0 or higher.
+
 ## racecar v1.2.0
 
 * Support for `ssl_client_cert_key_password` (#173).
