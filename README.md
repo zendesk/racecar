@@ -439,17 +439,16 @@ The important part is the `strategy.type` value, which tells Kubernetes how to u
 
 Instead, the `Recreate` update strategy should be used. It completely tears down the existing containers before starting all of the new containers simultaneously, allowing for a single synchronization stage and a much faster, more stable deployment update.
 
-#### Deploying to Heroku (Making use of Heroku Kafka ENVs)
+#### Deploying to Heroku (Making use of Heroku Kafka add-on ENVs)
 
-If you run your applications in Heroku and/or use Heroku Kafka as the broker, you will be provided with 4 ENVs to connect to the broker: `KAFKA_URL`, `KAFKA_TRUSTED_CERT`, `KAFKA_CLIENT_CERT`, `KAFKA_CLIENT_CERT_KEY`. Find [relavent Heroku Documentation here](https://devcenter.heroku.com/articles/kafka-on-heroku#connecting-to-a-kafka-cluster).
+If you run your applications in Heroku and/or use Heroku Kafka as the broker, you are be provided with 4 ENVs by the add-on to connect to the broker: `KAFKA_URL`, `KAFKA_TRUSTED_CERT`, `KAFKA_CLIENT_CERT`, `KAFKA_CLIENT_CERT_KEY`.
 
-Racecar provides an easy and flexible way to configure your consumer to work with these ENVs. Just requiring `racecar/heroku` in your consumer file or in one of your rails initializer files will set the Racecar configuration variables to the parsed ENV values.
+Racecar provides an easy way to configure consumers to work with these ENVs. Just requiring `racecar/heroku` in the consumer file or in one of the rails initializer files will set the Racecar configuration variables to the parsed ENV values.
 
-If your Kafka broker is named differently from `KAFKA`, you can tell Racecar to use that name by setting `Racecar::Heroku.kafka_name = NEW_KAFKA`. This will make Racecar to read values from ENVs `NEW_KAFKA_URL`, `NEW_KAFKA_TRUSTED_CERT` ... etc.
+Please note that this will work only if the Heroku Kafka add-on is aliased to the default name `KAFKA`
 
 ```ruby
-require "racecar/heroku.rb"
-Racecar::Heroku.kafka_name = "NEW_KAFKA"
+require "racecar/heroku"
 
 class OrderUpdatesConsumer < Racecar::Consumer
   subscribes_to "order_updates"
