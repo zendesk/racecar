@@ -439,6 +439,27 @@ The important part is the `strategy.type` value, which tells Kubernetes how to u
 
 Instead, the `Recreate` update strategy should be used. It completely tears down the existing containers before starting all of the new containers simultaneously, allowing for a single synchronization stage and a much faster, more stable deployment update.
 
+#### Deploying to Heroku (Making use of Heroku Kafka add-on ENVs)
+
+If you run your applications in Heroku and/or use Heroku Kafka as the broker, you are be provided with 4 ENVs by the add-on to connect to the broker: `KAFKA_URL`, `KAFKA_TRUSTED_CERT`, `KAFKA_CLIENT_CERT`, `KAFKA_CLIENT_CERT_KEY`.
+
+Racecar provides an easy way to configure consumers to work with these ENVs. Just requiring `racecar/heroku` in the consumer file or in one of the rails initializer files will set the Racecar configuration variables to the parsed ENV values.
+
+Please note that this will work only if the Heroku Kafka add-on is aliased to the default name `KAFKA`
+
+```ruby
+require "racecar/heroku"
+
+class OrderUpdatesConsumer < Racecar::Consumer
+  subscribes_to "order_updates"
+
+  def process(message)
+    data = JSON.parse(message.value)
+    order = Order.find(data["order_id"])
+    order.update(updated_at: Time.current)
+  end
+end
+```
 
 #### Running consumers in the background
 
