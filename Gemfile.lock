@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    racecar (2.2.0)
+    racecar (2.3.0.alpha1)
       king_konf (~> 1.0.0)
       rdkafka (~> 0.8.0)
 
@@ -18,12 +18,12 @@ GEM
     concurrent-ruby (1.1.7)
     diff-lcs (1.4.4)
     dogstatsd-ruby (4.8.2)
-    ffi (1.14.2)
+    ffi (1.15.0)
     i18n (1.8.5)
       concurrent-ruby (~> 1.0)
     king_konf (1.0.0)
     method_source (1.0.0)
-    mini_portile2 (2.5.0)
+    mini_portile2 (2.5.1)
     minitest (5.14.2)
     pry (0.13.1)
       coderay (~> 1.1)
