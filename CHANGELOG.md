@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## racecar v2.3.1
+
+* Require Ruby 2.5 when using gem (#256)
+
 ## racecar v2.3.0
 
 * Add native support for Heroku (#248)
