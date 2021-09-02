@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## racecar v2.3.1
+
+* Handle `ERR_NOT_COORDINATOR` (#209)
+
 ## racecar v2.3.0
 
 * Add native support for Heroku (#248)
