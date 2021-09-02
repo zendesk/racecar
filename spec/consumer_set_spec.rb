@@ -20,6 +20,7 @@ RSpec.describe Racecar::ConsumerSet do
   let(:instrumenter)        { Racecar::NullInstrumenter }
   let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger, instrumenter) }
   let(:max_poll_exceeded_error) { Rdkafka::RdkafkaError.new(-147) }
+  let(:not_coordinator_error) { Rdkafka::RdkafkaError.new(16) }
 
   def message_generator(messages)
     msgs = messages.dup
@@ -391,6 +392,27 @@ RSpec.describe Racecar::ConsumerSet do
         next nil if raised
         raised = true
         raise(max_poll_exceeded_error)
+      end
+      allow(rdconsumer2).to receive(:poll).and_return(nil)
+      allow(rdconsumer3).to receive(:poll)
+      allow(consumer_set).to receive(:reset_current_consumer)
+      allow(consumer_set).to receive(:sleep)
+
+      consumer_set.poll(200)
+      consumer_set.poll(200)
+
+      expect(consumer_set).to have_received(:reset_current_consumer).once
+      expect(rdconsumer1).to have_received(:poll).twice
+      expect(rdconsumer2).to have_received(:poll).once
+      expect(rdconsumer3).not_to have_received(:poll)
+    end
+
+    it "#poll retries upon not coordinator error" do
+      raised = false
+      allow(rdconsumer1).to receive(:poll) do
+        next nil if raised
+        raised = true
+        raise(not_coordinator_error)
       end
       allow(rdconsumer2).to receive(:poll).and_return(nil)
       allow(rdconsumer3).to receive(:poll)
