@@ -80,6 +80,9 @@ module Racecar
     desc "Protocol used to communicate with brokers"
     symbol :security_protocol, allowed_values: %i{plaintext ssl sasl_plaintext sasl_ssl}
 
+    desc "SASL mechanism to use for authentication. Supported: GSSAPI, PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, OAUTHBEARER."
+    symbol :security_mechanisms
+
     desc "File or directory path to CA certificate(s) for verifying the broker's key"
     string :ssl_ca_location
 
@@ -251,6 +254,7 @@ module Racecar
     def rdkafka_security_config
       {
         "security.protocol" => security_protocol,
+        "sasl.mechanisms" => security_mechanisms,
         "enable.ssl.certificate.verification" => ssl_verify_hostname,
         "ssl.ca.location" => ssl_ca_location,
         "ssl.crl.location" => ssl_crl_location,
