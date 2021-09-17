@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        ruby-version: ["2.4", 2.5", "2.6", "3.0"]
+        ruby-version: ["2.4", "2.5", "2.6", "3.0"]
 
     steps:
     - uses: zendesk/checkout@v2
