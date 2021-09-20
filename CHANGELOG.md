@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## v2.4.0
 
 * Update librdkafka version from 1.4.0 to 1.5.0 by upgrading from rdkafka 0.8.0 to 0.10.0. ([#263](https://github.com/zendesk/racecar/pull/263))
+* Restore support for Ruby 2.4 (#258)
 
 ## racecar v2.3.1
 
