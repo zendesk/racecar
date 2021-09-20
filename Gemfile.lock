@@ -1,9 +1,9 @@
 PATH
   remote: .
   specs:
-    racecar (2.3.0)
+    racecar (2.3.1)
       king_konf (~> 1.0.0)
-      rdkafka (~> 0.8.0)
+      rdkafka (~> 0.10.0)
 
 GEM
   remote: https://rubygems.org/
@@ -18,18 +18,18 @@ GEM
     concurrent-ruby (1.1.7)
     diff-lcs (1.4.4)
     dogstatsd-ruby (4.8.2)
-    ffi (1.15.3)
+    ffi (1.15.4)
     i18n (1.8.5)
       concurrent-ruby (~> 1.0)
     king_konf (1.0.0)
     method_source (1.0.0)
-    mini_portile2 (2.6.1)
+    mini_portile2 (2.7.0)
     minitest (5.14.2)
     pry (0.13.1)
       coderay (~> 1.1)
       method_source (~> 1.0)
     rake (13.0.1)
-    rdkafka (0.8.1)
+    rdkafka (0.10.0)
       ffi (~> 1.9)
       mini_portile2 (~> 2.1)
       rake (>= 12.3)
@@ -66,4 +66,4 @@ DEPENDENCIES
   timecop
 
 BUNDLED WITH
-   2.1.4
+   2.2.15

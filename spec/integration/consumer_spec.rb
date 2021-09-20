@@ -73,6 +73,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
 
     before do
       create_topic(topic: input_topic, partitions: topic_partitions)
+      create_topic(topic: output_topic, partitions: topic_partitions)
 
       consumer_class.subscribes_to(input_topic)
       consumer_class.output_topic = output_topic
