@@ -699,11 +699,35 @@ RSpec.describe Racecar::Runner do
 
   context "#stop" do
     let(:processor) { TestConsumer.new }
+    let(:datadog) { double("Racecar::Datadog", close: nil) }
 
     it "allows the processor to tear down resources" do
       runner.run
 
       expect(processor.torn_down?).to eq true
+    end
+
+    context "when DataDog metrics are disabled" do
+      before do
+        allow(Object).to receive(:const_defined?).with("Racecar::Datadog").and_return(false)
+      end
+
+      it "does not close Datadog::Statsd instance" do
+        expect(datadog).not_to receive(:close)
+        runner.run
+      end
+    end
+
+    context "when DataDog metrics are enabled" do
+      before do
+        stub_const("Racecar::Datadog", datadog)
+        allow(Object).to receive(:const_defined?).with("Racecar::Datadog").and_return(true)
+      end
+
+      it "closes Datadog::Statsd instance" do
+        expect(datadog).to receive(:close)
+        runner.run
+      end
     end
   end
 end
