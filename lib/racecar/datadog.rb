@@ -63,10 +63,14 @@ module Racecar
         clear
       end
 
+      def close
+        @statsd&.close
+      end
+
       private
 
       def clear
-        @statsd && @statsd.close
+        close
         @statsd = nil
       end
     end

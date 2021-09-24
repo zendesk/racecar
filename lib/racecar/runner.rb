@@ -92,6 +92,7 @@ module Racecar
       end
     ensure
       producer.close
+      Racecar::Datadog.close if Object.const_defined?("Racecar::Datadog")
     end
 
     def stop
