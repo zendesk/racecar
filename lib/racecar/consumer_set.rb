@@ -156,7 +156,7 @@ module Racecar
       msg = current.poll(max_wait_time_ms)
     rescue Rdkafka::RdkafkaError => e
       case e.code
-      when :max_poll_exceeded, :transport, :not_coordinator # -147, -195, 16
+      when :max_poll_exceeded, :transport, :not_coordinator, :network_exception # -147, -195, 16, 13
         reset_current_consumer
       end
       raise
