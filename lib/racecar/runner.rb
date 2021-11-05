@@ -36,7 +36,8 @@ module Racecar
         sasl_oauth_token_provider: config.sasl_oauth_token_provider,
         sasl_over_ssl: config.sasl_over_ssl,
         ssl_ca_certs_from_system: config.ssl_ca_certs_from_system,
-        ssl_verify_hostname: config.ssl_verify_hostname
+        ssl_verify_hostname: config.ssl_verify_hostname,
+        partitioner: Kafka::Partitioner.new(hash_function: config.partitioner)
       )
 
       @consumer = kafka.consumer(
