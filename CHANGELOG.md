@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## racecar v1.3.0
+
 * Support for `partitioner` configuration. (#268)
 
 ## racecar v1.2.1
