@@ -331,6 +331,7 @@ NOTE: `sasl_oauth_token_provider` only works using the `config/racecar.rb` confi
 These settings are related to consumers that _produce messages to Kafka_.
 
 * `producer_compression_codec` – If defined, Racecar will compress messages before writing them to Kafka. The codec needs to be one of `gzip`, `lz4`, or `snappy`, either as a Symbol or a String.
+* `partitioner` - The algorithm used to calculate message destination partitions. `crc32` is the default, `murmur2` is also supported. Can be passed as symbol or a string.
 
 #### Datadog monitoring
 

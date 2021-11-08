@@ -115,6 +115,9 @@ module Racecar
     desc "The codec used to compress messages with"
     symbol :producer_compression_codec
 
+    desc "The partitioner used to calculate message destination partition"
+    symbol :partitioner, default: :crc32, allowed_values: [:crc32, :murmur2]
+
     desc "Enable Datadog metrics"
     boolean :datadog_enabled, default: false
 

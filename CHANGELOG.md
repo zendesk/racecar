@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Support for `partitioner` configuration. (#268)
+
 ## racecar v1.2.1
 
 * Require king_konf v1.0 or higher.
