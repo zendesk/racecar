@@ -269,6 +269,10 @@ end
 - `group_id` – The group id to use for a given group of consumers. Note that this _must_ be different for each consumer class. If left blank a group id is generated based on the consumer class name such that (for example) a consumer with the class name `BaconConsumer` would default to a group id of `bacon-consumer`.
 - `group_id_prefix` – A prefix used when generating consumer group names. For instance, if you set the prefix to be `kevin.` and your consumer class is named `BaconConsumer`, the resulting consumer group will be named `kevin.bacon-consumer`.
 
+#### Batches
+
+- `fetch_messages` - The number of messages to fetch in a single batch. This can be set on a per consumer basis.
+
 #### Logging
 
 - `logfile` – A filename that log messages should be written to. Default is `nil`, which means logs will be written to standard output.

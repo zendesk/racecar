@@ -85,7 +85,7 @@ RSpec.describe Racecar::Config do
 
   describe "#load_consumer_class" do
     let(:consumer_class) {
-      OpenStruct.new(group_id: nil, name: "DoStuffConsumer", subscriptions: [])
+      OpenStruct.new(group_id: nil, fetch_messages: nil, name: "DoStuffConsumer", subscriptions: [])
     }
 
     it "sets the group id if one has been explicitly defined" do
@@ -112,16 +112,27 @@ RSpec.describe Racecar::Config do
       expect(config.subscriptions).to eq ["one", "two"]
     end
 
+    it "sets the fetch_messages to the one defined on the consumer class" do
+      consumer_class.fetch_messages = 10
+
+      config.load_consumer_class(consumer_class)
+
+      expect(config.fetch_messages).to eq 10
+    end
+
     it "doesn't override existing values if the consumer hasn't specified anything" do
       consumer_class.max_wait_time = nil
       consumer_class.group_id = nil
+      consumer_class.fetch_messages = nil
 
       config.max_wait_time = 10
       config.group_id = "cats"
+      config.fetch_messages = 100
       config.load_consumer_class(consumer_class)
 
       expect(config.max_wait_time).to eq 10
       expect(config.group_id).to eq "cats"
+      expect(config.fetch_messages).to eq 100
     end
   end
 

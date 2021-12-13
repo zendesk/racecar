@@ -223,6 +223,7 @@ module Racecar
       self.parallel_workers = consumer_class.parallel_workers
       self.subscriptions = consumer_class.subscriptions
       self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time
+      self.fetch_messages = consumer_class.fetch_messages || self.fetch_messages
       self.pidfile ||= "#{group_id}.pid"
     end
 

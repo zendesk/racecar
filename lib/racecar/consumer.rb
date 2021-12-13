@@ -9,7 +9,7 @@ module Racecar
     class << self
       attr_accessor :max_wait_time
       attr_accessor :group_id
-      attr_accessor :producer, :consumer, :parallel_workers
+      attr_accessor :producer, :consumer, :parallel_workers, :fetch_messages
 
       def subscriptions
         @subscriptions ||= []
