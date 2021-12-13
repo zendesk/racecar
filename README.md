@@ -271,7 +271,7 @@ end
 
 #### Batches
 
-- `fetch_messages` - The number of messages to fetch in a single batch. This can we set on a per consumer basis.
+- `fetch_messages` - The number of messages to fetch in a single batch. This can be set on a per consumer basis.
 
 #### Logging
 
