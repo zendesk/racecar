@@ -4,6 +4,9 @@
 
 * `fetch_messages` can be configured per consumer, just as the maximum timeout to wait for a full batch.
 
+## v2.4.1
+* Update librdkafka version from 1.5.0 to 1.8.2 by upgrading from rdkafka 0.10.0 to 0.11.0. ([#274](https://github.com/zendesk/racecar/pull/274))
+
 ## v2.4.0
 
 * Update librdkafka version from 1.4.0 to 1.5.0 by upgrading from rdkafka 0.8.0 to 0.10.0. ([#263](https://github.com/zendesk/racecar/pull/263))
