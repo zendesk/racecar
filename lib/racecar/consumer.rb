@@ -93,13 +93,14 @@ module Racecar
     protected
 
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
-    def produce(payload, topic:, key: nil, partition_key: nil, headers: nil, create_time: nil)
+    def produce(payload, topic:, key: nil, partition: nil, partition_key: nil, headers: nil, create_time: nil)
       @delivery_handles ||= []
       message_size = payload.respond_to?(:bytesize) ? payload.bytesize : 0
       instrumentation_payload = {
         value: payload,
         headers: headers,
         key: key,
+        partition: partition,
         partition_key: partition_key,
         topic: topic,
         message_size: message_size,
@@ -112,6 +113,7 @@ module Racecar
           topic: topic,
           payload: payload,
           key: key,
+          partition: partition,
           partition_key: partition_key,
           timestamp: create_time,
           headers: headers,

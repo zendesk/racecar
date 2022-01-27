@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Add capability to specify partition number when producing messages
+
 ## v2.5.0
 
 * `fetch_messages` can be configured per consumer, just as the maximum timeout to wait for a full batch.
