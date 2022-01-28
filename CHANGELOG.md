@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2.5.0
+
 * `fetch_messages` can be configured per consumer, just as the maximum timeout to wait for a full batch.
 
 ## v2.4.0
