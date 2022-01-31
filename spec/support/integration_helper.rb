@@ -50,6 +50,7 @@ module IntegrationHelper
 
     while incoming_messages.count < expected_message_count && attempts < 20
       $stderr.puts "Waiting for messages..."
+      attempts += 1
 
       while (message = rdkafka_consumer.poll(1000))
         $stderr.puts "Received message #{message}"
