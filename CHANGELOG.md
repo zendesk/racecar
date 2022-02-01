@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2.6.0
+
 * Add capability to specify partition number when producing messages
 
 ## v2.5.0
