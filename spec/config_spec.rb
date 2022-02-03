@@ -85,7 +85,7 @@ RSpec.describe Racecar::Config do
 
   describe "#load_consumer_class" do
     let(:consumer_class) {
-      OpenStruct.new(group_id: nil, name: "DoStuffConsumer", subscriptions: [])
+      OpenStruct.new(group_id: nil, fetch_messages: nil, name: "DoStuffConsumer", subscriptions: [])
     }
 
     it "sets the group id if one has been explicitly defined" do
@@ -112,16 +112,27 @@ RSpec.describe Racecar::Config do
       expect(config.subscriptions).to eq ["one", "two"]
     end
 
+    it "sets the fetch_messages to the one defined on the consumer class" do
+      consumer_class.fetch_messages = 10
+
+      config.load_consumer_class(consumer_class)
+
+      expect(config.fetch_messages).to eq 10
+    end
+
     it "doesn't override existing values if the consumer hasn't specified anything" do
       consumer_class.max_wait_time = nil
       consumer_class.group_id = nil
+      consumer_class.fetch_messages = nil
 
       config.max_wait_time = 10
       config.group_id = "cats"
+      config.fetch_messages = 100
       config.load_consumer_class(consumer_class)
 
       expect(config.max_wait_time).to eq 10
       expect(config.group_id).to eq "cats"
+      expect(config.fetch_messages).to eq 100
     end
   end
 
@@ -173,6 +184,52 @@ RSpec.describe Racecar::Config do
       config.client_id = "elvis"
 
       expect(config.inspect.split("\n")).to include %(client_id = "elvis")
+    end
+  end
+
+  describe "#statistics_interval_ms" do
+    before do
+      # If we set this for real, it can't then be unset (at least not without delving into
+      # the guts of Rdkafka)
+      allow(Rdkafka::Config).to receive(:statistics_callback).and_return(stats_callback)
+    end
+
+    context "when there is no statistics_callback defined in the rdkafka config" do
+      let(:stats_callback) { nil }
+
+      context "when statistics_interval is not set" do
+        it "returns 0" do
+          expect(config.statistics_interval_ms).to eq(0)
+        end
+      end
+
+      context "when statistics_interval is set" do
+        before { config.statistics_interval = 5 }
+
+        it "returns 0" do
+          expect(config.statistics_interval_ms).to eq(0)
+        end
+      end
+    end
+
+    context "when there is a statistics_callback defined in the rdkafka config" do
+      let(:stats_callback) do
+        ->(stats) { puts "Nice, a stats callback" }
+      end
+
+      context "when statistics_interval is not set" do
+        it "returns 1000 by default" do
+          expect(config.statistics_interval_ms).to eq(1000)
+        end
+      end
+
+      context "when statistics_interval is set" do
+        before { config.statistics_interval = 5 }
+
+        it "returns the interval in ms" do
+          expect(config.statistics_interval_ms).to eq(5000)
+        end
+      end
     end
   end
 end

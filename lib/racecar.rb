@@ -7,6 +7,7 @@ require "racecar/null_instrumenter"
 require "racecar/consumer"
 require "racecar/consumer_set"
 require "racecar/runner"
+require "racecar/parallel_runner"
 require "racecar/config"
 require "racecar/version"
 require "ensure_hash_compact"
@@ -51,6 +52,12 @@ module Racecar
   end
 
   def self.run(processor)
-    Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter).run
+    runner = Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter)
+
+    if config.parallel_workers && config.parallel_workers > 1
+      ParallelRunner.new(runner: runner, config: config, logger: logger).run
+    else
+      runner.run
+    end
   end
 end

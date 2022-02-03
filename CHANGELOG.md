@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+## v2.6.0
+
+* Add capability to specify partition number when producing messages
+
+## v2.5.0
+
+* `fetch_messages` can be configured per consumer, just as the maximum timeout to wait for a full batch.
+
+## v2.4.0
+
+* Update librdkafka version from 1.4.0 to 1.5.0 by upgrading from rdkafka 0.8.0 to 0.10.0. ([#263](https://github.com/zendesk/racecar/pull/263))
+* Restore support for Ruby 2.4 (#258)
+
+## racecar v2.3.1
+
+* Handle `ERR_NOT_COORDINATOR` (#209)
+
+## racecar v2.3.0
+
+* Add native support for Heroku (#248)
+* [Racecar::Consumer] When messages fail to deliver, an extended error with hints is now raised. Instead of `Rdkafka::RdkafkaError` you'll get a `Racecar::MessageDeliveryError` instead. ([#219](https://github.com/zendesk/racecar/pull/219)). If you have set a `Racecar.config.error_handler`, it might need to be updated.
+* [Racecar::Consumer] When message delivery times out, Racecar will reset the producer in an attempt to fix some of the potential causes for this error. ([#219](https://github.com/zendesk/racecar/pull/219))
+* Validate the `process` and `process_batch` method signature on consumer classes when initializing (#236)
+* Add Ruby 3.0 compatibility (#237)
+* Introduce parallel runner, which forks a number of independent consumers, allowing partitions to be processed in parallel. ([#222](https://github.com/zendesk/racecar/pull/222))
+* [Racecar::Runner] Ensure producer is closed, whether it closes or errors. ([#222](https://github.com/zendesk/racecar/pull/222))
+* Configure `statistics_interval` directly in the config. Disable statistics when no callback is defined ([#232](https://github.com/zendesk/racecar/pull/232))
+
+## racecar v2.2.0
+
+* [Racecar::ConsumerSet] **breaking change** `Racecar::ConsumerSet`'s functions `poll` and `batch_pall` expect the max wait values to be given in milliseconds. The defaults were using `config.max_wait_time`, which is in seconds. If you do not directly use `Racecar::ConsumerSet`, or always call its `poll` and `batch_poll` functions by specfiying the max wait time (the first argument), then this breaking change does not affect you. ([#214](https://github.com/zendesk/racecar/pull/214))
+
 ## racecar v2.1.1
 
 * [Bugfix] Close RdKafka consumer in ConsumerSet#reset_current_consumer to prevent memory leak (#196)

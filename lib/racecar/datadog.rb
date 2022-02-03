@@ -63,10 +63,14 @@ module Racecar
         clear
       end
 
+      def close
+        @statsd&.close
+      end
+
       private
 
       def clear
-        @statsd && @statsd.close
+        close
         @statsd = nil
       end
     end
@@ -75,8 +79,8 @@ module Racecar
       private
 
       %w[increment histogram count timing gauge].each do |type|
-        define_method(type) do |*args|
-          emit(type, *args)
+        define_method(type) do |*args, **kwargs|
+          emit(type, *args, **kwargs)
         end
       end
 

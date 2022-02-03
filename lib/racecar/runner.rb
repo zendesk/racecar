@@ -3,6 +3,7 @@
 require "rdkafka"
 require "racecar/pause"
 require "racecar/message"
+require "racecar/message_delivery_error"
 
 module Racecar
   class Runner
@@ -53,6 +54,7 @@ module Racecar
         producer:     producer,
         consumer:     consumer,
         instrumenter: @instrumenter,
+        config:       @config,
       )
 
       instrumentation_payload = {
@@ -79,12 +81,18 @@ module Racecar
       end
 
       logger.info "Gracefully shutting down"
-      processor.deliver!
-      processor.teardown
-      consumer.commit
-      @instrumenter.instrument('leave_group') do
-        consumer.close
+      begin
+        processor.deliver!
+        processor.teardown
+        consumer.commit
+      ensure
+        @instrumenter.instrument('leave_group') do
+          consumer.close
+        end
       end
+    ensure
+      producer.close
+      Racecar::Datadog.close if Object.const_defined?("Racecar::Datadog")
     end
 
     def stop
@@ -98,10 +106,20 @@ module Racecar
     def process_method
       @process_method ||= begin
         case
-        when processor.respond_to?(:process_batch) then :batch
-        when processor.respond_to?(:process) then :single
+        when processor.respond_to?(:process_batch)
+          if processor.method(:process_batch).arity != 1
+            raise Racecar::Error, "Invalid method signature for `process_batch`. The method must take exactly 1 argument."
+          end
+
+          :batch
+        when processor.respond_to?(:process)
+          if processor.method(:process).arity != 1
+            raise Racecar::Error, "Invalid method signature for `process`. The method must take exactly 1 argument."
+          end
+
+          :single
         else
-          raise NotImplementedError, "Consumer class must implement process or process_batch method"
+          raise NotImplementedError, "Consumer class `#{processor.class}` must implement a `process` or `process_batch` method"
         end
       end
     end
@@ -128,7 +146,8 @@ module Racecar
       producer_config = {
         "bootstrap.servers"      => config.brokers.join(","),
         "client.id"              => config.client_id,
-        "statistics.interval.ms" => 1000,
+        "statistics.interval.ms" => config.statistics_interval_ms,
+        "message.timeout.ms"     => config.message_timeout * 1000,
       }
       producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
       producer_config.merge!(config.rdkafka_producer)
@@ -171,11 +190,12 @@ module Racecar
       with_pause(message.topic, message.partition, message.offset..message.offset) do |pause|
         begin
           @instrumenter.instrument("process_message", instrumentation_payload) do
-            processor.process(Racecar::Message.new(message))
+            processor.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
             processor.deliver!
             consumer.store_offset(message)
           end
         rescue => e
+          instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
           instrumentation_payload[:retries_count] = pause.pauses_count
           config.error_handler.call(e, instrumentation_payload)
           raise e
@@ -199,16 +219,42 @@ module Racecar
       @instrumenter.instrument("process_batch", instrumentation_payload) do
         with_pause(first.topic, first.partition, first.offset..last.offset) do |pause|
           begin
-            processor.process_batch(messages.map {|message| Racecar::Message.new(message) })
+            racecar_messages = messages.map do |message|
+              Racecar::Message.new(message, retries_count: pause.pauses_count)
+            end
+            processor.process_batch(racecar_messages)
             processor.deliver!
             consumer.store_offset(messages.last)
           rescue => e
+            instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
             instrumentation_payload[:retries_count] = pause.pauses_count
             config.error_handler.call(e, instrumentation_payload)
             raise e
           end
         end
       end
+    end
+
+    # librdkafka will continue to try to deliver already queued messages, even if ruby-rdkafka
+    # raised before that. This method detects any unrecoverable errors and resets the producer
+    # as a last ditch effort.
+    # The function returns true if there were unrecoverable errors, or false otherwise.
+    def reset_producer_on_unrecoverable_delivery_errors(error)
+      return false unless error.is_a?(Racecar::MessageDeliveryError)
+      return false unless error.code == :msg_timed_out # -192
+
+      logger.error error.to_s
+      logger.error "Racecar will reset the producer to force a new broker connection."
+      @producer.close
+      @producer = nil
+      processor.configure(
+        producer:     producer,
+        consumer:     consumer,
+        instrumenter: @instrumenter,
+        config:       @config,
+      )
+
+      true
     end
 
     def with_pause(topic, partition, offsets)

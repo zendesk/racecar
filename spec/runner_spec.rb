@@ -78,6 +78,18 @@ class TestProducingConsumer < Racecar::Consumer
   end
 end
 
+class TestProducingBatchConsumer < Racecar::Consumer
+  subscribes_to "numbers"
+
+  def process_batch(messages)
+    messages.each do |message|
+      value = Integer(message.value) * 2
+
+      produce value, topic: "doubled", key: value, create_time: 123
+    end
+  end
+end
+
 class TestNilConsumer < Racecar::Consumer
   subscribes_to "greetings"
 end
@@ -156,13 +168,16 @@ class FakeProducer
     @delivery_callback = nil
   end
 
-  def produce(payload:, topic:, key:, partition_key: nil, timestamp: nil, headers: nil)
+  def produce(payload:, topic:, key:, partition: nil, partition_key: nil, timestamp: nil, headers: nil)
     @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0, timestamp, headers)
     FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback)
   end
 
   def delivery_callback=(handler)
     @delivery_callback = handler
+  end
+
+  def close
   end
 end
 
@@ -177,9 +192,13 @@ class FakeDeliveryHandle
     @msg.public_send(key)
   end
 
-  def wait
+  def wait(max_wait_timeout: 60, wait_timeout: 0.1)
     @kafka.produced_messages << @msg
     @delivery_callback.call(self) if @delivery_callback
+  end
+
+  def create_result
+    Rdkafka::Producer::DeliveryReport.new(partition, offset)
   end
 
   def offset
@@ -251,6 +270,28 @@ RSpec.shared_examples "offset handling" do |topic|
     runner.run rescue nil
 
     expect(consumers.first.committed_offset).to eq "not set yet"
+  end
+end
+
+RSpec.shared_examples "delivery error handling" do
+  let(:msg_timed_out) { Rdkafka::RdkafkaError.new(-192) }
+
+  it "handles unrecoverable delivery errors" do
+    allow_any_instance_of(FakeDeliveryHandle).to receive(:wait).and_raise(msg_timed_out)
+
+    expect(config.error_handler).to receive(:call)
+      .at_least(:once)
+      .with(
+        instance_of(Racecar::MessageDeliveryError),
+        hash_including({unrecoverable_delivery_error: true})
+      )
+    expect(processor).to receive(:configure)
+      .at_least(:twice)
+      .and_call_original
+
+    kafka.deliver_message("3", topic: "numbers")
+
+    runner.run
   end
 end
 
@@ -377,7 +418,8 @@ RSpec.describe Racecar::Runner do
         key: nil,
         value: error,
         headers: nil,
-        retries_count: anything
+        retries_count: anything,
+        unrecoverable_delivery_error: false,
       }
 
       expect(config.error_handler).to receive(:call).at_least(:once).with(error, info)
@@ -390,9 +432,17 @@ RSpec.describe Racecar::Runner do
     it "keeps track of the number of retries when a message causes an exception" do
       error = StandardError.new("surprise")
 
-      [0, 1, 2, anything].each do |arg|
-        expect(config.error_handler).to receive(:call).at_least(:once).with(error, hash_including(retries_count: arg)).ordered
+      [0, 1, 2].each do |retries_count|
+        expect(config.error_handler).to receive(:call)
+          .once.with(error, hash_including(retries_count: retries_count)).ordered
+        expect(Racecar::Message).to receive(:new)
+          .once.with(anything, retries_count: retries_count).and_call_original
       end
+
+      expect(config.error_handler).to receive(:call)
+        .at_least(:once).with(error, hash_including(retries_count: anything))
+      expect(Racecar::Message).to receive(:new)
+        .at_least(:once).with(anything, retries_count: anything).and_call_original
 
       kafka.deliver_message(error, topic: "greetings")
 
@@ -501,7 +551,8 @@ RSpec.describe Racecar::Runner do
         last_offset: 0,
         last_create_time: nil,
         message_count: 1,
-        retries_count: anything
+        retries_count: anything,
+        unrecoverable_delivery_error: false,
       }
 
       expect(config.error_handler).to receive(:call).at_least(:once).with(error, info)
@@ -514,9 +565,17 @@ RSpec.describe Racecar::Runner do
     it "keeps track of the number of retries when a message causes an exception" do
       error = StandardError.new("surprise")
 
-      [0, 1, 2, anything].each do |arg|
-        expect(config.error_handler).to receive(:call).at_least(:once).with(error, hash_including(retries_count: arg)).ordered
+      [0, 1, 2].each do |retries_count|
+        expect(config.error_handler).to receive(:call)
+          .once.with(error, hash_including(retries_count: retries_count)).ordered
+        expect(Racecar::Message).to receive(:new)
+          .once.with(anything, retries_count: retries_count).and_call_original
       end
+
+      expect(config.error_handler).to receive(:call)
+        .at_least(:once).with(error, hash_including(retries_count: anything))
+      expect(Racecar::Message).to receive(:new)
+        .at_least(:once).with(anything, retries_count: anything).and_call_original
 
       kafka.deliver_message(error, topic: "greetings")
 
@@ -564,24 +623,6 @@ RSpec.describe Racecar::Runner do
         runner.run
       end
     end
-
-    it "batches per partition" do
-      kafka.deliver_message("hello", topic: "greetings", partition: 0)
-      kafka.deliver_message("world", topic: "greetings", partition: 1)
-      kafka.deliver_message("!", topic: "greetings", partition: 1)
-
-      payload = a_hash_including(
-        :partition,
-        :first_offset,
-        consumer_class: "TestBatchConsumer",
-        topic: "greetings"
-      )
-
-      expect(processor).to receive(:process_batch).with([Racecar::Message.new(kafka.received_messages["greetings"][0])])
-      expect(processor).to receive(:process_batch).with(kafka.received_messages["greetings"][1, 2].map {|message| Racecar::Message.new(message) })
-
-      runner.run
-    end
   end
 
   context "with a consumer class with neither a #process or a #process_batch method" do
@@ -594,10 +635,27 @@ RSpec.describe Racecar::Runner do
     end
   end
 
+  context "with a consumer class with an invalid #process_batch method signature" do
+    class TestInvalidConsumer < Racecar::Consumer
+      subscribes_to "greetings"
+
+      def process_batch(batch, hello); end
+    end
+
+    let(:processor) { TestInvalidConsumer.new }
+
+    it "raises NotImplementedError" do
+      kafka.deliver_message("hello world", topic: "greetings")
+
+      expect { runner.run }.to raise_error(Racecar::Error, "Invalid method signature for `process_batch`. The method must take exactly 1 argument.")
+    end
+  end
+
   context "with a consumer that produces messages" do
     let(:processor) { TestProducingConsumer.new }
 
     include_examples "offset handling", "numbers"
+    include_examples "delivery error handling"
 
     it "delivers the messages to Kafka", focus: true do
       kafka.deliver_message("2", topic: "numbers")
@@ -634,13 +692,42 @@ RSpec.describe Racecar::Runner do
     end
   end
 
+  context "with a batch consumer that produces messages" do
+    let(:processor) { TestProducingBatchConsumer.new }
+    include_examples "delivery error handling"
+  end
+
   context "#stop" do
     let(:processor) { TestConsumer.new }
+    let(:datadog) { double("Racecar::Datadog", close: nil) }
 
     it "allows the processor to tear down resources" do
       runner.run
 
       expect(processor.torn_down?).to eq true
+    end
+
+    context "when DataDog metrics are disabled" do
+      before do
+        allow(Object).to receive(:const_defined?).with("Racecar::Datadog").and_return(false)
+      end
+
+      it "does not close Datadog::Statsd instance" do
+        expect(datadog).not_to receive(:close)
+        runner.run
+      end
+    end
+
+    context "when DataDog metrics are enabled" do
+      before do
+        stub_const("Racecar::Datadog", datadog)
+        allow(Object).to receive(:const_defined?).with("Racecar::Datadog").and_return(true)
+      end
+
+      it "closes Datadog::Statsd instance" do
+        expect(datadog).to receive(:close)
+        runner.run
+      end
     end
   end
 end

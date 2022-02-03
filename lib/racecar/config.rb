@@ -6,6 +6,8 @@ module Racecar
   class Config < KingKonf::Config
     env_prefix :racecar
 
+    STATISTICS_DISABLED_VALUE = 0
+
     desc "A list of Kafka brokers in the cluster that you're consuming from"
     list :brokers, default: ["localhost:9092"]
 
@@ -54,8 +56,11 @@ module Racecar
     desc "How long to wait when trying to communicate with a Kafka broker"
     float :socket_timeout, default: 30
 
-    desc "How long to allow the Kafka brokers to wait before returning messages"
+    desc "How long to allow the Kafka brokers to wait before returning messages (in seconds)"
     float :max_wait_time, default: 1
+
+    desc "How long to try to deliver a produced message before finally giving up (in seconds)"
+    float :message_timeout, default: 5*60
 
     desc "Maximum amount of data the broker shall return for a Fetch request"
     integer :max_bytes, default: 10485760
@@ -153,10 +158,24 @@ module Racecar
     desc "Whether to boot Rails when starting the consumer"
     boolean :without_rails, default: false
 
+    desc "How frequently librdkafka should report statistics to your application (in seconds). A statistics callback
+          must also be provided. This should be defined with a `statistics_callback` method on your processor. Stats
+          are disabled if this value is set to 0, or there is no callback defined. This is set by default to 1 second
+          for backward compatibility, however this can be quite memory intensive"
+    integer :statistics_interval, default: 1
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
-    attr_accessor :subscriptions, :logger
+    attr_accessor :subscriptions, :logger, :parallel_workers
+
+    def statistics_interval_ms
+      if Rdkafka::Config.statistics_callback
+        statistics_interval * 1000
+      else
+        STATISTICS_DISABLED_VALUE
+      end
+    end
 
     def max_wait_time_ms
       max_wait_time * 1000
@@ -201,8 +220,10 @@ module Racecar
         consumer_class.name.gsub(/[a-z][A-Z]/) { |str| "#{str[0]}-#{str[1]}" }.downcase,
       ].compact.join
 
+      self.parallel_workers = consumer_class.parallel_workers
       self.subscriptions = consumer_class.subscriptions
       self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time
+      self.fetch_messages = consumer_class.fetch_messages || self.fetch_messages
       self.pidfile ||= "#{group_id}.pid"
     end
 
@@ -231,6 +252,7 @@ module Racecar
     def rdkafka_security_config
       {
         "security.protocol" => security_protocol,
+        "enable.ssl.certificate.verification" => ssl_verify_hostname,
         "ssl.ca.location" => ssl_ca_location,
         "ssl.crl.location" => ssl_crl_location,
         "ssl.keystore.location" => ssl_keystore_location,

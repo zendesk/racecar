@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["master"]
+  push:
+    branches: ["master"]
+
+jobs:
+  unit-specs:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ruby-version: ["2.4", "2.5", "2.6", "3.0"]
+
+    steps:
+    - uses: zendesk/checkout@v2
+    - name: Set up Ruby
+      uses: zendesk/setup-ruby@v1.64.1
+      with:
+        ruby-version: ${{ matrix.ruby-version }}
+        bundler-cache: true
+    - name: Build and test with RSpec
+      run: bundle exec rspec --format documentation --require spec_helper --color --exclude-pattern='spec/integration/*_spec.rb'
+
+  integration-specs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: zendesk/checkout@v2
+    - name: Set up Ruby
+      uses: zendesk/setup-ruby@v1.64.1
+      with:
+        ruby-version: 2.7
+        bundler-cache: true
+    - name: Bring up docker-compose stack
+      run: docker-compose up -d
+    - name: Build and test with RSpec
+      env:
+        RACECAR_BROKERS: localhost:9092
+      run: timeout --kill-after 180 150 bundle exec rspec --format documentation --require spec_helper --color spec/integration/*_spec.rb

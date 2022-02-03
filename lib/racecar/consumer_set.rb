@@ -17,7 +17,7 @@ module Racecar
       @last_poll_read_nil_message = false
     end
 
-    def poll(max_wait_time_ms = @config.max_wait_time)
+    def poll(max_wait_time_ms = @config.max_wait_time_ms)
       batch_poll(max_wait_time_ms, 1).first
     end
 
@@ -31,7 +31,7 @@ module Racecar
     # Any errors during polling are retried in an exponential backoff fashion. If an error
     # occurs, but there is no time left for a backoff and retry, it will return the
     # already collected messages and only retry on the next call.
-    def batch_poll(max_wait_time_ms = @config.max_wait_time, max_messages = @config.fetch_messages)
+    def batch_poll(max_wait_time_ms = @config.max_wait_time_ms, max_messages = @config.fetch_messages)
       started_at = Time.now
       remain_ms = max_wait_time_ms
       maybe_select_next_consumer
@@ -130,6 +130,9 @@ module Racecar
         @logger.debug "Capping #{wait_ms}ms to #{max_wait_time_ms-1}ms."
         sleep (max_wait_time_ms-1)/1000.0
         remain_ms = 1
+      elsif try == 0 && remain_ms == 0
+        @logger.debug "No time remains for polling messages. Will try on next call."
+        return nil
       elsif wait_ms >= remain_ms
         @logger.warn "Only #{remain_ms}ms left, but want to wait for #{wait_ms}ms before poll. Will retry on next call."
         @previous_retries = try
@@ -153,7 +156,7 @@ module Racecar
       msg = current.poll(max_wait_time_ms)
     rescue Rdkafka::RdkafkaError => e
       case e.code
-      when :max_poll_exceeded, :transport # -147, -195
+      when :max_poll_exceeded, :transport, :not_coordinator # -147, -195, 16
         reset_current_consumer
       end
       raise
@@ -221,7 +224,7 @@ module Racecar
         "queued.min.messages"     => @config.min_message_queue_size,
         "session.timeout.ms"      => @config.session_timeout * 1000,
         "socket.timeout.ms"       => @config.socket_timeout * 1000,
-        "statistics.interval.ms"  => 1000, # 1s is the highest granularity offered
+        "statistics.interval.ms"  => @config.statistics_interval_ms
       }
       config.merge! @config.rdkafka_consumer
       config.merge! subscription.additional_config
