@@ -3,7 +3,7 @@ PATH
   specs:
     racecar (2.8.0.beta.1)
       king_konf (~> 1.0.0)
-      rdkafka (~> 0.12.0.beta.1)
+      rdkafka (~> 0.12.0.beta.3)
 
 GEM
   remote: https://rubygems.org/
@@ -28,7 +28,7 @@ GEM
       coderay (~> 1.1)
       method_source (~> 1.0)
     rake (13.0.1)
-    rdkafka (0.12.0.beta.1)
+    rdkafka (0.12.0.beta.3)
       ffi (~> 1.15)
       mini_portile2 (~> 2.6)
       rake (> 12)
