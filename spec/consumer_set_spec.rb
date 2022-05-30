@@ -3,7 +3,7 @@
 require "stringio"
 
 def subscription(name)
-  Racecar::Consumer::Subscription.new(name, true, 1048576, {})
+  Racecar::Consumer::Subscription.new(name, true, {})
 end
 
 def tpl(subscription)
