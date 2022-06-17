@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Replace colons in consumer group IDs with dashes.
+
 ## v2.8.0
 * Update librdkafka version from 1.8.2 to 1.9.0 by upgrading from rdkafka 0.10.0 to 0.12.0. ([#283](https://github.com/zendesk/racecar/pull/286))
 
