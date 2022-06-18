@@ -242,6 +242,18 @@ RSpec.describe Racecar::ConsumerSet do
         end
       end
 
+      describe "#store_offset" do
+        it "raises ErroneousStateError when RD_KAFKA_RESP_ERR__STATE(-172) is raised" do
+          allow(rdconsumer).to receive(:store_offset).with(:message).and_raise(Rdkafka::RdkafkaError, -172) # state
+          expect {consumer_set.store_offset(:message) }.to raise_error(Racecar::ErroneousStateError)
+        end
+
+        it "raises other rdkafka errors" do
+          allow(rdconsumer).to receive(:store_offset).with(:message).and_raise(Rdkafka::RdkafkaError, -1)
+          expect {consumer_set.store_offset(:message) }.to raise_error(Rdkafka::RdkafkaError)
+        end
+      end
+
       describe "#commit" do
         it "forwards to Rdkafka" do
           expect(rdconsumer).to receive(:commit).once
