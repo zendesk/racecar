@@ -4,6 +4,7 @@ require "rdkafka"
 require "racecar/pause"
 require "racecar/message"
 require "racecar/message_delivery_error"
+require "racecar/erroneous_state_error"
 
 module Racecar
   class Runner

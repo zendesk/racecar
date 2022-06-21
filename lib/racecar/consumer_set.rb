@@ -49,6 +49,9 @@ module Racecar
 
     def store_offset(message)
       current.store_offset(message)
+    rescue Rdkafka::RdkafkaError => e
+      raise ErroneousStateError.new(e) if e.code == :state # -172
+      raise e
     end
 
     def commit
