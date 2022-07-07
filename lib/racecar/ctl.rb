@@ -7,7 +7,7 @@ require "racecar/message_delivery_error"
 
 module Racecar
   class Ctl
-    ProduceMessage = Struct.new(:value, :key, :topic)
+    ProduceMessage = Struct.new(:value, :key, :topic, :headers)
 
     def self.main(args)
       command = args.shift
@@ -80,6 +80,10 @@ module Racecar
         opts.on("-t", "--topic TOPIC", "Set the message topic") do |topic|
           message.topic = topic
         end
+
+        opts.on("-h", "--headers HEADERS", "Set the header values") do |headers|
+          message.headers = headers
+        end
       end
 
       parser.parse!(args)
@@ -102,7 +106,7 @@ module Racecar
         "message.timeout.ms": Racecar.config.message_timeout * 1000,
       }.merge(Racecar.config.rdkafka_producer)).producer
 
-      handle = producer.produce(payload: message.value, key: message.key, topic: message.topic)
+      handle = producer.produce(payload: message.value, key: message.key, topic: message.topic, headers: message.headers)
       begin
         handle.wait(max_wait_timeout: Racecar.config.message_timeout)
       rescue Rdkafka::RdkafkaError => e
