@@ -25,7 +25,7 @@ module Racecar
 
     def to_s
       <<~EOM
-        Partition is no longer assigned to this consumer and the offset could not be stored for commit:
+        Partition is no longer assigned to this consumer and the offset could not be stored for commit.
         #{@rdkafka_error.to_s}
       EOM
     end
