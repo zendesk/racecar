@@ -3,7 +3,7 @@
 ## Unreleased
 
 ## v2.8.2
-* Changes log level for ErroneousStateError to WARN.
+* Handles ErroneousStateError, in previous versions the consumer would do several unecessary group leave/joins. The log level is also changed to WARN instead of ERROR. ([#285](https://github.com/zendesk/racecar/pull/295))
 
 ## v2.8.1
 * Adds new ErroneousStateError to racecar in order to give more information on this new possible exception.
