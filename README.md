@@ -338,6 +338,7 @@ Racecar has support for using SASL to authenticate clients using either the GSSA
 
 These settings are related to consumers that _produce messages to Kafka_.
 
+- `partitioner` – The strategy used to determine which topic partition a message is written to when Racecar produces a value to Kafka. The codec needs to be one of `consistent`, `consistent_random` `murmur2` `murmur2_random` `fnv1a` `fnv1a_random` either as a Symbol or a String, defaults to `consistent_random`
 - `producer_compression_codec` – If defined, Racecar will compress messages before writing them to Kafka. The codec needs to be one of `gzip`, `lz4`, or `snappy`, either as a Symbol or a String.
 
 #### Datadog monitoring

@@ -77,6 +77,9 @@ module Racecar
     desc "The log level for the Racecar logs"
     string :log_level, default: "info"
 
+    desc "The strategy used to determine which topic partition a message is written to when Racecar produces a value to Kafka; defaults to `consistent_random`"
+    symbol :partitioner, allowed_values: %i{consistent consistent_random murmur2 murmur2_random fnv1a fnv1a_random}, default: :consistent_random
+
     desc "Protocol used to communicate with brokers"
     symbol :security_protocol, allowed_values: %i{plaintext ssl sasl_plaintext sasl_ssl}
 

@@ -40,6 +40,27 @@ RSpec.describe Racecar::Config do
     }.to raise_exception(KingKonf::ConfigError)
   end
 
+  it "requires `partitioner` to be a valid value" do
+    expect {
+      config.partitioner = :consistent
+      config.partitioner = :consistent_random
+      config.partitioner = :murmur2
+      config.partitioner = :murmur2_random
+      config.partitioner = :fnv1a
+      config.partitioner = :fnv1a_random
+      config.partitioner = "consistent"
+      config.partitioner = "consistent_random"
+      config.partitioner = "murmur2"
+      config.partitioner = "murmur2_random"
+      config.partitioner = "fnv1a"
+      config.partitioner = "fnv1a_random"
+    }.not_to raise_exception
+
+    expect {
+      config.partitioner = "abc"
+    }.to raise_exception(KingKonf::ConfigError)
+  end
+
   it "requires `security_protocol` to be a valid" do
     expect {
       config.security_protocol = :plaintext
