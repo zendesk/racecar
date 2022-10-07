@@ -3,13 +3,13 @@
 ## Unreleased
 
 ## v2.8.2
-* Handles ErroneousStateError, in previous versions the consumer would do several unecessary group leave/joins. The log level is also changed to WARN instead of ERROR. ([#285](https://github.com/zendesk/racecar/pull/295))
+* Handles ErroneousStateError, in previous versions the consumer would do several unecessary group leave/joins. The log level is also changed to WARN instead of ERROR. ([#295](https://github.com/zendesk/racecar/pull/295))
 
 ## v2.8.1
 * Adds new ErroneousStateError to racecar in order to give more information on this new possible exception.
 
 ## v2.8.0
-* Update librdkafka version from 1.8.2 to 1.9.0 by upgrading from rdkafka 0.10.0 to 0.12.0. ([#283](https://github.com/zendesk/racecar/pull/293))
+* Update librdkafka version from 1.8.2 to 1.9.0 by upgrading from rdkafka 0.10.0 to 0.12.0. ([#293](https://github.com/zendesk/racecar/pull/293))
 
 ## v2.7.0
 
