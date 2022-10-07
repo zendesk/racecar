@@ -166,12 +166,12 @@ RSpec.describe Racecar::ConsumerSet do
 
         it "skips retries if rescue block was too slow" do
           allow(rdconsumer).to receive(:poll).and_raise(Rdkafka::RdkafkaError, 10) # msg_size_too_large
-          allow(logger).to receive(:error) do
+          allow(logger).to receive(:warn) do
             Timecop.freeze(Time.now + 1)
           end
 
           expect(consumer_set.poll(1000)).to eq nil
-          expect(logger).to have_received(:error).with(/Will retry on next call/)
+          expect(logger).to have_received(:warn).with(/Will retry on next call/)
         end
       end
 
