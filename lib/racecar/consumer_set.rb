@@ -140,7 +140,7 @@ module Racecar
         @logger.debug "No time remains for polling messages. Will try on next call."
         return nil
       elsif wait_ms >= remain_ms
-        @logger.error "Only #{remain_ms}ms left, but want to wait for #{wait_ms}ms before poll. Will retry on next call."
+        @logger.warn "Only #{remain_ms}ms left, but want to wait for #{wait_ms}ms before poll. Will retry on next call."
         @previous_retries = try
         return nil
       elsif wait_ms > 0
