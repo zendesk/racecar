@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* Add `partitioner` producer config option to allow changing the strategy to
+  determine which topic partition a message is written to when racecar
+  produces a kafka message
+
 ## v2.8.2
 * Handles ErroneousStateError, in previous versions the consumer would do several unecessary group leave/joins. The log level is also changed to WARN instead of ERROR. ([#295](https://github.com/zendesk/racecar/pull/295))
 
