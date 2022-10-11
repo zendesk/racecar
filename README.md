@@ -20,6 +20,7 @@ The framework is based on [rdkafka-ruby](https://github.com/appsignal/rdkafka-ru
    8. [Logging](#logging)
    9. [Operations](#operations)
    10. [Upgrading from v1 to v2](#upgrading-from-v1-to-v2)
+   11. [Compression](#compression)
 3. [Development](#development)
 4. [Contributing](#contributing)
 5. [Support and Discussion](#support-and-discussion)
@@ -480,7 +481,7 @@ Again, the recommended approach is to manage the processes using process manager
 
 ### Handling errors
 
-When processing messages from a Kafka topic, your code may encounter an error and raise an exception. The cause is typically one of two things:
+#### When processing messages from a Kafka topic, your code may encounter an error and raise an exception. The cause is typically one of two things:
 
 1. The message being processed is somehow malformed or doesn't conform with the assumptions made by the processing code.
 2. You're using some external resource such as a database or a network API that is temporarily unavailable.
@@ -515,6 +516,16 @@ end
 
 It is highly recommended that you set up an error handler. Please note that the `info` object contains different keys and values depending on whether you are using `process` or `process_batch`. See the `instrumentation_payload` object in the `process` and `process_batch` methods in the `Runner` class for the complete list.
 
+#### Errors related to Compression
+
+A sample error might look like this:
+
+```
+E, [2022-10-09T11:28:29.976548 #15] ERROR -- : (try 5/10): Error for topic subscription #<struct Racecar::Consumer::Subscription topic="support.entity_incremental.views.view_ticket_ids", start_from_beginning=false, max_bytes_per_partition=104857, additional_config={}>: Local: Not implemented (not_implemented)
+```
+
+Please see [Compression](#compression)
+
 ### Logging
 
 By default, Racecar will log to `STDOUT`. If you're using Rails, your application code will use whatever logger you've configured there.
@@ -529,7 +540,15 @@ In order to introspect the configuration of a consumer process, send it the `SIG
 
 ### Upgrading from v1 to v2
 
-In order to safely upgrade from Racecar v1 to v2, you need to completely shut down your consumer group before starting it up again with the v2 Racecar dependency. In general, you should avoid rolling deploys for consumers groups, so it is likely the case that this will just work for you, but it's a good idea to check first.
+In order to safely upgrade from Racecar v1 to v2, you need to completely shut down your consumer group before starting it up again with the v2 Racecar dependency. In general, you should avoid rolling deploys for consumers groups, so it is likely the case that this will just work for you, but it's a good idea to check first. 
+
+### Compression
+
+Racecar v2 requires a C library (zlib) to compress the messages before producing to the topic. If not already installed on you consumer docker container, please install using following command in Dockerfile of consumer
+
+``` 
+apt-get update && apt-get install -y libzstd-dev
+```
 
 ## Development
 
