@@ -544,7 +544,7 @@ In order to safely upgrade from Racecar v1 to v2, you need to completely shut do
 
 ### Compression
 
-Racecar v2 requires a C library (zlib) to compress the messages before producing to the topic. If not already installed on you consumer docker container, please install using follwoing command in Dockerfile of consumer
+Racecar v2 requires a C library (zlib) to compress the messages before producing to the topic. If not already installed on you consumer docker container, please install using following command in Dockerfile of consumer
 
 ``` 
 apt-get update && apt-get install -y libzstd-dev
