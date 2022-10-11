@@ -518,7 +518,7 @@ It is highly recommended that you set up an error handler. Please note that the 
 
 #### Errors related to Compression
 
-A sample error might seem like this:
+A sample error might look like this:
 
 ```
 E, [2022-10-09T11:28:29.976548 #15] ERROR -- : (try 5/10): Error for topic subscription #<struct Racecar::Consumer::Subscription topic="support.entity_incremental.views.view_ticket_ids", start_from_beginning=false, max_bytes_per_partition=104857, additional_config={}>: Local: Not implemented (not_implemented)
