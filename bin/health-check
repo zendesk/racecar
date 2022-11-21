@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+set -e
+
+path=$HEARTBEAT_FILE_PATH
+heartbeat_interval=$HEARTBEAT_TIMEOUT
+
+if [ -z "$path" ]
+then
+  echo "ENV var HEARTBEAT_FILE_PATH not specified!" 1>&2
+  exit 1
+fi
+
+if ! [ -f "$path" ]
+then
+  echo "Racecar heartbeat file $path not found; health check failed!" 1>&2
+  exit 1
+fi
+
+if [ $(find "$path" -mtime +"$heartbeat_interval") ]
+then
+  echo "Racecar heartbeat in $path is more than $heartbeat_interval old; health check failed!" 1>&2
+  exit 1
+else
+  echo "Racecar heartbeat detected in $path; health check succeeded!" 1>&2
+  exit 0
+fi

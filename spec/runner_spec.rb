@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "fileutils"
 require "stringio"
 
 class TestConsumer < Racecar::Consumer
@@ -727,6 +728,46 @@ RSpec.describe Racecar::Runner do
       it "closes Datadog::Statsd instance" do
         expect(datadog).to receive(:close)
         runner.run
+      end
+    end
+  end
+
+  context "with a heartbeat file" do
+    let(:processor) { TestConsumer.new }
+
+    context "unset" do
+      let(:config) { Racecar::Config.new }
+
+      before do
+        allow(Rdkafka::Config).to receive(:new) { kafka }
+        config.load_consumer_class(processor.class)
+      end
+
+      it "does not touch a heartbeat file when `heartbeat_file_path` is not set" do
+        runner.run
+
+        expect(File.exists?('./foo.txt')).to be false
+      end
+    end
+
+    context "set" do
+      let(:config) { Racecar::Config.new }
+
+      before do
+        allow(Rdkafka::Config).to receive(:new) { kafka }
+        config.load_consumer_class(processor.class)
+      end
+
+      after do
+        FileUtils.rm('./foo.txt')
+      end
+
+      it "touches a heartbeat file when `heartbeat_file_path` is set" do
+        config.heartbeat_file_path = "./foo.txt"
+
+        runner.run
+
+        expect(File.exists?('./foo.txt')).to be true
       end
     end
   end

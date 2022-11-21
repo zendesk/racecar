@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "fileutils"
 require "rdkafka"
 require "racecar/pause"
 require "racecar/message"
@@ -68,6 +69,10 @@ module Racecar
         break if @stop_requested
         resume_paused_partitions
         @instrumenter.instrument("main_loop", instrumentation_payload) do
+          if @config.heartbeat_file_path
+            FileUtils.touch(@config.heartbeat_file_path)
+          end
+
           case process_method
           when :batch then
             msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)

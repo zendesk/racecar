@@ -167,6 +167,9 @@ module Racecar
           for backward compatibility, however this can be quite memory intensive"
     integer :statistics_interval, default: 1
 
+    desc "Path to heartbeat file"
+    string :heartbeat_file_path
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
