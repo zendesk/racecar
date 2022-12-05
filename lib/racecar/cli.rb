@@ -29,9 +29,6 @@ module Racecar
         require "./config/racecar"
       end
 
-      # Find the consumer class by name.
-      consumer_class = Kernel.const_get(consumer_name)
-
       # Load config defined by the consumer class itself.
       config.load_consumer_class(consumer_class)
 
@@ -58,12 +55,35 @@ module Racecar
         $stderr.puts "=> Ctrl-C to shutdown consumer"
       end
 
-      processor = consumer_class.new
-      Racecar.run(processor)
+      install_signal_handlers
+      runner.run
       nil
     end
 
+    def stop
+      runner.stop
+    end
+
     private
+
+    def install_signal_handlers
+      # SIGINT, SIGTERM, SIGQUIT stop the runner.
+      # The runner stops all its consumers, processes and/or threads.
+      Signal.trap("QUIT") { stop }
+      Signal.trap("INT") { stop }
+      Signal.trap("TERM") { stop }
+
+      # Print the consumer config to STDERR on USR1.
+      Signal.trap("USR1") { $stderr.puts config.inspect }
+    end
+
+    def runner
+      @runner ||= Racecar.runner(consumer_class.new)
+    end
+
+    def consumer_class
+      consumer_class = Kernel.const_get(consumer_name)
+    end
 
     attr_reader :consumer_name
 

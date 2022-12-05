@@ -13,9 +13,12 @@ class NoProcessConsumer < Racecar::Consumer
 end
 
 RSpec.describe "running a Racecar consumer", type: :integration do
+  let(:threads_per_process) { nil }
+  let(:forks) { nil }
+
   context "when an error occurs trying to start the runner" do
-    context "when there are no subscriptions, and no parallelism" do
-      before { NoSubsConsumer.parallel_workers = nil }
+    context "when there are no subscriptions, and no forks" do
+      before { NoSubsConsumer.forks = nil }
 
       it "raises an exception" do
         expect do
@@ -24,8 +27,8 @@ RSpec.describe "running a Racecar consumer", type: :integration do
       end
     end
 
-    context "when there are no subscriptions, and parallelism" do
-      before { NoSubsConsumer.parallel_workers = 3 }
+    context "when there are no subscriptions, and forks" do
+      before { NoSubsConsumer.forks = 3 }
 
       it "raises an exception" do
         expect do
@@ -34,8 +37,8 @@ RSpec.describe "running a Racecar consumer", type: :integration do
       end
     end
 
-    context "when there is no process method, and no parallelism" do
-      before { NoProcessConsumer.parallel_workers = nil }
+    context "when there is no process method, and no forks" do
+      before { NoProcessConsumer.forks = nil }
 
       it "raises an exception" do
         expect do
@@ -44,8 +47,8 @@ RSpec.describe "running a Racecar consumer", type: :integration do
       end
     end
 
-    context "when there is no process method, and parallelism" do
-      before { NoSubsConsumer.parallel_workers = 3 }
+    context "when there is no process method, and forks" do
+      before { NoSubsConsumer.forks = 3 }
 
       it "raises an exception" do
         expect do
@@ -73,18 +76,19 @@ RSpec.describe "running a Racecar consumer", type: :integration do
 
     before do
       create_topic(topic: input_topic, partitions: topic_partitions)
-      create_topic(topic: output_topic, partitions: topic_partitions)
+      create_topic(topic: output_topic, partitions: 1)
 
       consumer_class.subscribes_to(input_topic)
       consumer_class.output_topic = output_topic
-      consumer_class.parallel_workers = parallelism
+      consumer_class.forks = forks
+      consumer_class.threads = threads_per_process
 
       publish_messages!(input_topic, input_messages)
     end
 
     after(:all) { delete_all_test_topics }
 
-    context "for a single threaded consumer" do
+    context "for a single process consumer" do
       let(:consumer_class) do
         class EchoConsumer1 < mock_echo_consumer_class
           self.group_id = "echo-consumer-1"
@@ -94,7 +98,6 @@ RSpec.describe "running a Racecar consumer", type: :integration do
 
       let(:input_messages) { [{ payload: "hello", key: "greetings", partition: nil }] }
       let(:topic_partitions) { 1 }
-      let(:parallelism) { nil }
 
       it "can consume and publish a message" do
         in_background(cleanup_callback: -> { Process.kill("INT", Process.pid) }) do
@@ -110,9 +113,112 @@ RSpec.describe "running a Racecar consumer", type: :integration do
         expect(message.payload).to eq "hello"
         expect(message.key).to eq "greetings"
       end
+
+      context "when running multithreaded" do
+        class MultiThreadedEchoConsumer < Racecar::Consumer
+          class << self
+            attr_accessor :output_topic
+          end
+          SeriousError = Class.new(Exception)
+          self.group_id = "multithreaded-echo-consumer"
+
+          def process(message)
+            raise SeriousError.new("Error in worker thread") if message.value == "horrible news"
+            new_value = JSON.dump({ "handling_thread" => Thread.current.name, "incoming_value" => message.value })
+            produce new_value, key: message.key, topic: self.class.output_topic
+            deliver!
+          end
+        end
+
+        let(:consumer_class) { MultiThreadedEchoConsumer }
+
+        let(:input_messages) { message_count.times.map { |i|
+          { payload: "message payload #{i}", partition: (i%topic_partitions) }
+        } }
+
+        let(:message_count) { 20 }
+        let(:topic_partitions) { 4 }
+        let(:messages_per_partition) { 5 }
+        let(:threads_per_process) { 4 }
+
+        it "can consume multiple partitions concurrently" do
+          in_background(cleanup_callback: -> { Process.kill("INT", Process.pid) }) do
+            wait_for_assignments(
+              group_id: consumer_class.group_id,
+              topic: input_topic,
+              expected_members_count: threads_per_process,
+            )
+            wait_for_messages(topic: output_topic, expected_message_count: message_count)
+          end
+
+          Racecar::Cli.new([consumer_class.name.to_s]).run
+
+          messages_by_handling_thread = incoming_messages
+            .group_by { |m| JSON.parse(m.payload).fetch("handling_thread") }
+
+          aggregate_failures do
+            expect(messages_by_handling_thread.keys.size).to eq(threads_per_process)
+            expect(messages_by_handling_thread.values.map(&:size).uniq).to eq([messages_per_partition])
+          end
+        end
+
+        context "when there is an uncaught exception in a worker thread" do
+          let(:input_messages) { [] }
+          let(:message_count) { 0 }
+
+          it "stops the other threads and exits" do
+            in_background(cleanup_callback: ->{ cause_problems }) do
+              wait_for_assignments(
+                group_id: consumer_class.group_id,
+                topic: input_topic,
+                expected_members_count: threads_per_process,
+              )
+            end
+
+            expect {
+              Racecar::Cli.new([consumer_class.name.to_s]).run
+            }.to raise_error(MultiThreadedEchoConsumer::SeriousError)
+          end
+
+          def cause_problems
+            publish_messages!(input_topic, [{ payload: "horrible news", partition: 0 }])
+          end
+        end
+
+        context "when combining threading and forking" do
+          let(:message_count) { 20 }
+          let(:topic_partitions) { 4 }
+          let(:messages_per_partition) { 5 }
+          let(:forks) { 2 }
+          let(:threads_per_process) { 2 }
+          let(:total_concurrency) { forks * threads_per_process}
+
+          it "can consume multiple partitions concurrently" do
+            in_background(cleanup_callback: -> { Process.kill("INT", Process.pid) }) do
+              wait_for_assignments(
+                group_id: consumer_class.group_id,
+                topic: input_topic,
+                expected_members_count: total_concurrency,
+              )
+
+              wait_for_messages(topic: output_topic, expected_message_count: message_count)
+            end
+
+            Racecar::Cli.new([consumer_class.name.to_s]).run
+
+            messages_by_handling_process_and_thread = incoming_messages
+              .group_by { |m| JSON.parse(m.payload).fetch("handling_thread") }
+
+            aggregate_failures do
+              expect(messages_by_handling_process_and_thread.keys.size).to eq(total_concurrency)
+              expect(messages_by_handling_process_and_thread.values.map(&:size).uniq).to eq([messages_per_partition])
+            end
+          end
+        end
+      end
     end
 
-    context "when running parallel workers" do
+    context "when running forked workers" do
       let(:input_messages) do
         [
           { payload: "message-0", partition: 0, key: "a" },
@@ -124,9 +230,9 @@ RSpec.describe "running a Racecar consumer", type: :integration do
         ]
       end
 
-      context "when partitions exceed parallelism" do
+      context "when partitions exceed single threaded forked workers" do
         let(:topic_partitions) { 6 }
-        let(:parallelism) { 3 }
+        let(:forks) { 3 }
         let(:consumer_class) do
           class EchoConsumer2 < mock_echo_consumer_class
             self.group_id = "echo-consumer-2"
@@ -134,12 +240,12 @@ RSpec.describe "running a Racecar consumer", type: :integration do
           EchoConsumer2
         end
 
-        it "assigns partitions to all parallel workers" do
+        it "assigns partitions to all forks workers" do
           in_background(cleanup_callback: -> { Process.kill("INT", Process.pid) }) do
             wait_for_assignments(
               group_id: "echo-consumer-2",
               topic: input_topic,
-              expected_members_count: parallelism
+              expected_members_count: forks
             )
             wait_for_messages(topic: output_topic, expected_message_count: input_messages.count)
           end
@@ -152,7 +258,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
         end
       end
 
-      context "when the parallelism exceeds the number of partitions" do
+      context "when the (single threaded) forked workers exceeds the number of partitions" do
         let(:consumer_class) do
           class EchoConsumer3 < mock_echo_consumer_class
             self.group_id = "echo-consumer-3"
@@ -161,7 +267,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
         end
 
         let(:topic_partitions) { 3 }
-        let(:parallelism) { 5 }
+        let(:forks) { 5 }
         let(:input_messages) do
           [
             { payload: "message-0", partition: 0, key: "a" },

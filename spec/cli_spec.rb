@@ -8,6 +8,8 @@ RSpec.describe Racecar::Cli do
     Racecar.config = nil
   end
 
+  let(:mock_runner) { double(:runner, run: nil) }
+
   it "raise exception if no consumer class is specified" do
     expect { Racecar::Cli.main([]) }.to raise_exception(Racecar::Error, "no consumer specified")
   end
@@ -22,7 +24,7 @@ RSpec.describe Racecar::Cli do
     it "doesn't start Rails if --without-rails option is specified" do
       args = ["--require", "./examples/cat_consumer.rb", "CatConsumer", "--without-rails"]
 
-      allow(Racecar).to receive(:run)
+      allow(Racecar).to receive(:runner).and_return(mock_runner)
       expect(Racecar::RailsConfigFileLoader).not_to receive(:load!)
 
       Racecar::Cli.main(args)
@@ -31,7 +33,7 @@ RSpec.describe Racecar::Cli do
     it "starts Rails if the --without-rails option is omitted" do
       args = ["--require", "./examples/cat_consumer.rb", "CatConsumer"]
 
-      allow(Racecar).to receive(:run)
+      allow(Racecar).to receive(:runner).and_return(mock_runner)
       expect(Racecar::RailsConfigFileLoader).to receive(:load!)
 
       Racecar::Cli.main(args)

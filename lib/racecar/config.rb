@@ -62,6 +62,9 @@ module Racecar
     desc "How long to try to deliver a produced message before finally giving up (in seconds)"
     float :message_timeout, default: 5*60
 
+    desc "How long to wait for the thread pool to be ready or to shutdown (in seconds)"
+    float :thread_pool_timeout, default: 5
+
     desc "Maximum amount of data the broker shall return for a Fetch request"
     integer :max_bytes, default: 10485760
 
@@ -170,7 +173,17 @@ module Racecar
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
-    attr_accessor :subscriptions, :logger, :parallel_workers
+    attr_accessor :subscriptions, :logger, :forks, :threads
+
+    # For deprecation
+    def parallel_workers
+      self.forks
+    end
+
+    # For deprecation
+    def parallel_workers=(forks)
+      self.forks = forks
+    end
 
     def statistics_interval_ms
       if Rdkafka::Config.statistics_callback
@@ -223,7 +236,8 @@ module Racecar
         consumer_class.name.gsub(/[a-z][A-Z]/) { |str| "#{str[0]}-#{str[1]}" }.downcase,
       ].compact.join
 
-      self.parallel_workers = consumer_class.parallel_workers
+      self.forks = consumer_class.forks
+      self.threads = consumer_class.threads
       self.subscriptions = consumer_class.subscriptions
       self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time
       self.fetch_messages = consumer_class.fetch_messages || self.fetch_messages
@@ -255,7 +269,7 @@ module Racecar
     def rdkafka_security_config
       {
         "security.protocol" => security_protocol,
-        "enable.ssl.certificate.verification" => ssl_verify_hostname,
+        # "enable.ssl.certificate.verification" => ssl_verify_hostname,
         "ssl.ca.location" => ssl_ca_location,
         "ssl.crl.location" => ssl_crl_location,
         "ssl.keystore.location" => ssl_keystore_location,

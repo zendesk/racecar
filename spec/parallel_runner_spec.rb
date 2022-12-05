@@ -159,7 +159,7 @@ RSpec.describe Racecar::ParallelRunner do
 
       it "stops all the child processes and closes gracefully" do
         when_ready do
-          Process.kill("TERM", Process.pid)
+          parallel_runner.stop
         end
 
         expect { parallel_runner.run }.not_to raise_error
