@@ -167,8 +167,8 @@ module Racecar
           for backward compatibility, however this can be quite memory intensive"
     integer :statistics_interval, default: 1
 
-    # The error handler must be set directly on the object.
-    attr_reader :error_handler
+    # The error handler and consumer rebalance listener must be set directly on the object.
+    attr_reader :error_handler, :consumer_rebalance_listener
 
     attr_accessor :subscriptions, :logger, :parallel_workers
 
@@ -187,6 +187,7 @@ module Racecar
     def initialize(env: ENV)
       super(env: env)
       @error_handler = proc {}
+      @consumer_rebalance_listener = nil
       @subscriptions = []
       @logger = Logger.new(STDOUT)
     end
@@ -232,6 +233,10 @@ module Racecar
 
     def on_error(&handler)
       @error_handler = handler
+    end
+
+    def consumer_rebalance_listener(&handler)
+      @consumer_rebalance_listener = handler
     end
 
     def rdkafka_consumer

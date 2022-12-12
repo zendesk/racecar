@@ -526,6 +526,26 @@ E, [2022-10-09T11:28:29.976548 #15] ERROR -- : (try 5/10): Error for topic subsc
 
 Please see [Compression](#compression)
 
+### Consumer rebalance listener
+
+You may also want to set a consuemr rebalance listener.
+
+```ruby
+class MyConsumerRebalanceListener
+  def on_partitions_assigned(_consumer, _list)
+  end
+
+  def on_partitions_revoked(_consumer, _list)
+  end
+end
+
+Racecar.config.consumer_rebalance_listener do
+  MyConsumerRebalanceListener.new
+end
+```
+
+Note that the exact requirements for the consumer rebalance listener are set by rdkafka-ruby and may change from version to version.
+
 ### Logging
 
 By default, Racecar will log to `STDOUT`. If you're using Rails, your application code will use whatever logger you've configured there.
