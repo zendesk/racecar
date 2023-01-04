@@ -54,7 +54,7 @@ module Racecar
     end
 
     def pid
-      if File.exists?(pidfile)
+      if File.exist?(pidfile)
         File.read(pidfile).to_i
       else
         nil
@@ -89,7 +89,7 @@ module Racecar
       end
 
       at_exit do
-        File.delete(pidfile) if File.exists?(pidfile)
+        File.delete(pidfile) if File.exist?(pidfile)
       end
     rescue Errno::EEXIST
       check_pid
