@@ -147,10 +147,10 @@ module IntegrationHelper
       command = raw_command
     else
       maybe_sudo = "sudo " if ENV["DOCKER_SUDO"] == "true"
-      command = "#{maybe_sudo}docker exec -t $(#{maybe_sudo}docker ps | grep broker | awk '{print $1}') #{command}"
+      command = "#{maybe_sudo}docker exec -t $(#{maybe_sudo}docker ps | grep broker | awk '{print $1}') #{raw_command}"
     end
 
-    $stderr.puts "Running Kafka command `#{raw_command}`"
+    $stderr.puts "Running Kafka command `#{command}`"
     Open3.capture2e(command)
   end
 
