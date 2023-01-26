@@ -115,22 +115,22 @@ RSpec.describe "running a Racecar consumer", type: :integration do
       end
 
       context "when running multithreaded" do
-        class MultiThreadedEchoConsumer < Racecar::Consumer
-          class << self
-            attr_accessor :output_topic
-          end
-          SeriousError = Class.new(Exception)
-          self.group_id = "multithreaded-echo-consumer"
+        let(:consumer_class) {
+          class MultiThreadedEchoConsumer < Racecar::Consumer
+            class << self
+              attr_accessor :output_topic
+            end
+            self.group_id = name
 
-          def process(message)
-            raise SeriousError.new("Error in worker thread") if message.value == "horrible news"
-            new_value = JSON.dump({ "handling_thread" => Thread.current.name, "incoming_value" => message.value })
-            produce new_value, key: message.key, topic: self.class.output_topic
-            deliver!
-          end
-        end
+            def process(message)
+              new_value = JSON.dump({ "handling_thread" => Thread.current.name, "incoming_value" => message.value })
+              produce new_value, key: message.key, topic: self.class.output_topic
+              deliver!
+            end
 
-        let(:consumer_class) { MultiThreadedEchoConsumer }
+            self
+          end
+        }
 
         let(:input_messages) { message_count.times.map { |i|
           { payload: "message payload #{i}", partition: (i%topic_partitions) }
@@ -163,8 +163,20 @@ RSpec.describe "running a Racecar consumer", type: :integration do
         end
 
         context "when there is an uncaught exception in a worker thread" do
+          SeriousError = Class.new(Exception)
+
           let(:input_messages) { [] }
           let(:message_count) { 0 }
+          let(:consumer_class) {
+            class RaisingMultiThreadedEchoConsumer < super()
+              self.group_id = name
+              def process(message)
+                raise SeriousError.new("Error in worker thread") if message.value == "horrible news"
+                super
+              end
+              self
+            end
+          }
 
           it "stops the other threads and exits" do
             in_background(cleanup_callback: ->{ cause_problems }) do
@@ -177,7 +189,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
 
             expect {
               Racecar::Cli.new([consumer_class.name.to_s]).run
-            }.to raise_error(MultiThreadedEchoConsumer::SeriousError)
+            }.to raise_error(SeriousError)
           end
 
           def cause_problems
@@ -192,6 +204,12 @@ RSpec.describe "running a Racecar consumer", type: :integration do
           let(:forks) { 2 }
           let(:threads_per_process) { 2 }
           let(:total_concurrency) { forks * threads_per_process}
+          let(:consumer_class) {
+            class CombinedForkAndThreadConsumer < super()
+              self.group_id = name
+              self
+            end
+          }
 
           it "can consume multiple partitions concurrently" do
             in_background(cleanup_callback: -> { Process.kill("INT", Process.pid) }) do
