@@ -22,7 +22,7 @@ module Racecar
     end
 
     def running?
-      @runners.any?(&:running?)
+      runners.any?(&:running?)
     end
 
     def run
@@ -46,8 +46,6 @@ module Racecar
     end
 
     private
-
-    attr_reader :runners
 
     def work_in_thread(id)
       Thread.current.name = "Racecar worker thread #{Process.pid}-#{id}"
