@@ -22,9 +22,9 @@ module Racecar
     end
 
     def stop
-      if workers.any?
+      if workers.any?        # This is the parent process
         terminate_workers
-      else
+      else                   # This is a forked process
         runner.stop
       end
     end

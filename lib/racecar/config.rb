@@ -269,7 +269,7 @@ module Racecar
     def rdkafka_security_config
       {
         "security.protocol" => security_protocol,
-        # "enable.ssl.certificate.verification" => ssl_verify_hostname,
+        "enable.ssl.certificate.verification" => ssl_verify_hostname,
         "ssl.ca.location" => ssl_ca_location,
         "ssl.crl.location" => ssl_crl_location,
         "ssl.keystore.location" => ssl_keystore_location,
