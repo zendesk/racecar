@@ -7,9 +7,25 @@ module Racecar
     Subscription = Struct.new(:topic, :start_from_beginning, :max_bytes_per_partition, :additional_config)
 
     class << self
-      attr_accessor :max_wait_time
-      attr_accessor :group_id
-      attr_accessor :producer, :consumer, :parallel_workers, :fetch_messages
+      attr_accessor(
+        :max_wait_time,
+        :group_id,
+        :producer,
+        :consumer,
+        :fetch_messages,
+        :forks,
+        :threads,
+      )
+
+      # For deprecation
+      def parallel_workers
+        self.forks
+      end
+
+      # For deprecation
+      def parallel_workers=(forks)
+        self.forks = forks
+      end
 
       def subscriptions
         @subscriptions ||= []

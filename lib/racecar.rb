@@ -8,6 +8,7 @@ require "racecar/consumer"
 require "racecar/consumer_set"
 require "racecar/runner"
 require "racecar/parallel_runner"
+require "racecar/threadpool_runner_proxy"
 require "racecar/config"
 require "racecar/version"
 require "ensure_hash_compact"
@@ -52,12 +53,33 @@ module Racecar
   end
 
   def self.run(processor)
-    runner = Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter)
+    runner(processor).run
+  end
 
-    if config.parallel_workers && config.parallel_workers > 1
-      ParallelRunner.new(runner: runner, config: config, logger: logger).run
+  def self.runner(processor)
+    if config.threads && config.threads > 1
+      runner = multithreaded_runner(processor)
     else
-      runner.run
+      runner = standard_runner(processor)
     end
+
+    if config.forks && config.forks > 1
+      runner = forking_runner(processor, runner)
+    end
+
+    runner
+  end
+
+  private_class_method def self.forking_runner(processor, base_runner)
+    ParallelRunner.new(runner: base_runner, config: config, logger: logger)
+  end
+
+  private_class_method def self.multithreaded_runner(processor)
+    standard_runner_factory = method(:standard_runner)
+    ThreadPoolRunnerProxy.new(processor, config: config, runner_factory: standard_runner_factory)
+  end
+
+  private_class_method def self.standard_runner(processor)
+    Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter)
   end
 end

@@ -10,6 +10,7 @@ module Racecar
       @runner = runner
       @config = config
       @logger = logger
+      @workers = []
     end
 
     def worker_pids
@@ -18,6 +19,14 @@ module Racecar
 
     def running?
       @running
+    end
+
+    def stop
+      if workers.any?        # This is the parent process
+        terminate_workers
+      else                   # This is a forked process
+        runner.stop
+      end
     end
 
     def run

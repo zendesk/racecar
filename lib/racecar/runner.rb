@@ -14,6 +14,7 @@ module Racecar
       @processor, @config, @logger = processor, config, logger
       @instrumenter = instrumenter
       @stop_requested = false
+      @running = false
       Rdkafka::Config.logger = logger
 
       if processor.respond_to?(:statistics_callback)
@@ -46,8 +47,8 @@ module Racecar
     end
 
     def run
-      install_signal_handlers
       @stop_requested = false
+      @running = true
 
       # Configure the consumer with a producer so it can produce messages and
       # with a consumer so that it can support advanced use-cases.
@@ -92,12 +93,18 @@ module Racecar
         end
       end
     ensure
+      @running = false
+
       producer.close
       Racecar::Datadog.close if Object.const_defined?("Racecar::Datadog")
     end
 
     def stop
       @stop_requested = true
+    end
+
+    def running?
+      !!@running
     end
 
     private
@@ -165,16 +172,6 @@ module Racecar
         }
         @instrumenter.instrument("acknowledged_message", payload)
       end
-    end
-
-    def install_signal_handlers
-      # Stop the consumer on SIGINT, SIGQUIT or SIGTERM.
-      trap("QUIT") { stop }
-      trap("INT")  { stop }
-      trap("TERM") { stop }
-
-      # Print the consumer config to STDERR on USR1.
-      trap("USR1") { $stderr.puts config.inspect }
     end
 
     def process(message)

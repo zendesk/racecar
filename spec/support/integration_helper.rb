@@ -23,7 +23,7 @@ module IntegrationHelper
     messages.map do |m|
       rdkafka_producer.produce(
         topic: topic,
-        key: m.fetch(:key),
+        key: m.fetch(:key, nil),
         payload: m.fetch(:payload),
         partition: m.fetch(:partition)
       )
@@ -57,6 +57,8 @@ module IntegrationHelper
         incoming_messages << message
       end
     end
+  ensure
+    rdkafka_consumer.close
   end
 
   def wait_for_assignments(group_id:, topic:, expected_members_count:)
@@ -140,11 +142,27 @@ module IntegrationHelper
       end
   end
 
-  def run_kafka_command(command)
-    maybe_sudo = "sudo " if ENV["DOCKER_SUDO"] == "true"
+  def run_kafka_command(raw_command)
+    if ENV["LOCAL"]
+      command = raw_command
+    else
+      maybe_sudo = "sudo " if ENV["DOCKER_SUDO"] == "true"
+      command = "#{maybe_sudo}docker exec -t $(#{maybe_sudo}docker ps | grep broker | awk '{print $1}') #{raw_command}"
+    end
 
-    Open3.capture2e(
-      "#{maybe_sudo}docker exec -t $(#{maybe_sudo}docker ps | grep broker | awk '{print $1}') #{command}"
-    )
+    $stderr.puts "Running Kafka command `#{command}`"
+    Open3.capture2e(command)
+  end
+
+  module_function def reset_signal_handlers_to_default
+    ["QUIT", "INT", "TERM", "USR1"].each do |signal|
+      Signal.trap(signal, "DEFAULT")
+    end
+  end
+
+  module_function def ensure_all_child_process_have_exited
+    Timeout.timeout(5) { Process.waitall }
+  rescue Timeout::Error
+    raise "Timed out waiting for child process to exit. It's likely you need to clean them up."
   end
 end
