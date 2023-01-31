@@ -82,8 +82,6 @@ RSpec.describe "running a Racecar consumer", type: :integration do
       consumer_class.output_topic = output_topic
       consumer_class.forks = forks
       consumer_class.threads = threads_per_process
-
-      publish_messages!(input_topic, input_messages)
     end
 
     after(:all) { delete_all_test_topics }
@@ -101,6 +99,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
 
       it "can consume and publish a message" do
         in_background(cleanup_callback: -> { Process.kill("INT", Process.pid) }) do
+          publish_messages!(input_topic, input_messages)
           wait_for_messages(topic: output_topic, expected_message_count: 1)
         end
 
@@ -148,6 +147,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
               topic: input_topic,
               expected_members_count: threads_per_process,
             )
+            publish_messages!(input_topic, input_messages)
             wait_for_messages(topic: output_topic, expected_message_count: message_count)
           end
 
@@ -185,6 +185,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
                 topic: input_topic,
                 expected_members_count: threads_per_process,
               )
+              publish_messages!(input_topic, input_messages)
             end
 
             expect {
@@ -218,7 +219,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
                 topic: input_topic,
                 expected_members_count: total_concurrency,
               )
-
+              publish_messages!(input_topic, input_messages)
               wait_for_messages(topic: output_topic, expected_message_count: message_count)
             end
 
@@ -265,6 +266,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
               topic: input_topic,
               expected_members_count: forks
             )
+              publish_messages!(input_topic, input_messages)
             wait_for_messages(topic: output_topic, expected_message_count: input_messages.count)
           end
 
@@ -304,6 +306,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
               topic: input_topic,
               expected_members_count: topic_partitions
             )
+              publish_messages!(input_topic, input_messages)
             wait_for_messages(topic: output_topic, expected_message_count: input_messages.count)
           end
 
