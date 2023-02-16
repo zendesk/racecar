@@ -246,6 +246,69 @@ The `deliver!` method can be used to block until the broker received all queued 
 
 You can set message headers by passing a `headers:` option with a Hash of headers.
 
+### Standalone Producer
+
+Racecar provides a standalone producer to publish messages to Kafka directly from your Rails application:
+```
+# app/controllers/comments_controller.rb
+class CommentsController < ApplicationController
+  def create
+    @comment = Comment.create!(params)
+
+    # This will publish a JSON representation of the comment to the `comments` topic
+    # in Kafka. Make sure to create the topic first, or this may fail.
+    Racecar.produce_sync(value:comment.to_json, topic: "comments")
+  end
+end
+```
+
+The above example will block the server process until the message has been delivered. If you want deliveries to happen in the background in order to free up your server processes more quickly, call #deliver_async instead:
+```
+# app/controllers/comments_controller.rb
+class CommentsController < ApplicationController
+  def show
+    @comment = Comment.find(params[:id])
+
+    event = {
+      name: "comment_viewed",
+      data: {
+        comment_id: @comment.id,
+        user_id: current_user.id
+      }
+    }
+
+    # By delivering messages asynchronously you free up your server processes faster.
+    Racecar.produce_async(value: event.to_json, topic: "activity")
+  end
+end
+```
+In addition to improving response time, delivering messages asynchronously also protects your application against Kafka availability issues -- if messages cannot be delivered, they'll be buffered for later and retried automatically.
+
+A third method is to produce messages first (without delivering the messages to Kafka yet), and deliver them synchronously later.
+
+```
+ # app/controllers/comments_controller.rb
+ class CommentsController < ApplicationController
+   def create
+     @comment = Comment.create!(params)
+
+     event = {
+       name: "comment_created",
+       data: {
+         comment_id: @comment.id
+         user_id: current_user.id
+       }
+     }
+
+     # This will queue the two messages in the internal buffer and block server process until they are delivered.
+    Racecar.wait_for_delivery do
+      Racecar.produce_async(comment.to_json, topic: "comments")
+      Racecar.produce_async(event.to_json, topic: "activity")
+    end
+   end
+ end
+ ```
+
 ### Configuration
 
 Racecar provides a flexible way to configure your consumer in a way that feels at home in a Rails application. If you haven't already, run `bundle exec rails generate racecar:install` in order to generate a config file. You'll get a separate section for each Rails environment, with the common configuration values in a shared `common` section.

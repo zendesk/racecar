@@ -244,6 +244,50 @@ module Racecar
         # Number of messages ACK'd for the topic.
         increment("producer.ack.messages", tags: tags)
       end
+      
+      def produce_async(event)
+        client = event.payload.fetch(:client_id)
+        topic = event.payload.fetch(:topic)
+        message_size = event.payload.fetch(:message_size)
+        buffer_size = event.payload.fetch(:buffer_size)
+
+        tags = {
+          client: client,
+          topic: topic,
+        }
+
+        # This gets us the write rate.
+        increment("producer.produce.messages", tags: tags.merge(topic: topic))
+
+        # Information about typical/average/95p message size.
+        histogram("producer.produce.message_size", message_size, tags: tags.merge(topic: topic))
+
+        # Aggregate message size.
+        count("producer.produce.message_size.sum", message_size, tags: tags.merge(topic: topic))
+
+        # This gets us the avg/max buffer size per producer.
+        histogram("producer.buffer.size", buffer_size, tags: tags)
+      end
+
+      def produce_sync(event)
+        client = event.payload.fetch(:client_id)
+        topic = event.payload.fetch(:topic)
+        message_size = event.payload.fetch(:message_size)
+
+        tags = {
+          client: client,
+          topic: topic,
+        }
+
+        # This gets us the write rate.
+        increment("producer.produce.messages", tags: tags.merge(topic: topic))
+
+        # Information about typical/average/95p message size.
+        histogram("producer.produce.message_size", message_size, tags: tags.merge(topic: topic))
+
+        # Aggregate message size.
+        count("producer.produce.message_size.sum", message_size, tags: tags.merge(topic: topic))
+      end
 
       attach_to "racecar"
     end
