@@ -24,9 +24,9 @@ module IntegrationHelper
     messages.map do |m|
       rdkafka_producer.produce(
         topic: topic,
-        key: m.fetch(:key),
+        key: m.fetch(:key, nil),
         payload: m.fetch(:payload),
-        partition: m.fetch(:partition)
+        partition: m.fetch(:partition, nil),
       )
     end.each(&:wait)
 
