@@ -28,9 +28,10 @@ module IntegrationHelper
         partition: m.fetch(:partition)
       )
     end.each(&:wait)
-    rdkafka_producer.close
 
     $stderr.puts "Published messages to topic: #{topic}; messages: #{messages}"
+  ensure
+    rdkafka_producer.close
   end
 
   def create_topic(topic:, partitions: 1)
@@ -57,6 +58,8 @@ module IntegrationHelper
         incoming_messages << message
       end
     end
+  ensure
+    rdkafka_consumer.close
   end
 
   def wait_for_assignments(group_id:, topic:, expected_members_count:)
