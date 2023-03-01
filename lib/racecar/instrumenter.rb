@@ -9,16 +9,9 @@ module Racecar
     NAMESPACE = "racecar"
     attr_reader :backend
 
-    def initialize(default_payload = {})
+    def initialize(backend:, default_payload: {})
+      @backend = backend
       @default_payload = default_payload
-
-      @backend = if defined?(ActiveSupport::Notifications)
-        # ActiveSupport needs `concurrent-ruby` but doesn't `require` it.
-        require 'concurrent/utility/monotonic_time'
-        ActiveSupport::Notifications
-      else
-        NullInstrumenter
-      end
     end
 
     def instrument(event_name, payload = {}, &block)

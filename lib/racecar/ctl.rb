@@ -32,6 +32,17 @@ module Racecar
       @command = command
     end
 
+    def liveness_probe(args)
+      require "racecar/liveness_probe"
+      parse_options!(args)
+
+      if ENV["RAILS_ENV"]
+        Racecar.config.load_file("config/racecar.yml", ENV["RAILS_ENV"])
+      end
+
+      Racecar.config.liveness_probe.check_liveness_within_interval!
+    end
+
     def status(args)
       parse_options!(args)
 

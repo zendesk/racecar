@@ -2,10 +2,11 @@
 
 RSpec.describe Racecar::Instrumenter do
   describe '#instrument' do
-    let(:instrumenter) { Racecar::Instrumenter.new }
+    let(:instrumenter) { Racecar::Instrumenter.new(backend: backend) }
+    let(:backend) { double(:backend, instrument: nil) }
 
     it 'applies a namespace' do
-      expect(instrumenter.backend).
+      expect(backend).
         to receive(:instrument).
         with('event.racecar', any_args)
 
@@ -13,7 +14,7 @@ RSpec.describe Racecar::Instrumenter do
     end
 
     it 'appends a default payload' do
-      expect(instrumenter.backend).
+      expect(backend).
         to receive(:instrument).
         with('event.racecar', client_id: 'race')
 
