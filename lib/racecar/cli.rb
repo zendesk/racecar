@@ -50,7 +50,7 @@ module Racecar
         configure_datadog
       end
 
-      $stderr.puts "=> Wrooooom!"
+      $stderr.puts "=> Vrooooom!"
 
       if config.daemonize
         daemonize!
