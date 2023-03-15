@@ -7,6 +7,7 @@ RSpec.describe Racecar::MessageDeliveryError do
     Rdkafka::Producer::DeliveryHandle.new.tap do |dh|
       dh[:partition] = 37
       dh[:offset] = 42
+      dh[:topic_name] = FFI::MemoryPointer.from_string("produce_test_topic")
     end
   end
 
