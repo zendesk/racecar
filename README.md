@@ -508,6 +508,63 @@ The important part is the `strategy.type` value, which tells Kubernetes how to u
 
 Instead, the `Recreate` update strategy should be used. It completely tears down the existing containers before starting all of the new containers simultaneously, allowing for a single synchronization stage and a much faster, more stable deployment update.
 
+#### Liveness Probe
+
+Racecar comes with a built-in liveness probe, primarily for use with Kubernetes, but useful for any deployment environment where you can periodically run a process to check the health of your consumer.
+
+To use this feature:
+- set the `liveness_probe_enabled` config option to true.
+- configure your Kubernetes deployment to run `$ racecarctl liveness_probe`
+
+
+When enabled (see config) Racecar will touch the file at `liveness_probe_file_path` each time it finishes polling Kafka and processing the messages in the batch (if any).
+
+The modified time of this file can be observed to determine when the consumer last exhibited 'liveness'.
+
+Running `racecarctl liveness_probe` will return a successful exit status if the last 'liveness' event happened within an acceptable time, `liveness_probe_max_interval`.
+
+`liveness_probe_max_interval` should be long enough to account for both the Kafka polling time of `max_wait_time` and the processing time of a full message batch.
+
+On receiving `SIGTERM`, Racecar will gracefully shut down and delete this file, causing the probe to fail immediately after exit.
+
+You may wish to tolerate more than one failed probe run to accommodate for environmental variance and clock changes.
+
+See the [Configuration section](https://github.com/zendesk/racecar#configuration) for the various ways the liveness probe can be configured, environment variables being one option.
+
+Here is an example Kubernetes liveness probe configuration:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+      - name: consumer
+
+        args:
+        - racecar
+        - SomeConsumer
+
+        env:
+        - name: RACECAR_LIVENESS_PROBE_ENABLED
+          value: "true"
+
+        livenessProbe:
+          exec:
+            command:
+            - racecarctl
+            - liveness_probe
+
+          # Allow up to 10 consecutive failures before terminating Pod:
+          failureThreshold: 10
+
+          # Wait 30 seconds before starting the probes:
+          initialDelaySeconds: 30
+
+          # Perform the check every 10 seconds:
+          periodSeconds: 10
+
 #### Deploying to Heroku
 
 If you run your applications in Heroku and/or use the Heroku Kafka add-on, you application will be provided with 4 ENV variables that allow connecting to the cluster: `KAFKA_URL`, `KAFKA_TRUSTED_CERT`, `KAFKA_CLIENT_CERT`, and `KAFKA_CLIENT_CERT_KEY`.
