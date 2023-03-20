@@ -8,6 +8,7 @@ require "racecar/consumer"
 require "racecar/consumer_set"
 require "racecar/runner"
 require "racecar/parallel_runner"
+require "racecar/producer"
 require "racecar/config"
 require "racecar/version"
 require "ensure_hash_compact"
@@ -37,6 +38,27 @@ module Racecar
 
   def self.logger=(logger)
     config.logger = logger
+  end
+
+  def self.produce_async(value:, topic:, **options)
+    producer.produce_async(value: value, topic: topic, **options)
+  end
+
+  def self.produce_sync(value:, topic:, **options)
+    producer.produce_sync(value: value, topic: topic, **options)
+  end  
+  
+  def self.wait_for_delivery(&block)
+    producer.wait_for_delivery(&block)
+  end
+
+  def self.producer
+    Thread.current[:racecar_producer] ||= begin
+      if config.datadog_enabled
+        require "racecar/datadog"
+      end
+      Racecar::Producer.new(config: config, logger: logger, instrumenter: instrumenter)
+    end
   end
 
   def self.instrumenter
