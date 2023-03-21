@@ -564,6 +564,7 @@ spec:
 
           # Perform the check every 10 seconds:
           periodSeconds: 10
+```
 
 #### Deploying to Heroku
 
