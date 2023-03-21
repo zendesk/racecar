@@ -67,6 +67,8 @@ module Racecar
       loop do
         break if @stop_requested
         resume_paused_partitions
+
+        @instrumenter.instrument("start_main_loop", instrumentation_payload)
         @instrumenter.instrument("main_loop", instrumentation_payload) do
           case process_method
           when :batch then
@@ -94,6 +96,7 @@ module Racecar
     ensure
       producer.close
       Racecar::Datadog.close if Object.const_defined?("Racecar::Datadog")
+      @instrumenter.instrument("shut_down", instrumentation_payload || {})
     end
 
     def stop

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "securerandom"
 require "open3"
 
 module IntegrationHelper
@@ -23,14 +24,15 @@ module IntegrationHelper
     messages.map do |m|
       rdkafka_producer.produce(
         topic: topic,
-        key: m.fetch(:key),
+        key: m.fetch(:key, nil),
         payload: m.fetch(:payload),
-        partition: m.fetch(:partition)
+        partition: m.fetch(:partition, nil),
       )
     end.each(&:wait)
-    rdkafka_producer.close
 
     $stderr.puts "Published messages to topic: #{topic}; messages: #{messages}"
+  ensure
+    rdkafka_producer.close
   end
 
   def create_topic(topic:, partitions: 1)
@@ -57,6 +59,8 @@ module IntegrationHelper
         incoming_messages << message
       end
     end
+  ensure
+    rdkafka_consumer.close
   end
 
   def wait_for_assignments(group_id:, topic:, expected_members_count:)

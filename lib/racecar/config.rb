@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 
+require "tmpdir"
+
 require "king_konf"
+
+require "racecar/liveness_probe"
+require "racecar/instrumenter"
 
 module Racecar
   class Config < KingKonf::Config
@@ -167,6 +172,15 @@ module Racecar
           for backward compatibility, however this can be quite memory intensive"
     integer :statistics_interval, default: 1
 
+    desc "Whether to enable liveness probe behavior (touch the file)"
+    boolean :liveness_probe_enabled, default: false
+
+    desc "Path to a file Racecar will touch to show liveness"
+    string :liveness_probe_file_path, default: "#{Dir.tmpdir}/racecar-liveness"
+
+    desc "Used only by the liveness probe: Max time (in seconds) between liveness events before the process is considered not healthy"
+    integer :liveness_probe_max_interval, default: 5
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
@@ -248,6 +262,35 @@ module Racecar
       end.to_h
       producer_config.merge!(rdkafka_security_config)
       producer_config
+    end
+
+    def instrumenter
+      @instrumenter ||= begin
+        default_payload = { client_id: client_id, group_id: group_id }
+
+        if defined?(ActiveSupport::Notifications)
+          # ActiveSupport needs `concurrent-ruby` but doesn't `require` it.
+          require 'concurrent/utility/monotonic_time'
+          Instrumenter.new(backend: ActiveSupport::Notifications, default_payload: default_payload)
+        else
+          logger.warn "ActiveSupport::Notifications not available, instrumentation is disabled"
+          NullInstrumenter
+        end
+      end
+    end
+    attr_writer :instrumenter
+
+    def install_liveness_probe
+      liveness_probe.tap(&:install)
+    end
+
+    def liveness_probe
+      require "active_support/notifications"
+      @liveness_probe ||= LivenessProbe.new(
+        ActiveSupport::Notifications,
+        liveness_probe_file_path,
+        liveness_probe_max_interval
+      )
     end
 
     private

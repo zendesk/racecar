@@ -62,19 +62,11 @@ module Racecar
   end
 
   def self.instrumenter
-    @instrumenter ||= begin
-      default_payload = { client_id: config.client_id, group_id: config.group_id }
-
-      Instrumenter.new(default_payload).tap do |instrumenter|
-        if instrumenter.backend == NullInstrumenter
-          logger.warn "ActiveSupport::Notifications not available, instrumentation is disabled"
-        end
-      end
-    end
+    config.instrumenter
   end
 
   def self.run(processor)
-    runner = Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter)
+    runner = Runner.new(processor, config: config, logger: logger, instrumenter: config.instrumenter)
 
     if config.parallel_workers && config.parallel_workers > 1
       ParallelRunner.new(runner: runner, config: config, logger: logger).run

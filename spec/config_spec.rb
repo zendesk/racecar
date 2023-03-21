@@ -253,4 +253,58 @@ RSpec.describe Racecar::Config do
       end
     end
   end
+
+  describe "#instrumenter" do
+    context "when ActiveSupport::Notifications is available" do
+      before { require "active_support/notifications" }
+
+      it "returns the 'real' instrumenter" do
+        expect(config.instrumenter).to be_a(Racecar::Instrumenter)
+      end
+    end
+
+    context "when ActiveSupport::Notifications is not available" do
+      before { hide_const("ActiveSupport::Notifications") }
+
+      it "returns the compatible null instrumenter singleton" do
+        expect(config.instrumenter).to be(Racecar::NullInstrumenter)
+      end
+
+      it "warns that instrumentation is disabled" do
+        expect(config.logger).to receive(:warn).with(/instrumentation is disabled/)
+
+        config.instrumenter
+      end
+    end
+  end
+
+  describe "#install_liveness_probe" do
+    it "delegates to LivenessProbe#install" do
+      expect(config.liveness_probe).to receive(:install)
+
+      config.install_liveness_probe
+    end
+  end
+
+  describe "#liveness_probe" do
+    it "returns the liveness probe" do
+      expect(config.liveness_probe).to be_a(Racecar::LivenessProbe)
+    end
+
+    it "returns the same LivenessProbe instance" do
+      expect(config.liveness_probe).to be(config.liveness_probe)
+    end
+
+    it "loads ActiveSupport::Notifications" do
+      expect(config).to receive(:require).with("active_support/notifications").and_call_original
+
+      config.liveness_probe
+    end
+
+    it "loads ActiveSupport::Notifications" do
+      expect(config).to receive(:require).with("active_support/notifications").and_call_original
+
+      config.liveness_probe
+    end
+  end
 end

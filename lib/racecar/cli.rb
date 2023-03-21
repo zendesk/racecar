@@ -5,6 +5,7 @@ require "logger"
 require "fileutils"
 require "racecar/rails_config_file_loader"
 require "racecar/daemon"
+require "racecar/liveness_probe"
 
 module Racecar
   class Cli
@@ -56,6 +57,11 @@ module Racecar
         daemonize!
       else
         $stderr.puts "=> Ctrl-C to shutdown consumer"
+      end
+
+      if config.liveness_probe_enabled
+        $stderr.puts "=> Liveness probe enabled"
+        config.install_liveness_probe
       end
 
       processor = consumer_class.new

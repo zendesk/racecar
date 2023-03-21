@@ -244,8 +244,7 @@ end
 
 class FakeInstrumenter < Racecar::Instrumenter
   def initialize(*)
-    super
-    @backend = Racecar::NullInstrumenter
+    super(backend: Racecar::NullInstrumenter)
   end
 end
 
