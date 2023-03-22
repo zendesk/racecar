@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.9.0.beta1
 
 * Add `partitioner` producer config option to allow changing the strategy to
   determine which topic partition a message is written to when racecar
