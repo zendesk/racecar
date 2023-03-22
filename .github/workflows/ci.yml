@@ -17,12 +17,12 @@ jobs:
     steps:
     - uses: zendesk/checkout@v2
     - name: Set up Ruby
-      uses: zendesk/setup-ruby@v1.64.1
+      uses: zendesk/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby-version }}
         bundler-cache: true
     - name: Build and test with RSpec
-      run: bundle exec rspec --format documentation --require spec_helper --color --exclude-pattern='spec/integration/*_spec.rb'
+      run: bundle exec rspec --exclude-pattern='spec/integration/*_spec.rb'
 
   integration-specs:
     runs-on: ubuntu-latest
@@ -38,4 +38,4 @@ jobs:
     - name: Build and test with RSpec
       env:
         RACECAR_BROKERS: localhost:9092
-      run: timeout --kill-after 180 150 bundle exec rspec --format documentation --require spec_helper --color spec/integration/*_spec.rb
+      run: timeout --kill-after 180 150 bundle exec rspec spec/integration/*_spec.rb
