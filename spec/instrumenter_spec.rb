@@ -16,7 +16,7 @@ RSpec.describe Racecar::Instrumenter do
     it 'appends a default payload' do
       expect(backend).
         to receive(:instrument).
-        with('event.racecar', client_id: 'race')
+        with('event.racecar', { client_id: 'race' })
 
       instrumenter.instrument('event', client_id: 'race')
     end
