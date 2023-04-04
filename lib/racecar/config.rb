@@ -233,8 +233,8 @@ module Racecar
         # Configurable and optional prefix:
         group_id_prefix,
 
-        # MyFunnyConsumer => my-funny-consumer
-        consumer_class.name.gsub(/[a-z][A-Z]/) { |str| "#{str[0]}-#{str[1]}" }.downcase,
+        # My::FunnyConsumer => my-funny-consumer
+        consumer_class.name.gsub(/[a-z][A-Z]/) { |str| "#{str[0]}-#{str[1]}" }.gsub(/:+/, '-').downcase,
       ].compact.join
 
       self.parallel_workers = consumer_class.parallel_workers

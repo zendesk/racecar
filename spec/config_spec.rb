@@ -106,7 +106,7 @@ RSpec.describe Racecar::Config do
 
   describe "#load_consumer_class" do
     let(:consumer_class) {
-      OpenStruct.new(group_id: nil, fetch_messages: nil, name: "DoStuffConsumer", subscriptions: [])
+      OpenStruct.new(group_id: nil, fetch_messages: nil, name: "Do::StuffConsumer", subscriptions: [])
     }
 
     it "sets the group id if one has been explicitly defined" do
