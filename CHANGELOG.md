@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Test with Ruby 3.2
+
 ## v2.9.0.beta1
 
 * Add `partitioner` producer config option to allow changing the strategy to
