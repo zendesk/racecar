@@ -249,7 +249,8 @@ You can set message headers by passing a `headers:` option with a Hash of header
 ### Standalone Producer
 
 Racecar provides a standalone producer to publish messages to Kafka directly from your Rails application:
-```
+
+```ruby
 # app/controllers/comments_controller.rb
 class CommentsController < ApplicationController
   def create
@@ -263,7 +264,8 @@ end
 ```
 
 The above example will block the server process until the message has been delivered. If you want deliveries to happen in the background in order to free up your server processes more quickly, call #deliver_async instead:
-```
+
+```ruby
 # app/controllers/comments_controller.rb
 class CommentsController < ApplicationController
   def show
@@ -284,9 +286,9 @@ end
 ```
 In addition to improving response time, delivering messages asynchronously also protects your application against Kafka availability issues -- if messages cannot be delivered, they'll be buffered for later and retried automatically.
 
-A third method is to produce messages first (without delivering the messages to Kafka yet), and deliver them synchronously later.
+A third method is to produce messages first (without delivering the messages to Kafka yet), and deliver them synchronously later:
 
-```
+```ruby
  # app/controllers/comments_controller.rb
  class CommentsController < ApplicationController
    def create
