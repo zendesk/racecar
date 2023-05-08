@@ -98,13 +98,11 @@ module Racecar
     end
 
     def resume(topic, partition)
-      consumer, filtered_tpl = find_consumer_by(topic, partition)
-      if !consumer
-        @logger.info "Attempted to resume #{topic}/#{partition}, but we're not subscribed to it"
-        return
+      each do |consumer|
+        tpl = Rdkafka::Consumer::TopicPartitionList.new
+        tpl.add_topic(topic , [partition])
+        consumer.resume(tpl)
       end
-
-      consumer.resume(filtered_tpl)
     end
 
     alias :each :each_subscribed

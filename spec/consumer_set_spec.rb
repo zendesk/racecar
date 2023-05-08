@@ -95,11 +95,6 @@ RSpec.describe Racecar::ConsumerSet do
           end
           consumer_set.resume("greetings", 0)
         end
-
-        it "#resume doesn't resume unknown partitions" do
-          expect(rdconsumer).not_to receive(:resume)
-          consumer_set.resume("greetings", 1)
-        end
       end
 
       describe "#poll" do
@@ -382,21 +377,11 @@ RSpec.describe Racecar::ConsumerSet do
         consumer_set.pause("unknowntopic", 0, 1233456)
       end
 
-      it "#resume resumes partition in right consumer" do
+      it "#resume resumes partition in all consumers" do
+        expect(rdconsumer1).to receive(:resume).once
+        expect(rdconsumer2).to receive(:resume).once
         expect(rdconsumer3).to receive(:resume).once
         consumer_set.resume("account", 0)
-      end
-
-      it "#resume doesn't resume unknown partitions" do
-        expect(rdconsumer3).not_to receive(:resume)
-        consumer_set.resume("account", 1)
-      end
-
-      it "#resume doesn't resume unknown topics" do
-        expect(rdconsumer1).not_to receive(:resume)
-        expect(rdconsumer2).not_to receive(:resume)
-        expect(rdconsumer3).not_to receive(:resume)
-        consumer_set.resume("unknowntopic", 0)
       end
     end
 
