@@ -69,6 +69,8 @@ RSpec.describe "running a Racecar consumer", type: :integration do
       consumer_class.subscribes_to(input_topic)
       consumer_class.output_topic = output_topic
       consumer_class.parallel_workers = parallelism
+      consumer_class.group_id = group_id
+      consumer_class.pipe_to_test = consumer_message_pipe
     end
 
     context "for a single threaded consumer" do
@@ -109,7 +111,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
           publish_messages
           wait_for_messages
 
-          message_count_by_worker = incoming_messages.group_by { |m| m.headers.fetch(:processed_by_pid) }.transform_values(&:count)
+          message_count_by_worker = incoming_messages.group_by { |m| m.headers.fetch("processed_by") }.transform_values(&:count)
 
           expect(incoming_messages.map(&:topic).uniq).to eq([output_topic])
           expect(incoming_messages.map(&:payload))
@@ -129,7 +131,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
           publish_messages
           wait_for_messages
 
-          message_count_by_worker = incoming_messages.group_by { |m| m.headers.fetch(:processed_by_pid) }.transform_values(&:count)
+          message_count_by_worker = incoming_messages.group_by { |m| m.headers.fetch("processed_by") }.transform_values(&:count)
 
           expect(incoming_messages.count).to eq(6)
           expect(incoming_messages.map(&:topic).uniq).to eq([output_topic])
@@ -143,37 +145,5 @@ RSpec.describe "running a Racecar consumer", type: :integration do
 
   after do
     Object.send(:remove_const, :IntegrationTestConsumer) if defined?(IntegrationTestConsumer)
-  end
-
-  def echo_consumer_class
-    test_instance = self
-
-    Class.new(Racecar::Consumer) do
-      class << self
-        attr_accessor :output_topic
-        attr_accessor :pipe_to_test
-      end
-      self.group_id = test_instance.group_id
-      self.pipe_to_test = test_instance.consumer_message_pipe.write_end
-
-      def self.on_partitions_assigned(topic_partition_list)
-        Racecar.logger.info("on_partitions_assigned #{topic_partition_list.to_h}")
-
-        pipe_to_test.puts(JSON.dump({group_id: self.group_id, pid: Process.pid}))
-      end
-
-      def process(message)
-        produce(message.value, key: message.key, topic: self.class.output_topic, headers: headers)
-        deliver!
-      end
-
-      private
-
-      def headers
-        {
-          processed_by_pid: Process.pid,
-        }
-      end
-    end
   end
 end

@@ -124,6 +124,7 @@ RSpec.describe "kubernetes probes", type: :integration do
 
   def set_config
     Racecar.config = Racecar::Config.new
+    Racecar.config.load_consumer_class(consumer_class)
     Racecar.config.max_wait_time = 0.05
     Racecar.config.liveness_probe_enabled = true
     Racecar.config.liveness_probe_file_path = file_path

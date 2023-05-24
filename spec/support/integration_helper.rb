@@ -9,7 +9,12 @@ module IntegrationHelper
         @test_topic_names ||= []
       end
 
+      before do
+        listen_for_consumer_events
+      end
+
       after do
+        stop_listening_for_consumer_events
         incoming_messages.clear
         @rdkafka_consumer&.close
         @rdkafka_producer&.close
@@ -59,31 +64,44 @@ module IntegrationHelper
     rdkafka_consumer.subscribe(topic)
 
     attempts = 0
+    max_attempts = 30
 
     $stderr.print "\nWaiting for messages "
-    while incoming_messages.count < expected_message_count && attempts < 15
+    while incoming_messages.count < expected_message_count && attempts < max_attempts
       $stderr.print "."
       attempts += 1
 
-      while (message = rdkafka_consumer.poll(200))
-        $stderr.puts "\nReceived message #{message} #{message.headers}"
+      while (message = rdkafka_consumer.poll(250))
         incoming_messages << message
-      end
-    end
-    $stderr.print("\n")
-  end
-
-  def wait_for_assignments(n)
-    Timeout.timeout(5*n) do
-      consumer_messages = []
-
-      until consumer_messages.length == n
-        message = get_consumer_message
-        if message && message["group_id"] == group_id
-          consumer_messages << message
+        if incoming_messages.count == expected_message_count
+          break
         end
       end
     end
+    $stderr.print("\n")
+
+    if incoming_messages.count < expected_message_count
+      raise "Timed out waiting for messages, expected: #{expected_message_count}, got: #{incoming_messages.count}"
+    end
+  end
+
+  def wait_for_assignments(n)
+    $stderr.print "Waiting for assignments: #{n}"
+    Timeout.timeout(5*n) do
+      until assignment_events.length >= n
+        sleep 0.5
+      end
+    end
+  rescue Timeout::Error => e
+    raise Timeout::Error.new("Timeout waiting for assignments, expected #{n} got #{assignment_events.length}")
+  end
+
+  def assignment_events
+    received_consumer_events.select { |e| e["event"] == "partitions_assigned" }
+  end
+
+  def revocation_events
+    received_consumer_events.select { |e| e["event"] == "partitions_revoked" }
   end
 
   def create_topic(topic:, partitions: 1, replication_factor: 1)
@@ -99,13 +117,27 @@ module IntegrationHelper
       $stdout.puts "Deleting topic #{topic_name.inspect}"
       rdkafka_admin.delete_topic(topic_name)
     }.each(&:wait)
+    rdkafka_admin.close
   end
 
-  def get_consumer_message
-    rs, _ws, _es = IO.select([consumer_message_pipe.read_end], [], [], _timeout = 0.1)
-    if rs && rs.any?
-      consumer_message_pipe.read
+  def listen_for_consumer_events
+    @received_consumer_events ||= []
+    @listening_for_consumer_events = true
+
+    Thread.new do
+      Thread.current.name = "Test consumer event listener"
+      while @listening_for_consumer_events
+        event = consumer_message_pipe.read
+        if event
+          @received_consumer_events << event
+        end
+      end
     end
+  end
+  attr_reader :received_consumer_events
+
+  def stop_listening_for_consumer_events
+    @listening_for_consumer_events = false
   end
 
   def consumer_message_pipe
@@ -175,6 +207,45 @@ module IntegrationHelper
     warn "Timed out waiting for child processes to exit, may have left zombie processes."
   end
 
+  def echo_consumer_class
+    Class.new(Racecar::Consumer) do
+      class << self
+        attr_accessor :output_topic, :pipe_to_test
+      end
+
+      def self.on_partitions_assigned(topic_partition_list, _consumer)
+        ps = topic_partition_list.values.flatten.map(&:partition)
+        message = { event: "partitions_assigned", partitions: ps, consumer_id: consumer_id}
+        pipe_to_test.write(message)
+      end
+
+      def self.on_partitions_revoked(topic_partition_list, _consumer)
+        ps = topic_partition_list.values.flatten.map(&:partition)
+        message = { event: "partitions_revoked", partitions: ps, consumer_id: consumer_id}
+        pipe_to_test.write(message)
+      end
+
+      def self.consumer_id
+        "#{Process.pid}-#{Thread.current.object_id}"
+      end
+
+      def process(message)
+        produce(message.value, topic: self.class.output_topic, partition: message.partition, key: message.key, headers: headers(message))
+        deliver!
+      end
+
+      private
+
+      def headers(message)
+        {
+          processed_by: self.class.consumer_id,
+          processed_at: Process.clock_gettime(Process::CLOCK_MONOTONIC),
+          partition: message.partition,
+        }
+      end
+    end
+  end
+
   class JSONPipe
     def initialize(actual_pipe = IO.pipe)
       @read_end = actual_pipe[0]
@@ -183,7 +254,7 @@ module IntegrationHelper
     attr_reader :read_end, :write_end
 
     def write(data)
-      write_end.puts(JSON.dump(data))
+      write_end.write(JSON.dump(data) + "\n")
     end
 
     def read

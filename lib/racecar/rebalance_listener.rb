@@ -1,22 +1,36 @@
 module Racecar
   class RebalanceListener
-    def initialize(config)
-      @config = config
-      @consumer_class = config.consumer_class
+    def initialize(consumer_class, instrumenter)
+      @consumer_class = consumer_class
+      @instrumenter = instrumenter
+      @rdkafka_consumer = nil
     end
 
-    attr_reader :config, :consumer_class
+    attr_writer :rdkafka_consumer
 
-    def on_partitions_assigned(_consumer, topic_partition_list)
-      consumer_class.respond_to?(:on_partitions_assigned) &&
-        consumer_class.on_partitions_assigned(topic_partition_list.to_h)
-    rescue
+    attr_reader :consumer_class, :instrumenter, :rdkafka_consumer
+    private     :consumer_class, :instrumenter, :rdkafka_consumer
+
+    def on_partitions_assigned(rdkafka_topic_partition_list)
+      partitions_by_topic = rdkafka_topic_partition_list.to_h
+
+      instrument("partitions_assigned", partitions: partitions_by_topic ) do
+        consumer_class.on_partitions_assigned(partitions_by_topic, rdkafka_consumer)
+      end
     end
 
-    def on_partitions_revoked(_consumer, topic_partition_list)
-      consumer_class.respond_to?(:on_partitions_revoked) &&
-        consumer_class.on_partitions_revoked(topic_partition_list.to_h)
-    rescue
+    def on_partitions_revoked(rdkafka_topic_partition_list)
+      partitions_by_topic = rdkafka_topic_partition_list.to_h
+
+      instrument("partitions_revoked", partitions: partitions_by_topic ) do
+        consumer_class.on_partitions_revoked(partitions_by_topic, rdkafka_consumer)
+      end
+    end
+
+    private
+
+    def instrument(event, payload, &block)
+      instrumenter.instrument(event, payload, &block)
     end
   end
 end

@@ -29,6 +29,9 @@ module Racecar
     desc "The minimum number of messages in the local consumer queue"
     integer :min_message_queue_size, default: 2000
 
+    desc "Which partition assignment strategy to use, range, roundrobin or cooperative-sticky. -- https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md"
+    string :partition_assignment_strategy, default: "range,roundrobin"
+
     desc "Kafka consumer configuration options, separated with '=' -- https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md"
     list :consumer, default: []
 
@@ -294,10 +297,6 @@ module Racecar
         liveness_probe_file_path,
         liveness_probe_max_interval
       )
-    end
-
-    def rebalance_listener
-      RebalanceListener.new(self)
     end
 
     private
