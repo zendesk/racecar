@@ -61,16 +61,20 @@ module IntegrationHelper
     attempts = 0
 
     $stderr.print "\nWaiting for messages "
-    while incoming_messages.count < expected_message_count && attempts < 15
+    while incoming_messages.count < expected_message_count && attempts < 30
       $stderr.print "."
       attempts += 1
 
-      while (message = rdkafka_consumer.poll(200))
+      while (message = rdkafka_consumer.poll(250))
         $stderr.puts "\nReceived message #{message} #{message.headers}"
         incoming_messages << message
       end
     end
     $stderr.print("\n")
+
+    if incoming_messages.count < expected_message_count
+      raise "Timed out waiting for messages, expected: #{expected_message_count}, got: #{incoming_messages.count}"
+    end
   end
 
   def wait_for_assignments(n)
