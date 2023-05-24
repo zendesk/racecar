@@ -19,6 +19,7 @@ module Racecar
       @parser = build_parser
       @parser.parse!(args)
       @consumer_name = args.first or raise Racecar::Error, "no consumer specified"
+      @runner = nil
     end
 
     def run
@@ -65,8 +66,13 @@ module Racecar
       end
 
       processor = consumer_class.new
-      Racecar.run(processor)
+      @runner = Racecar.runner(processor)
+      @runner.run
       nil
+    end
+
+    def stop
+      @runner.stop
     end
 
     private

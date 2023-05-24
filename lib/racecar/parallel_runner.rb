@@ -37,6 +37,10 @@ module Racecar
       wait_for_exit
     end
 
+    def stop
+      terminate_workers
+    end
+
     private
 
     attr_accessor :workers

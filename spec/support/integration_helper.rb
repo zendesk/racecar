@@ -1,26 +1,48 @@
 # frozen_string_literal: true
 
 require "securerandom"
-require "open3"
 
 module IntegrationHelper
   def self.included(klass)
     klass.instance_eval do
-      after { incoming_messages.clear }
+      before(:all) do
+        @test_topic_names ||= []
+      end
+
+      after do
+        incoming_messages.clear
+        @rdkafka_consumer&.close
+        @rdkafka_producer&.close
+        @rdkafka_admin&.close
+        stop_racecar
+        wait_for_child_processes
+        reset_signal_handlers
+      end
+
+      after(:all) do
+        delete_test_topics
+      end
     end
   end
 
-  def rdkafka_config
-    @rdkafka_config ||= Rdkafka::Config.new({
-      "bootstrap.servers": kafka_brokers,
-      "client.id":         Racecar.config.client_id,
-      "group.id":          "racecar-tests",
-      "auto.offset.reset": "beginning"
-    }.merge(Racecar.config.rdkafka_consumer))
+  def start_racecar
+    @cli_run_thread = Thread.new do
+      Thread.current.name = "Racecar CLI"
+      racecar_cli.run
+    end
   end
 
-  def publish_messages!(topic, messages)
-    rdkafka_producer = rdkafka_config.producer
+  def stop_racecar
+    return unless @cli_run_thread && @cli_run_thread.alive?
+
+    racecar_cli.stop
+
+    @cli_run_thread.wakeup
+    @cli_run_thread.join(2)
+    @cli_run_thread.terminate
+  end
+
+  def publish_messages(topic: input_topic, messages: input_messages)
     messages.map do |m|
       rdkafka_producer.produce(
         topic: topic,
@@ -31,47 +53,63 @@ module IntegrationHelper
     end.each(&:wait)
 
     $stderr.puts "Published messages to topic: #{topic}; messages: #{messages}"
-  ensure
-    rdkafka_producer.close
   end
 
-  def create_topic(topic:, partitions: 1)
-    $stderr.puts "Creating topic #{topic}"
-    msg, process = run_kafka_command("kafka-topics --bootstrap-server #{kafka_brokers} --create "\
-                                     "--topic #{topic} --partitions #{partitions} --replication-factor 1")
-    return if process.exitstatus.zero?
-
-    raise "Kafka topic creation exited with status #{process.exitstatus}, message: #{msg}"
-  end
-
-  def wait_for_messages(topic:, expected_message_count:)
-    rdkafka_consumer = rdkafka_config.consumer
+  def wait_for_messages(topic: output_topic, expected_message_count: input_messages.count)
     rdkafka_consumer.subscribe(topic)
 
     attempts = 0
 
-    while incoming_messages.count < expected_message_count && attempts < 20
-      $stderr.puts "Waiting for messages..."
+    $stderr.print "\nWaiting for messages "
+    while incoming_messages.count < expected_message_count && attempts < 15
+      $stderr.print "."
       attempts += 1
 
-      while (message = rdkafka_consumer.poll(1000))
-        $stderr.puts "Received message #{message}"
+      while (message = rdkafka_consumer.poll(200))
+        $stderr.puts "\nReceived message #{message} #{message.headers}"
         incoming_messages << message
       end
     end
-  ensure
-    rdkafka_consumer.close
+    $stderr.print("\n")
   end
 
-  def wait_for_assignments(group_id:, topic:, expected_members_count:)
-    rebalance_attempt = 1
+  def wait_for_assignments(n)
+    Timeout.timeout(5*n) do
+      consumer_messages = []
 
-    until members_count(group_id, topic) == expected_members_count
-      $stderr.puts "Waiting for rebalance..."
-      sleep 2 * rebalance_attempt
-      raise "Did not rebalance in time" if rebalance_attempt > 5
-      rebalance_attempt += 1
+      until consumer_messages.length == n
+        message = get_consumer_message
+        if message && message["group_id"] == group_id
+          consumer_messages << message
+        end
+      end
     end
+  end
+
+  def create_topic(topic:, partitions: 1, replication_factor: 1)
+    $stderr.puts "Creating topic #{topic}"
+    handle = rdkafka_admin.create_topic(topic, partitions, replication_factor)
+    handle.wait
+    @test_topic_names.push(topic)
+    nil
+  end
+
+  def delete_test_topics
+    @test_topic_names.map { |topic_name|
+      $stdout.puts "Deleting topic #{topic_name.inspect}"
+      rdkafka_admin.delete_topic(topic_name)
+    }.each(&:wait)
+  end
+
+  def get_consumer_message
+    rs, _ws, _es = IO.select([consumer_message_pipe.read_end], [], [], _timeout = 0.1)
+    if rs && rs.any?
+      consumer_message_pipe.read
+    end
+  end
+
+  def consumer_message_pipe
+    @consumer_message_pipe ||= JSONPipe.new
   end
 
   def generate_input_topic_name
@@ -82,23 +120,34 @@ module IntegrationHelper
     "#{output_topic_prefix}-#{SecureRandom.hex(8)}"
   end
 
-  def delete_all_test_topics
-    message, process = run_kafka_command(
-      "kafka-topics --bootstrap-server #{kafka_brokers} --delete --topic '#{input_topic_prefix}-.*'"
-    )
-    $stderr.puts "Input topics deletion exited with status #{process.exitstatus}, message: #{message}"
+  def generate_group_id
+    "racecar_test_consumers-#{SecureRandom.hex(8)}"
+  end
 
-    message, process = run_kafka_command(
-      "kafka-topics --bootstrap-server #{kafka_brokers} --delete --topic '#{output_topic_prefix}-.*'"
-    )
-    $stderr.puts "Output topics deletion exited with status #{process.exitstatus}, message: #{message}"
+  def rdkafka_consumer
+    @rdkafka_consumer ||= Rdkafka::Config.new(
+      "bootstrap.servers" => kafka_brokers,
+      "client.id" =>         Racecar.config.client_id,
+      "group.id" =>          "racecar-tests",
+      "auto.offset.reset" => "beginning"
+    ).consumer
+  end
+
+  def rdkafka_admin
+    @rdkafka_admin ||= Rdkafka::Config.new({
+      "bootstrap.servers" => kafka_brokers,
+    }).admin
+  end
+
+  def rdkafka_producer
+    @rdkafka_producer ||= Rdkafka::Config.new({
+      "bootstrap.servers" => kafka_brokers,
+    }).producer
   end
 
   def incoming_messages
     @incoming_messages ||= []
   end
-
-  private
 
   def kafka_brokers
     Racecar.config.brokers.join(",")
@@ -112,43 +161,34 @@ module IntegrationHelper
     "output-test-topic"
   end
 
-  def members_count(group_id, topic)
-    consumer_group_partitions_and_member_ids(group_id, topic).uniq { |data| data.fetch(:member_id) }.count
-  end
-
-  def in_background(cleanup_callback:, &block)
-    Thread.new do
-      begin
-        block.call
-      ensure
-        cleanup_callback.call
-      end
+  def reset_signal_handlers
+    ["INT", "TERM", "QUIT"].each do |signal|
+      Signal.trap(signal, "DEFAULT")
     end
   end
 
-  def consumer_group_partitions_and_member_ids(group_id, topic)
-    message, process = run_kafka_command(
-      "kafka-consumer-groups --bootstrap-server #{kafka_brokers} --describe --group #{group_id}"
-    )
-    unless process.exitstatus.zero?
-      raise "Kafka consumer group inspection exited with status #{process.exitstatus}, message: #{message}"
+  def wait_for_child_processes
+    Timeout.timeout(5) do
+      Process.waitall
     end
-
-    return [] if message.match?(/consumer.+(is rebalancing|does not exist|has no active members)/i)
-
-    message
-      .scan(/^#{group_id}\ +#{topic}\ +(?<partition>\d+)\ +\S+\ +\S+\ +\S+\ +(?<member_id>\S+)\ /)
-      .map { |partition, member_id| { partition: partition, member_id: member_id } }
-      .tap do |partitions|
-        raise("Unexpected command output, please review regexp matcher:\n\n #{message}") if partitions.empty?
-      end
+  rescue Timeout::Error
+    warn "Timed out waiting for child processes to exit, may have left zombie processes."
   end
 
-  def run_kafka_command(command)
-    maybe_sudo = "sudo " if ENV["DOCKER_SUDO"] == "true"
+  class JSONPipe
+    def initialize(actual_pipe = IO.pipe)
+      @read_end = actual_pipe[0]
+      @write_end = actual_pipe[1]
+    end
+    attr_reader :read_end, :write_end
 
-    Open3.capture2e(
-      "#{maybe_sudo}docker exec -t $(#{maybe_sudo}docker ps | grep broker | awk '{print $1}') #{command}"
-    )
+    def write(data)
+      write_end.puts(JSON.dump(data))
+    end
+
+    def read
+      data = read_end.readline
+      data && JSON.parse(data)
+    end
   end
 end

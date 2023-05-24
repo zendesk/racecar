@@ -6,6 +6,7 @@ require "king_konf"
 
 require "racecar/liveness_probe"
 require "racecar/instrumenter"
+require "racecar/rebalance_listener"
 
 module Racecar
   class Config < KingKonf::Config
@@ -227,6 +228,7 @@ module Racecar
     end
 
     def load_consumer_class(consumer_class)
+      self.consumer_class = consumer_class
       self.group_id = consumer_class.group_id || self.group_id
 
       self.group_id ||= [
@@ -243,6 +245,7 @@ module Racecar
       self.fetch_messages = consumer_class.fetch_messages || self.fetch_messages
       self.pidfile ||= "#{group_id}.pid"
     end
+    attr_accessor :consumer_class
 
     def on_error(&handler)
       @error_handler = handler
@@ -291,6 +294,10 @@ module Racecar
         liveness_probe_file_path,
         liveness_probe_max_interval
       )
+    end
+
+    def rebalance_listener
+      RebalanceListener.new(self)
     end
 
     private

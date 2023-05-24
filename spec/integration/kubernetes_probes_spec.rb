@@ -2,6 +2,7 @@
 
 require "timeout"
 require "securerandom"
+require "open3"
 require "active_support/notifications"
 require "racecar/cli"
 
@@ -14,10 +15,8 @@ RSpec.describe "kubernetes probes", type: :integration do
     end
 
     after do
-      stop_racecar
       ensure_liveness_file_is_deleted
-      reset_notifications
-      restore_config
+      reset_probe
     end
 
     it "initially fails, then passes when the main loop starts" do
@@ -111,22 +110,6 @@ RSpec.describe "kubernetes probes", type: :integration do
     end
   end
 
-  def start_racecar
-    @cli_run_thread = Thread.new do
-      Thread.current.name = "Racecar CLI"
-      racecar_cli.run
-    end
-  end
-
-  def stop_racecar
-    Process.kill("INT", Process.pid)
-    if @cli_run_thread.alive?
-      @cli_run_thread.wakeup
-      @cli_run_thread.join(2)
-      @cli_run_thread.terminate
-    end
-  end
-
   def execute_after_next_main_loop(&block)
     subscriber = ActiveSupport::Notifications.subscribe("main_loop.racecar") do |event, *_|
       ActiveSupport::Notifications.unsubscribe(subscriber)
@@ -140,7 +123,6 @@ RSpec.describe "kubernetes probes", type: :integration do
   end
 
   def set_config
-    @original_config = Racecar.config
     Racecar.config = Racecar::Config.new
     Racecar.config.max_wait_time = 0.05
     Racecar.config.liveness_probe_enabled = true
@@ -148,11 +130,7 @@ RSpec.describe "kubernetes probes", type: :integration do
     Racecar.config.liveness_probe_max_interval = max_interval
   end
 
-  def restore_config
-    Racecar.config = @original_config
-  end
-
-  def reset_notifications
+  def reset_probe
     Racecar.config.liveness_probe.uninstall
   end
 end
