@@ -52,7 +52,17 @@ module Racecar
     # Racecar on the status of the message and it won't halt execution
     # of the rest of your code.
     def produce_async(value:, topic:, **options)
-      with_instrumentation(action: "produce_async", value: value, topic: topic, **options) do
+      message_size = value.respond_to?(:bytesize) ? value.bytesize : 0
+      instrumentation_payload = {
+        value: value,
+        topic: topic,
+        message_size: message_size,
+        buffer_size: @delivery_handles.size,
+        key: options.fetch(:key, nil),
+        partition: options.fetch(:partition, nil),
+        partition_key: options.fetch(:partition_key, nil)
+      }
+      @instrumenter.instrument("produce_async", instrumentation_payload) do
         handle = internal_producer.produce(payload: value, topic: topic, **options)
         @delivery_handles << handle if @batching
       end
@@ -62,9 +72,24 @@ module Racecar
 
     # synchronous message production - will wait until the delivery handle succeeds, fails or times out.
     def produce_sync(value:, topic:, **options)
-      with_instrumentation(action: "produce_sync", value: value, topic: topic, **options) do
+      message_size = value.respond_to?(:bytesize) ? value.bytesize : 0
+      instrumentation_payload = {
+        value: value,
+        topic: topic,
+        message_size: message_size,
+        buffer_size: @delivery_handles.size,
+        key: options.fetch(:key, nil),
+        partition: options.fetch(:partition, nil),
+        partition_key: options.fetch(:partition_key, nil)
+      }
+      @instrumenter.instrument("produce_sync", instrumentation_payload) do
         handle = internal_producer.produce(payload: value, topic: topic, **options)
-        deliver_with_error_handling(handle)
+        begin
+          deliver_with_error_handling(handle)
+        rescue MessageDeliveryError => e
+          instrumentation_payload[:exception] = e
+          raise e
+        end
       end
 
       nil
@@ -108,22 +133,6 @@ module Racecar
       retry
     rescue Rdkafka::RdkafkaError => e
       raise MessageDeliveryError.new(e, handle)
-    end
-
-    def with_instrumentation(action:, value:, topic:, **options)
-      message_size = value.respond_to?(:bytesize) ? value.bytesize : 0
-      instrumentation_payload = {
-        value: value,
-        topic: topic,
-        message_size: message_size,
-        buffer_size: @delivery_handles.size,
-        key: options.fetch(:key, nil),
-        partition: options.fetch(:partition, nil),
-        partition_key: options.fetch(:partition_key, nil)
-      }
-      @instrumenter.instrument(action, instrumentation_payload) do
-        yield
-      end
     end
   end
 end
