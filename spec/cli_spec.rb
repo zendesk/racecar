@@ -15,7 +15,7 @@ RSpec.describe Racecar::Cli do
   context "displaying startup message" do
     before do
       expect($stderr).to receive(:puts).with(/Starting Racecar consumer CatConsumer/)
-      expect($stderr).to receive(:puts).with(/Wro+m!/)
+      expect($stderr).to receive(:puts).with(/Vro+m!/)
       expect($stderr).to receive(:puts).with(/Ctrl-C to shutdown consumer/)
     end
 
