@@ -1,9 +1,19 @@
+GIT
+  remote: https://github.com/streemau/rdkafka-ruby.git
+  revision: 5f0746979827f310af5bca2a9840a2770c08c446
+  branch: add-offsets_for_times-method-on-consumer
+  specs:
+    rdkafka (0.13.0.beta.3)
+      ffi (~> 1.15)
+      mini_portile2 (~> 2.6)
+      rake (> 12)
+
 PATH
   remote: .
   specs:
     racecar (2.9.0.beta1)
       king_konf (~> 1.0.0)
-      rdkafka (~> 0.12.0)
+      rdkafka
 
 GEM
   remote: https://rubygems.org/
@@ -29,10 +39,6 @@ GEM
       coderay (~> 1.1)
       method_source (~> 1.0)
     rake (13.0.6)
-    rdkafka (0.12.0)
-      ffi (~> 1.15)
-      mini_portile2 (~> 2.6)
-      rake (> 12)
     rspec (3.12.0)
       rspec-core (~> 3.12.0)
       rspec-expectations (~> 3.12.0)
@@ -61,6 +67,7 @@ DEPENDENCIES
   pry
   racecar!
   rake (> 10.0)
+  rdkafka!
   rspec (~> 3.0)
   timecop
 
