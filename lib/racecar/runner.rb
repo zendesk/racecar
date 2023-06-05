@@ -5,6 +5,7 @@ require "racecar/pause"
 require "racecar/message"
 require "racecar/message_delivery_error"
 require "racecar/erroneous_state_error"
+require "racecar/delivery_callback"
 
 module Racecar
   class Runner
@@ -141,7 +142,7 @@ module Racecar
 
     def producer
       @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |producer|
-        producer.delivery_callback = delivery_callback
+        producer.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
       end
     end
 
@@ -158,16 +159,6 @@ module Racecar
       producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
       producer_config.merge!(config.rdkafka_producer)
       producer_config
-    end
-
-    def delivery_callback
-      ->(delivery_report) do
-        payload = {
-          offset: delivery_report.offset,
-          partition: delivery_report.partition
-        }
-        @instrumenter.instrument("acknowledged_message", payload)
-      end
     end
 
     def install_signal_handlers
