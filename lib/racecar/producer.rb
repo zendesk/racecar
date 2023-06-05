@@ -47,13 +47,14 @@ module Racecar
           producer.delivery_callback = lambda { |delivery_report|
             if delivery_report.error.to_i.positive?
               instrumentation_payload = {
+                client: config.client_id,
                 topic: delivery_report.topic,
                 partition: delivery_report.partition,
                 exception: delivery_report.error
               }
               @instrumenter.instrument("produce_error", instrumentation_payload)
             end
-          } 
+          }
           producer
         end
       end
