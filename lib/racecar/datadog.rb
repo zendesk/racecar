@@ -248,6 +248,15 @@ module Racecar
         # Number of messages ACK'd for the topic.
         increment("producer.ack.messages", tags: tags)
       end
+
+      def producer_error(event)
+        tags = {
+          client: event.payload.fetch(:client_id),
+          topic: event.payload.fetch(:topic),
+        }
+
+        increment("producer.produce.errors", tags: tags)
+      end
       
       def produce_async(event)
         client = event.payload.fetch(:client_id)

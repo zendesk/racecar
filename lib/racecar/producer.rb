@@ -42,7 +42,19 @@ module Racecar
           }
           producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
           producer_config.merge!(config.rdkafka_producer)
-          Rdkafka::Config.new(producer_config).producer
+          producer = Rdkafka::Config.new(producer_config).producer
+
+          producer.delivery_callback = lambda { |delivery_report|
+            if delivery_report.error.to_i.positive?
+              instrumentation_payload = {
+                topic: delivery_report.topic,
+                partition: delivery_report.partition,
+                exception: delivery_report.error
+              }
+              @instrumenter.instrument("produce_error", instrumentation_payload)
+            end
+          } 
+          producer
         end
       end
     end
