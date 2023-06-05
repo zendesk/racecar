@@ -181,6 +181,17 @@ class FakeProducer
   end
 end
 
+class FakeDeliveryReport
+  attr_reader :error, :topic_name, :partition, :offset
+
+  def initialize(partition, offset, error, topic_name)
+    @partition = partition
+    @offset = offset
+    @error = error
+    @topic_name = topic_name
+  end
+end
+
 class FakeDeliveryHandle
   def initialize(kafka, msg, delivery_callback)
     @kafka = kafka
@@ -192,9 +203,15 @@ class FakeDeliveryHandle
     @msg.public_send(key)
   end
 
+  def report
+    FakeDeliveryReport.new(0, 0, 0, "test")
+  end
+
   def wait(max_wait_timeout: 60, wait_timeout: 0.1)
     @kafka.produced_messages << @msg
-    @delivery_callback.call(self) if @delivery_callback
+    # @delivery_callback.call(self) if @delivery_callback
+    # @delivery_callback.call(report, self) if @delivery_callback
+    @delivery_callback.call(report) if @delivery_callback
   end
 
   def create_result
@@ -207,14 +224,6 @@ class FakeDeliveryHandle
 
   def partition
     0
-  end
-
-  def error
-    1
-  end
-
-  def topic
-    "test"
   end
 end
 
@@ -688,8 +697,7 @@ RSpec.describe Racecar::Runner do
     end
 
     it "instruments delivery notifications" do
-      allow_any_instance_of(FakeDeliveryHandle).to receive(:error)
-        .and_return(0)
+      allow_any_instance_of(FakeDeliveryReport).to receive(:error).and_return(0)
       allow(instrumenter).to receive(:instrument).and_call_original
       kafka.deliver_message("2", topic: "numbers")
 

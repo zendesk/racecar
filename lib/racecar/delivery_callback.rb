@@ -9,7 +9,7 @@ module Racecar
     def call(delivery_report)
       if delivery_report.error.to_i.positive?
         instrumentation_payload = {
-          topic: delivery_report.topic,
+          topic: delivery_report.topic_name,
           partition: delivery_report.partition,
           exception: delivery_report.error
         }
