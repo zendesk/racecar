@@ -44,7 +44,7 @@ module Racecar
           producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
           producer_config.merge!(config.rdkafka_producer)
           producer = Rdkafka::Config.new(producer_config).producer.tap do |producer|
-            producer.delivery_callback = DeliveryCallback.new
+            producer.delivery_callback = DeliveryCallback.new(instrumenter: @instrumenter)
           end
         end
       end

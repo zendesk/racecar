@@ -142,7 +142,7 @@ module Racecar
 
     def producer
       @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |producer|
-        producer.delivery_callback = Racecar::DeliveryCallback.new
+        producer.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
       end
     end
 

@@ -1,5 +1,11 @@
 module Racecar
   class DeliveryCallback
+    attr_reader :instrumenter
+
+    def initialize(instrumenter:)
+      @instrumenter = instrumenter
+    end
+
     def call(delivery_report)
       if delivery_report.error.to_i.positive?
         instrumentation_payload = {

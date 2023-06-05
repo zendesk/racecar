@@ -194,8 +194,6 @@ class FakeDeliveryHandle
 
   def wait(max_wait_timeout: 60, wait_timeout: 0.1)
     @kafka.produced_messages << @msg
-    require 'byebug'
-    byebug
     @delivery_callback.call(self) if @delivery_callback
   end
 
@@ -690,6 +688,8 @@ RSpec.describe Racecar::Runner do
     end
 
     it "instruments delivery notifications" do
+      allow_any_instance_of(FakeDeliveryHandle).to receive(:error)
+        .and_return(0)
       allow(instrumenter).to receive(:instrument).and_call_original
       kafka.deliver_message("2", topic: "numbers")
 
