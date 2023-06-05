@@ -194,6 +194,8 @@ class FakeDeliveryHandle
 
   def wait(max_wait_timeout: 60, wait_timeout: 0.1)
     @kafka.produced_messages << @msg
+    require 'byebug'
+    byebug
     @delivery_callback.call(self) if @delivery_callback
   end
 
@@ -207,6 +209,14 @@ class FakeDeliveryHandle
 
   def partition
     0
+  end
+
+  def error
+    1
+  end
+
+  def topic
+    "test"
   end
 end
 
