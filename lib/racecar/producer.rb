@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "racecar/message_delivery_error"
+require "racecar/delivery_callback"
 
 at_exit do
   Racecar::Producer.shutdown!
@@ -43,31 +44,11 @@ module Racecar
           producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
           producer_config.merge!(config.rdkafka_producer)
           producer = Rdkafka::Config.new(producer_config).producer.tap do |producer|
-            producer.delivery_callback = delivery_callback
+            producer.delivery_callback = DeliveryCallback.new
           end
         end
       end
     end
-
-    def delivery_callback
-      -> { |delivery_report|
-        if delivery_report.error.to_i.positive?
-          instrumentation_payload = {
-            topic: delivery_report.topic,
-            partition: delivery_report.partition,
-            exception: delivery_report.error
-          }
-          @instrumenter.instrument("produce_error", instrumentation_payload)
-        else
-          payload = {
-            offset: delivery_report.offset,
-            partition: delivery_report.partition
-          }
-          @instrumenter.instrument("acknowledged_message", payload)
-        end
-      }
-    end
-
 
     # fire and forget - you won't get any guarantees or feedback from 
     # Racecar on the status of the message and it won't halt execution
