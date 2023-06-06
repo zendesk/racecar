@@ -213,10 +213,10 @@ module Racecar
 
         if event.payload.key?(:exception)
           increment("producer.produce.errors", tags: tags)
-        else
-          # This gets us the write rate.
-          increment("producer.produce.messages", tags: tags.merge(topic: topic))
         end
+
+        # This gets us the write rate.
+        increment("producer.produce.messages", tags: tags.merge(topic: topic))
 
         # Information about typical/average/95p message size.
         histogram("producer.produce.message_size", message_size, tags: tags.merge(topic: topic))
