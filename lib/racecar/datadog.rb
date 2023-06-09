@@ -269,6 +269,10 @@ module Racecar
           topic: topic,
         }
 
+        if event.payload.key?(:exception)
+          increment("producer.produce.errors", tags: tags)
+        end
+
         # This gets us the write rate.
         increment("producer.produce.messages", tags: tags.merge(topic: topic))
 
@@ -291,6 +295,11 @@ module Racecar
           client: client,
           topic: topic,
         }
+
+        if event.payload.key?(:exception)
+          increment("producer.produce.errors", tags: tags)
+        end
+
 
         # This gets us the write rate.
         increment("producer.produce.messages", tags: tags.merge(topic: topic))
