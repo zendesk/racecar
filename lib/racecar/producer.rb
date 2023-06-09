@@ -64,24 +64,9 @@ module Racecar
 
     # synchronous message production - will wait until the delivery handle succeeds, fails or times out.
     def produce_sync(value:, topic:, **options)
-      message_size = value.respond_to?(:bytesize) ? value.bytesize : 0
-      instrumentation_payload = {
-        value: value,
-        topic: topic,
-        message_size: message_size,
-        buffer_size: @delivery_handles.size,
-        key: options.fetch(:key, nil),
-        partition: options.fetch(:partition, nil),
-        partition_key: options.fetch(:partition_key, nil)
-      }
-      @instrumenter.instrument("produce_sync", instrumentation_payload) do
+      with_instrumentation(action: "produce_sync", value: value, topic: topic, **options) do
         handle = internal_producer.produce(payload: value, topic: topic, **options)
-        begin
-          deliver_with_error_handling(handle)
-        rescue MessageDeliveryError => e
-          instrumentation_payload[:exception] = e
-          raise e
-        end
+        deliver_with_error_handling(handle)
       end
 
       nil
