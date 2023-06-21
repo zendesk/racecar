@@ -240,6 +240,9 @@ class FakeRdkafka
   def producer(*)
     FakeProducer.new(self, @runner)
   end
+
+  def consumer_rebalance_listener=(_listenr)
+  end
 end
 
 class FakeInstrumenter < Racecar::Instrumenter

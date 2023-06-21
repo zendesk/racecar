@@ -66,12 +66,16 @@ module Racecar
   end
 
   def self.run(processor)
+    runner(processor).run
+  end
+
+  def self.runner(processor)
     runner = Runner.new(processor, config: config, logger: logger, instrumenter: config.instrumenter)
 
     if config.parallel_workers && config.parallel_workers > 1
-      ParallelRunner.new(runner: runner, config: config, logger: logger).run
+      ParallelRunner.new(runner: runner, config: config, logger: logger)
     else
-      runner.run
+      runner
     end
   end
 end

@@ -15,7 +15,7 @@ end
 RSpec.describe Racecar::ConsumerSet do
   let(:config)              { Racecar::Config.new }
   let(:rdconsumer)          { double("rdconsumer", subscribe: true) }
-  let(:rdconfig)            { double("rdconfig", consumer: rdconsumer) }
+  let(:rdconfig)            { double("rdconfig", consumer: rdconsumer, "consumer_rebalance_listener=": nil) }
   let(:logger)              { Logger.new(StringIO.new) }
   let(:instrumenter)        { Racecar::NullInstrumenter }
   let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger, instrumenter) }

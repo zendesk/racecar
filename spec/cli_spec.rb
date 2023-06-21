@@ -18,11 +18,12 @@ RSpec.describe Racecar::Cli do
       expect($stderr).to receive(:puts).with(/Wro+m!/)
       expect($stderr).to receive(:puts).with(/Ctrl-C to shutdown consumer/)
     end
+    let(:mock_runner) { double(:mock_runner, run: nil) }
 
     it "doesn't start Rails if --without-rails option is specified" do
       args = ["--require", "./examples/cat_consumer.rb", "CatConsumer", "--without-rails"]
 
-      allow(Racecar).to receive(:run)
+      allow(Racecar).to receive(:runner).and_return(mock_runner)
       expect(Racecar::RailsConfigFileLoader).not_to receive(:load!)
 
       Racecar::Cli.main(args)
@@ -31,7 +32,7 @@ RSpec.describe Racecar::Cli do
     it "starts Rails if the --without-rails option is omitted" do
       args = ["--require", "./examples/cat_consumer.rb", "CatConsumer"]
 
-      allow(Racecar).to receive(:run)
+      allow(Racecar).to receive(:runner).and_return(mock_runner)
       expect(Racecar::RailsConfigFileLoader).to receive(:load!)
 
       Racecar::Cli.main(args)
