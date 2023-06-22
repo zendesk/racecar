@@ -201,6 +201,7 @@ module Racecar
             consumer.store_offset(message)
           end
         rescue => e
+          instrumentation_payload[:exception] = e
           instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
           instrumentation_payload[:retries_count] = pause.pauses_count
           config.error_handler.call(e, instrumentation_payload)
@@ -232,6 +233,7 @@ module Racecar
             processor.deliver!
             consumer.store_offset(messages.last)
           rescue => e
+            instrumentation_payload[:exception] = e
             instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
             instrumentation_payload[:retries_count] = pause.pauses_count
             config.error_handler.call(e, instrumentation_payload)
