@@ -14,12 +14,11 @@ module Racecar
         }
         @instrumenter.instrument("acknowledged_message", payload)
       else
-        instrumentation_payload = {
-          topic: delivery_report.topic_name,
+        payload = {
           partition: delivery_report.partition,
           exception: delivery_report.error
         }
-        @instrumenter.instrument("produce_error", instrumentation_payload)
+        @instrumenter.instrument("produce_error", payload)
       end
     end
   end

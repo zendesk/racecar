@@ -252,7 +252,6 @@ module Racecar
       def produce_error(event)
         tags = {
           client: event.payload.fetch(:client_id),
-          topic: event.payload.fetch(:topic),
         }
 
         increment("producer.produce.errors", tags: tags)
