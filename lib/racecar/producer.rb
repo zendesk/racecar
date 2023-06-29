@@ -65,8 +65,12 @@ module Racecar
     # synchronous message production - will wait until the delivery handle succeeds, fails or times out.
     def produce_sync(value:, topic:, **options)
       with_instrumentation(action: "produce_sync", value: value, topic: topic, **options) do
-        handle = internal_producer.produce(payload: value, topic: topic, **options)
-        deliver_with_error_handling(handle)
+        begin
+          handle = internal_producer.produce(payload: value, topic: topic, **options)
+          deliver_with_error_handling(handle)
+        rescue Rdkafka::RdkafkaError => e
+          raise MessageDeliveryError.new(e, handle)
+        end
       end
 
       nil
