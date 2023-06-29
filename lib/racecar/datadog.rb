@@ -249,12 +249,12 @@ module Racecar
         increment("producer.ack.messages", tags: tags)
       end
 
-      def produce_error(event)
+      def produce_delivery_error(event)
         tags = {
           client: event.payload.fetch(:client_id),
         }
 
-        increment("producer.produce.errors", tags: tags)
+        increment("producer.produce.delivery.errors", tags: tags)
       end
 
       def produce_async(event)
