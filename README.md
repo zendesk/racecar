@@ -417,7 +417,7 @@ Racecar supports [Datadog](https://www.datadoghq.com/) monitoring integration. I
 - `datadog_namespace` – The namespace to use for Datadog metrics.
 - `datadog_tags` – Tags that should always be set on Datadog metrics.
 
-Furthermore, there's a [standard Datadog dashboard configution file](https://raw.githubusercontent.com/zendesk/racecar/master/extra/datadog-dashboard.json) that you can import to get started with a Racecar dashboard for all of your consumers.
+Furthermore, there's a [standard Datadog dashboard configuration file](https://raw.githubusercontent.com/zendesk/racecar/master/extra/datadog-dashboard.json) that you can import to get started with a Racecar dashboard for all of your consumers.
 
 #### Consumers Without Rails
 
