@@ -711,7 +711,8 @@ RSpec.describe Racecar::Runner do
 
     context "when DataDog metrics are disabled" do
       before do
-        allow(Object).to receive(:const_defined?).with("Racecar::Datadog").and_return(false)
+        stub_const("Racecar::Datadog", datadog)
+        config.datadog_enabled = false
       end
 
       it "does not close Datadog::Statsd instance" do
@@ -723,7 +724,7 @@ RSpec.describe Racecar::Runner do
     context "when DataDog metrics are enabled" do
       before do
         stub_const("Racecar::Datadog", datadog)
-        allow(Object).to receive(:const_defined?).with("Racecar::Datadog").and_return(true)
+        config.datadog_enabled = true
       end
 
       it "closes Datadog::Statsd instance" do
