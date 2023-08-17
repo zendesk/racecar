@@ -476,6 +476,8 @@ With Foreman, you can easily run these processes locally by executing `foreman r
 
 If you run your applications in Kubernetes, use the following [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) spec as a starting point:
 
+##### Recreate Strategy
+
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -483,8 +485,8 @@ metadata:
   name: my-racecar-deployment
   labels:
     app: my-racecar
-spec:
-  replicas: 3 # <-- this will give us three consumers in the group.
+spec
+  replicas: 4 # <-- this is a good value if you have a multliple of 4 partitions
   selector:
     matchLabels:
       app: my-racecar
@@ -506,9 +508,33 @@ spec:
               value: 5
 ```
 
-The important part is the `strategy.type` value, which tells Kubernetes how to upgrade from one version of your Deployment to another. Many services use so-called _rolling updates_, where some but not all containers are replaced with the new version. This is done so that, if the new version doesn't work, the old version is still there to serve most of the requests. For Kafka consumers, this doesn't work well. The reason is that every time a consumer joins or leaves a group, every other consumer in the group needs to stop and synchronize the list of partitions assigned to each group member. So if the group is updated in a rolling fashion, this synchronization would occur over and over again, causing undesirable double-processing of messages as consumers would start only to be synchronized shortly after.
+This configuration uses the recreate strategy which completely terminates all consumers before starting new ones.
+It's simple and easy to understand but can result in significant 'downtime' where no messages are processed.
 
-Instead, the `Recreate` update strategy should be used. It completely tears down the existing containers before starting all of the new containers simultaneously, allowing for a single synchronization stage and a much faster, more stable deployment update.
+##### Rolling Updates and 'sticky-cooperative' Assignment
+
+A newer alternative is to use the consumer's "cooperative-sticky" assignment strategy which allows healthy consumers to keep processing their partitions while others are terminated.
+This can be combined with a restricted rolling update to minimize processing downtime.
+
+Add to your Racecar config:
+```ruby
+Racecar.configure do |c|
+  c.partition_assignment_strategy = "cooperative-sticky"
+end
+```
+
+Replace the Kubernetes deployment strategy with:
+```yaml
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+        maxSurge: 0 # <- Never boot an excess consumer
+        maxUnavailable: 1 # <- The deploy 'rolls' one consumer at a time
+```
+
+These two configurations should be deployed together.
+
+While `maxSurge` should always be 0, `maxUnavailable` can be increased to reduce deployment times in exchange for longer pauses in message processing.
 
 #### Liveness Probe
 
@@ -663,7 +689,7 @@ In order to introspect the configuration of a consumer process, send it the `SIG
 
 ### Upgrading from v1 to v2
 
-In order to safely upgrade from Racecar v1 to v2, you need to completely shut down your consumer group before starting it up again with the v2 Racecar dependency. In general, you should avoid rolling deploys for consumers groups, so it is likely the case that this will just work for you, but it's a good idea to check first. 
+In order to safely upgrade from Racecar v1 to v2, you need to completely shut down your consumer group before starting it up again with the v2 Racecar dependency.
 
 ### Compression
 
