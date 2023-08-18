@@ -15,7 +15,10 @@ module Racecar
       partitions_by_topic = rdkafka_topic_partition_list.to_h
 
       instrument("partitions_assigned", partitions: partitions_by_topic ) do
-        consumer_class.on_partitions_assigned(partitions_by_topic, rdkafka_consumer)
+        consumer_class.on_partitions_assigned(
+          partitions_by_topic: partitions_by_topic,
+          rdkafka_consumer: rdkafka_consumer
+        )
       end
     end
 
@@ -23,7 +26,10 @@ module Racecar
       partitions_by_topic = rdkafka_topic_partition_list.to_h
 
       instrument("partitions_revoked", partitions: partitions_by_topic ) do
-        consumer_class.on_partitions_revoked(partitions_by_topic, rdkafka_consumer)
+        consumer_class.on_partitions_revoked(
+          partitions_by_topic: partitions_by_topic,
+          rdkafka_consumer: rdkafka_consumer
+        )
       end
     end
 

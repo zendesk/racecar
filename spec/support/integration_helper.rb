@@ -213,14 +213,14 @@ module IntegrationHelper
         attr_accessor :output_topic, :pipe_to_test
       end
 
-      def self.on_partitions_assigned(topic_partition_list, _consumer)
-        ps = topic_partition_list.values.flatten.map(&:partition)
+      def self.on_partitions_assigned(partitions_by_topic:, rdkafka_consumer:)
+        ps = partitions_by_topic.values.flatten.map(&:partition)
         message = { event: "partitions_assigned", partitions: ps, consumer_id: consumer_id}
         pipe_to_test.write(message)
       end
 
-      def self.on_partitions_revoked(topic_partition_list, _consumer)
-        ps = topic_partition_list.values.flatten.map(&:partition)
+      def self.on_partitions_revoked(partitions_by_topic:, rdkafka_consumer:)
+        ps = partitions_by_topic.values.flatten.map(&:partition)
         message = { event: "partitions_revoked", partitions: ps, consumer_id: consumer_id}
         pipe_to_test.write(message)
       end
