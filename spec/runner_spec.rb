@@ -170,7 +170,7 @@ class FakeProducer
 
   def produce(payload:, topic:, key:, partition: nil, partition_key: nil, timestamp: nil, headers: nil)
     @buffer << FakeRdkafka::FakeMessage.new(payload, key, topic, 0, 0, timestamp, headers)
-    FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback)
+    FakeDeliveryHandle.new(@kafka, @buffer.last, @delivery_callback, topic)
   end
 
   def delivery_callback=(handler)
@@ -182,10 +182,12 @@ class FakeProducer
 end
 
 class FakeDeliveryHandle
-  def initialize(kafka, msg, delivery_callback)
+  attr_reader :topic_name
+  def initialize(kafka, msg, delivery_callback, topic)
     @kafka = kafka
     @msg = msg
     @delivery_callback = delivery_callback
+    @topic_name = topic
   end
 
   def [](key)
@@ -690,7 +692,7 @@ RSpec.describe Racecar::Runner do
       runner.run
 
       expect(instrumenter).to have_received(:instrument)
-        .with("acknowledged_message", {partition: 0, offset: 0})
+        .with("acknowledged_message", {partition: 0, offset: 0, topic: "doubled"})
     end
   end
 

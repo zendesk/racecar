@@ -258,7 +258,7 @@ RSpec.describe Racecar::Datadog::ConsumerSubscriber do
   describe '#pause_status' do
     let(:event) do
       create_event(
-        'main_loop',
+        'pause_status',
         client_id: 'racecar',
         group_id:  'test_group',
         topic:     'test_topic',
@@ -380,14 +380,18 @@ RSpec.describe Racecar::Datadog::ProducerSubscriber do
   describe '#acknowledged_message' do
     let(:event) do
       create_event(
-        'deliver_messages',
+        'acknowledged_message',
         client_id: 'racecar',
-        delivered_message_count: 10
+        offset: 2,
+        partition: 1,
+        topic: 'test_topic',
       )
     end
     let(:metric_tags) do
       %w[
           client:racecar
+          partition:1
+          topic:test_topic
         ]
     end
 

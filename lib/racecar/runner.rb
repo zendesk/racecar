@@ -164,7 +164,8 @@ module Racecar
       ->(delivery_report) do
         payload = {
           offset: delivery_report.offset,
-          partition: delivery_report.partition
+          partition: delivery_report.partition,
+          topic: delivery_report.topic_name
         }
         @instrumenter.instrument("acknowledged_message", payload)
       end
