@@ -109,7 +109,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
           publish_messages
           wait_for_messages
 
-          message_count_by_worker = incoming_messages.group_by { |m| m.headers.fetch(:processed_by_pid) }.transform_values(&:count)
+          message_count_by_worker = incoming_messages.group_by { |m| m.headers.fetch("processed_by_pid") }.transform_values(&:count)
 
           expect(incoming_messages.map(&:topic).uniq).to eq([output_topic])
           expect(incoming_messages.map(&:payload))
@@ -129,7 +129,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
           publish_messages
           wait_for_messages
 
-          message_count_by_worker = incoming_messages.group_by { |m| m.headers.fetch(:processed_by_pid) }.transform_values(&:count)
+          message_count_by_worker = incoming_messages.group_by { |m| m.headers.fetch("processed_by_pid") }.transform_values(&:count)
 
           expect(incoming_messages.count).to eq(6)
           expect(incoming_messages.map(&:topic).uniq).to eq([output_topic])
