@@ -222,21 +222,21 @@ module Racecar
       }
 
       @instrumenter.instrument("start_process_batch", instrumentation_payload)
-      @instrumenter.instrument("process_batch", instrumentation_payload) do
-        with_pause(first.topic, first.partition, first.offset..last.offset) do |pause|
-          begin
+      with_pause(first.topic, first.partition, first.offset..last.offset) do |pause|
+        begin
+          @instrumenter.instrument("process_batch", instrumentation_payload) do
             racecar_messages = messages.map do |message|
               Racecar::Message.new(message, retries_count: pause.pauses_count)
             end
             processor.process_batch(racecar_messages)
             processor.deliver!
             consumer.store_offset(messages.last)
-          rescue => e
-            instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
-            instrumentation_payload[:retries_count] = pause.pauses_count
-            config.error_handler.call(e, instrumentation_payload)
-            raise e
           end
+        rescue => e
+          instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
+          instrumentation_payload[:retries_count] = pause.pauses_count
+          config.error_handler.call(e, instrumentation_payload)
+          raise e
         end
       end
     end
