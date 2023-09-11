@@ -118,6 +118,7 @@ module Racecar
 
       consumer.resume(filtered_tpl)
       @paused_tpls[topic].delete(partition)
+      @paused_tpls.delete(topic) if @paused_tpls[topic].empty?
     end
 
     alias :each :each_subscribed

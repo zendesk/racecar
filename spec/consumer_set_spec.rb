@@ -128,14 +128,19 @@ RSpec.describe Racecar::ConsumerSet do
           consumer_set.resume("greetings", 0)
         end
 
-        it "#resume clears the paused_tpls hash" do
+        it "#resume removes topic/ partition from paused_tpls hash" do
           allow(rdconsumer).to receive(:resume)
-          consumer_set.instance_variable_set(:@paused_tpls,{"greetings" => {0 => {}}})
+          partition_0_tpl = tpl(subscriptions.first, [0])
+          partition_1_tpl = tpl(subscriptions.first, [1])
+          consumer_set.instance_variable_set(:@paused_tpls, {"greetings" => {
+            0 => [rdconsumer, partition_0_tpl],
+            1 => [rdconsumer, partition_1_tpl]
+          }})
           expect do
             consumer_set.resume("greetings", 0)
           end.to change {
             consumer_set.instance_variable_get(:@paused_tpls)
-          }.to({"greetings" => {}})
+          }.to({"greetings" => {1 => [rdconsumer, partition_1_tpl]}})
         end
       end
 
@@ -313,7 +318,7 @@ RSpec.describe Racecar::ConsumerSet do
 
         it "clears paused_tpls" do
           allow(rdconsumer).to receive(:close)
-          consumer_set.instance_variable_set(:@paused_tpls, {"topic:0" => {} })
+          consumer_set.instance_variable_set(:@paused_tpls, {"topic" => {0 => []}})
           expect do
           consumer_set.close
           end.to change {
@@ -465,14 +470,14 @@ RSpec.describe Racecar::ConsumerSet do
         consumer_set.resume("feature", 0)
       end
 
-      it "#resume clears the paused_tpls hash" do
+      it "#resume removes the topic/partition from the paused_tpls hash" do
         allow(rdconsumer1).to receive(:resume)
-        consumer_set.instance_variable_set(:@paused_tpls,{"feature" => {0 => {}}})
+        consumer_set.instance_variable_set(:@paused_tpls, {"feature" => {0 => []}})
         expect do
           consumer_set.resume("feature", 0)
         end.to change {
           consumer_set.instance_variable_get(:@paused_tpls)
-        }.to({"feature" => {}})
+        }.to({})
       end
     end
 
