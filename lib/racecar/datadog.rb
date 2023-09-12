@@ -211,6 +211,10 @@ module Racecar
           topic: topic,
         }
 
+        if event.payload.key?(:exception)
+          increment("producer.produce.errors", tags: tags)
+        end
+
         # This gets us the write rate.
         increment("producer.produce.messages", tags: tags.merge(topic: topic))
 
@@ -244,7 +248,15 @@ module Racecar
         # Number of messages ACK'd for the topic.
         increment("producer.ack.messages", tags: tags)
       end
-      
+
+      def produce_delivery_error(event)
+        tags = {
+          client: event.payload.fetch(:client_id),
+        }
+
+        increment("producer.produce.delivery.errors", tags: tags)
+      end
+
       def produce_async(event)
         client = event.payload.fetch(:client_id)
         topic = event.payload.fetch(:topic)
@@ -255,6 +267,10 @@ module Racecar
           client: client,
           topic: topic,
         }
+
+        if event.payload.key?(:exception)
+          increment("producer.produce.errors", tags: tags)
+        end
 
         # This gets us the write rate.
         increment("producer.produce.messages", tags: tags.merge(topic: topic))
@@ -278,6 +294,11 @@ module Racecar
           client: client,
           topic: topic,
         }
+
+        if event.payload.key?(:exception)
+          increment("producer.produce.errors", tags: tags)
+        end
+
 
         # This gets us the write rate.
         increment("producer.produce.messages", tags: tags.merge(topic: topic))

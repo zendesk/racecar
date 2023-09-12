@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "racecar/message_delivery_error"
+require "racecar/delivery_callback"
 
 at_exit do
   Racecar::Producer.shutdown!
@@ -42,19 +43,24 @@ module Racecar
           }
           producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
           producer_config.merge!(config.rdkafka_producer)
-          Rdkafka::Config.new(producer_config).producer
+          Rdkafka::Config.new(producer_config).producer.tap do |producer|
+            producer.delivery_callback = DeliveryCallback.new(instrumenter: @instrumenter)
+          end
         end
       end
     end
 
-
-    # fire and forget - you won't get any guarantees or feedback from 
+    # fire and forget - you won't get any guarantees or feedback from
     # Racecar on the status of the message and it won't halt execution
     # of the rest of your code.
     def produce_async(value:, topic:, **options)
       with_instrumentation(action: "produce_async", value: value, topic: topic, **options) do
-        handle = internal_producer.produce(payload: value, topic: topic, **options)
-        @delivery_handles << handle if @batching
+        begin
+          handle = internal_producer.produce(payload: value, topic: topic, **options)
+          @delivery_handles << handle if @batching
+        rescue Rdkafka::RdkafkaError => e
+          raise MessageDeliveryError.new(e, handle)
+        end
       end
 
       nil
@@ -63,8 +69,12 @@ module Racecar
     # synchronous message production - will wait until the delivery handle succeeds, fails or times out.
     def produce_sync(value:, topic:, **options)
       with_instrumentation(action: "produce_sync", value: value, topic: topic, **options) do
-        handle = internal_producer.produce(payload: value, topic: topic, **options)
-        deliver_with_error_handling(handle)
+        begin
+          handle = internal_producer.produce(payload: value, topic: topic, **options)
+          deliver_with_error_handling(handle)
+        rescue Rdkafka::RdkafkaError => e
+          raise MessageDeliveryError.new(e, handle)
+        end
       end
 
       nil
