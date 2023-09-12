@@ -218,6 +218,11 @@ module Racecar
     def rdkafka_config(subscription)
       # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
       config = {
+        # Manually store offset after messages have been processed successfully
+        # to avoid marking failed messages as committed. The call just updates
+        # a value within librdkafka and is asynchronously written to proper
+        # storage through auto commits.
+        "enable.auto.offset.store" => false,
         "auto.commit.interval.ms" => @config.offset_commit_interval * 1000,
         "auto.offset.reset"       => subscription.start_from_beginning ? "earliest" : "largest",
         "bootstrap.servers"       => @config.brokers.join(","),
