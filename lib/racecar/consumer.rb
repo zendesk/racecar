@@ -39,8 +39,8 @@ module Racecar
       end
 
       # Rebalance hooks for subclasses to override
-      def on_partitions_assigned(partitions_by_topic:, rdkafka_consumer:); end
-      def on_partitions_revoked(partitions_by_topic:, rdkafka_consumer:); end
+      def on_partitions_assigned(rebalance_event); end
+      def on_partitions_revoked(rebalance_event); end
     end
 
     def configure(producer:, consumer:, instrumenter: NullInstrumenter, config: Racecar.config)
