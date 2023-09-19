@@ -1,10 +1,11 @@
 version: 2
 registries:
   artifactory:
+    rubygems-server-pkgs-shopify-io:
     type: rubygems-server
-    url: ${{secrets.ARTIFACTORY_URL}}
-    username: ${{secrets.ARTIFACTORY_USERNAME}}
-    password: ${{secrets.ARTIFACTORY_API_KEY}}
+    url: https://pkgs.shopify.io
+    username: ${{secrets.RUBYGEMS_SERVER_PKGS_SHOPIFY_IO_USERNAME}}
+    password: ${{secrets.RUBYGEMS_SERVER_PKGS_SHOPIFY_IO_PASSWORD}}
 updates:
   - package-ecosystem: "bundler"
     vendor: true

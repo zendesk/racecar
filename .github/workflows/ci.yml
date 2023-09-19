@@ -13,15 +13,12 @@ jobs:
     strategy:
       matrix:
         ruby-version:
-          - "2.7"
-          - "3.0"
-          - "3.1"
           - "3.2"
+          - head
 
     steps:
-    - uses: zendesk/checkout@v3
-    - name: Set up Ruby
-      uses: zendesk/setup-ruby@v1
+    - uses: actions/checkout@v4
+    - uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby-version }}
         bundler-cache: true
@@ -31,11 +28,10 @@ jobs:
   integration-specs:
     runs-on: ubuntu-latest
     steps:
-    - uses: zendesk/checkout@v3
-    - name: Set up Ruby
-      uses: zendesk/setup-ruby@v1
+    - uses: actions/checkout@v4
+    - uses: ruby/setup-ruby@v1
       with:
-        ruby-version: "2.7"
+        ruby-version: "3.2"
         bundler-cache: true
     - name: Bring up docker-compose stack
       run: docker-compose up -d
