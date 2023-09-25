@@ -4,7 +4,7 @@
 
 * Test with Ruby 3.2
 
-## v2.9.0.beta1
+## v2.9.0, v2.9.0.beta1
 
 * Add `partitioner` producer config option to allow changing the strategy to
   determine which topic partition a message is written to when racecar
