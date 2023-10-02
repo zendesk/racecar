@@ -252,8 +252,14 @@ class FakeRdkafka
 end
 
 class FakeInstrumenter < Racecar::Instrumenter
-  def initialize(*)
+  def initialize(received = [])
     super(backend: Racecar::NullInstrumenter)
+    @received = received
+  end
+
+  def instrument(event_name, payload = {}, &block)
+    @received << [event_name, payload]
+    super
   end
 end
 
@@ -381,7 +387,8 @@ RSpec.describe Racecar::Runner do
   let(:config) { Racecar::Config.new }
   let(:logger) { Logger.new(StringIO.new) }
   let(:kafka)  { FakeRdkafka.new(runner: runner) }
-  let(:instrumenter) { FakeInstrumenter.new }
+  let(:instrumenter) { FakeInstrumenter.new(instrumented_events) }
+  let(:instrumented_events) { [] }
 
   let(:runner) do
     Racecar::Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter)
@@ -425,8 +432,9 @@ RSpec.describe Racecar::Runner do
         create_time: nil,
         key: nil,
         value: error,
+        exception: error,
         headers: nil,
-        retries_count: anything,
+        retries_count: instance_of(Integer),
         unrecoverable_delivery_error: false,
       }
 
@@ -435,6 +443,18 @@ RSpec.describe Racecar::Runner do
       kafka.deliver_message(error, topic: "greetings")
 
       runner.run
+    end
+
+    it "adds the exception to the instrumentation payload" do
+      error = StandardError.new("surprise")
+
+      kafka.deliver_message(error, topic: "greetings")
+
+      runner.run
+
+      expect(instrumented_events).to include(
+        ["process_message", hash_including(exception: error) ]
+      )
     end
 
     it "keeps track of the number of retries when a message causes an exception" do
@@ -561,6 +581,7 @@ RSpec.describe Racecar::Runner do
         message_count: 1,
         retries_count: anything,
         unrecoverable_delivery_error: false,
+        exception: error,
       }
 
       expect(config.error_handler).to receive(:call).at_least(:once).with(error, info)
