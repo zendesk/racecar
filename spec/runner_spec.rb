@@ -248,6 +248,18 @@ end
 class FakeInstrumenter < Racecar::Instrumenter
   def initialize(*)
     super(backend: Racecar::NullInstrumenter)
+    @errored_events = []
+  end
+
+  def instrument(event_name, payload = {}, &block)
+    super
+  rescue => e
+    @errored_events << event_name unless @errored_events.include?(event_name)
+    raise
+  end
+
+  def event_raised_errors?(event_name)
+    @errored_events.include?(event_name)
   end
 end
 
@@ -497,6 +509,11 @@ RSpec.describe Racecar::Runner do
 
         runner.run
       end
+
+      specify 'message processing errors are propagated to the instrumenter' do
+        kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+        expect { runner.run }.to change { instrumenter.event_raised_errors?("process_message") }.to(true)
+      end
     end
   end
 
@@ -623,6 +640,11 @@ RSpec.describe Racecar::Runner do
           with("process_batch", hash_including(batch_instrumentation))
 
         runner.run
+      end
+
+      specify 'batch processing errors are propagated to the instrumenter' do
+        kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+        expect { runner.run }.to change { instrumenter.event_raised_errors?("process_batch") }.to(true)
       end
     end
   end

@@ -87,6 +87,15 @@ RSpec.describe Racecar::Datadog::ConsumerSubscriber do
 
       subscriber.process_message(event)
     end
+
+    it 'publishes errors' do
+      event.payload[:exception] = StandardError.new("surprise")
+      expect(statsd).
+        to receive(:increment).
+        with("consumer.process_message.errors", tags: metric_tags)
+
+      subscriber.process_message(event)
+    end
   end
 
   describe '#process_batch' do
@@ -134,6 +143,15 @@ RSpec.describe Racecar::Datadog::ConsumerSubscriber do
       expect(statsd).
         to receive(:gauge).
         with('consumer.offset', 10, tags: metric_tags)
+
+      subscriber.process_batch(event)
+    end
+
+    it 'publishes errors' do
+      event.payload[:exception] = StandardError.new("surprise")
+      expect(statsd).
+        to receive(:increment).
+        with("consumer.process_batch.errors", tags: metric_tags)
 
       subscriber.process_batch(event)
     end
