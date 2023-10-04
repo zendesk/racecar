@@ -36,8 +36,10 @@ module Racecar
       require "racecar/liveness_probe"
       parse_options!(args)
 
-      if ENV["RAILS_ENV"]
-        Racecar.config.load_file("config/racecar.yml", ENV["RAILS_ENV"])
+      RailsConfigFileLoader.load! unless config.without_rails?
+
+      if File.exist?("config/racecar.rb")
+        require "./config/racecar"
       end
 
       Racecar.config.liveness_probe.check_liveness_within_interval!
@@ -135,6 +137,10 @@ module Racecar
       end
 
       parser.parse!(args)
+    end
+
+    def config
+      Racecar.config
     end
   end
 end
