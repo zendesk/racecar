@@ -80,9 +80,9 @@ RSpec.describe Racecar::Config do
 
   describe "#load_env" do
     it "sets the brokers from RACECAR_BROKERS" do
-      ENV["RACECAR_BROKERS"] = "hansel,gretel"
-
-      expect(config.brokers).to eq ["hansel", "gretel"]
+      with_env("RACECAR_BROKERS", "hansel,gretel") do
+        expect(config.brokers).to eq ["hansel", "gretel"]
+      end
     end
 
     it "sets the client id from RACECAR_CLIENT_ID" do
@@ -92,15 +92,15 @@ RSpec.describe Racecar::Config do
     end
 
     it "sets the offset commit interval from RACECAR_OFFSET_COMMIT_INTERVAL" do
-      ENV["RACECAR_OFFSET_COMMIT_INTERVAL"] = "45"
-
-      expect(config.offset_commit_interval).to eq 45
+      with_env("RACECAR_OFFSET_COMMIT_INTERVAL", '45') do
+        expect(config.offset_commit_interval).to eq 45
+      end
     end
 
     it "sets the heartbeat interval from RACECAR_HEARTBEAT_INTERVAL" do
-      ENV["RACECAR_HEARTBEAT_INTERVAL"] = "45"
-
-      expect(config.heartbeat_interval).to eq 45
+      with_env("RACECAR_HEARTBEAT_INTERVAL", "45") do
+        expect(config.heartbeat_interval).to eq 45
+      end
     end
   end
 

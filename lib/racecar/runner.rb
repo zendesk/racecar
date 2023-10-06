@@ -96,7 +96,7 @@ module Racecar
       end
     ensure
       producer.close
-      Racecar::Datadog.close if Object.const_defined?("Racecar::Datadog")
+      Racecar::Datadog.close if config.datadog_enabled
       @instrumenter.instrument("shut_down", instrumentation_payload || {})
     end
 
@@ -131,11 +131,6 @@ module Racecar
 
     def consumer
       @consumer ||= begin
-        # Manually store offset after messages have been processed successfully
-        # to avoid marking failed messages as committed. The call just updates
-        # a value within librdkafka and is asynchronously written to proper
-        # storage through auto commits.
-        config.consumer << "enable.auto.offset.store=false"
         ConsumerSet.new(config, logger, @instrumenter)
       end
     end
