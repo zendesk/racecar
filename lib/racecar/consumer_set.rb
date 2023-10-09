@@ -70,9 +70,11 @@ module Racecar
     def current
       @consumers[@consumer_id_iterator.peek] ||= begin
         consumer_config = Rdkafka::Config.new(rdkafka_config(current_subscription))
-        consumer_config.consumer_rebalance_listener = @config.rebalance_listener
-
+        listener = RebalanceListener.new(@config.consumer_class, @instrumenter)
+        consumer_config.consumer_rebalance_listener = listener
         consumer = consumer_config.consumer
+        listener.rdkafka_consumer = consumer
+
         @instrumenter.instrument('join_group') do
           consumer.subscribe current_subscription.topic
         end
@@ -238,7 +240,8 @@ module Racecar
         "queued.min.messages"     => @config.min_message_queue_size,
         "session.timeout.ms"      => @config.session_timeout * 1000,
         "socket.timeout.ms"       => @config.socket_timeout * 1000,
-        "statistics.interval.ms"  => @config.statistics_interval_ms
+        "statistics.interval.ms"  => @config.statistics_interval_ms,
+        "partition.assignment.strategy" => @config.partition_assignment_strategy,
       }
       config.merge! @config.rdkafka_consumer
       config.merge! subscription.additional_config

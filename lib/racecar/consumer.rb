@@ -37,6 +37,10 @@ module Racecar
           subscriptions << Subscription.new(topic, start_from_beginning, max_bytes_per_partition, additional_config)
         end
       end
+
+      # Rebalance hooks for subclasses to override
+      def on_partitions_assigned(rebalance_event); end
+      def on_partitions_revoked(rebalance_event); end
     end
 
     def configure(producer:, consumer:, instrumenter: NullInstrumenter, config: Racecar.config)
