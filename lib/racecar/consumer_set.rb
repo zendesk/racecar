@@ -15,6 +15,7 @@ module Racecar
       @previous_retries = 0
 
       @last_poll_read_nil_message = false
+      @paused_tpls = Hash.new { |h, k| h[k] = {} }
     end
 
     def poll(max_wait_time_ms = @config.max_wait_time_ms)
@@ -65,6 +66,7 @@ module Racecar
 
     def close
       each_subscribed(&:close)
+      @paused_tpls.clear
     end
 
     def current
@@ -100,16 +102,25 @@ module Racecar
       consumer.pause(filtered_tpl)
       fake_msg = OpenStruct.new(topic: topic, partition: partition, offset: offset)
       consumer.seek(fake_msg)
+
+      @paused_tpls[topic][partition] = [consumer, filtered_tpl]
     end
 
     def resume(topic, partition)
       consumer, filtered_tpl = find_consumer_by(topic, partition)
+
+      if !consumer && @paused_tpls[topic][partition]
+        consumer, filtered_tpl = @paused_tpls[topic][partition]
+      end
+
       if !consumer
         @logger.info "Attempted to resume #{topic}/#{partition}, but we're not subscribed to it"
         return
       end
 
       consumer.resume(filtered_tpl)
+      @paused_tpls[topic].delete(partition)
+      @paused_tpls.delete(topic) if @paused_tpls[topic].empty?
     end
 
     alias :each :each_subscribed

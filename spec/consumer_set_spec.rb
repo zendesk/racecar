@@ -6,9 +6,9 @@ def subscription(name)
   Racecar::Consumer::Subscription.new(name, true, 1048576, {})
 end
 
-def tpl(subscription)
+def tpl(subscription, partitions=[0])
   Rdkafka::Consumer::TopicPartitionList.new.tap do |tpl|
-    tpl.add_topic(subscription.topic, 1)
+    tpl.add_topic(subscription.topic, partitions)
   end
 end
 
@@ -88,6 +88,16 @@ RSpec.describe Racecar::ConsumerSet do
           consumer_set.pause("greetings", 0, 123456)
         end
 
+        it "#pause keeps tracked of paused tpls and consumers" do
+          allow(rdconsumer).to receive(:pause)
+          allow(rdconsumer).to receive(:seek)
+
+          expect do
+          consumer_set.pause("greetings", 0, 123456)
+          end.to change { consumer_set.instance_variable_get(:@paused_tpls) }
+            .to({"greetings" => {0 => [rdconsumer, tpl(subscriptions.first)]}})
+        end
+
         it "#resume allows to resume known partitions" do
           expect(rdconsumer).to receive(:resume) do |tpl|
             expect(tpl.count).to eq 1
@@ -99,6 +109,38 @@ RSpec.describe Racecar::ConsumerSet do
         it "#resume doesn't resume unknown partitions" do
           expect(rdconsumer).not_to receive(:resume)
           consumer_set.resume("greetings", 1)
+        end
+
+        it "#resume allows to resume paused partitions that are no longer assigned to consumer" do
+          expect(rdconsumer).to receive(:pause)
+          allow(rdconsumer).to receive(:seek)
+          consumer_set.pause("greetings", 0, 12345)
+
+          new_tpl_assignment = tpl(subscription("greetings"), [1])
+          expect(rdconsumer).to receive(:assignment).and_return(new_tpl_assignment)
+
+          paused_tpl = tpl(subscription("greetings"), [0])
+          expect(rdconsumer).to receive(:resume) do |tpl|
+            expect(tpl.count).to eq 1
+            expect(tpl).to be_kind_of Rdkafka::Consumer::TopicPartitionList
+            expect(tpl).to match(paused_tpl)
+          end
+          consumer_set.resume("greetings", 0)
+        end
+
+        it "#resume removes topic/ partition from paused_tpls hash" do
+          allow(rdconsumer).to receive(:resume)
+          partition_0_tpl = tpl(subscriptions.first, [0])
+          partition_1_tpl = tpl(subscriptions.first, [1])
+          consumer_set.instance_variable_set(:@paused_tpls, {"greetings" => {
+            0 => [rdconsumer, partition_0_tpl],
+            1 => [rdconsumer, partition_1_tpl]
+          }})
+          expect do
+            consumer_set.resume("greetings", 0)
+          end.to change {
+            consumer_set.instance_variable_get(:@paused_tpls)
+          }.to({"greetings" => {1 => [rdconsumer, partition_1_tpl]}})
         end
       end
 
@@ -243,10 +285,10 @@ RSpec.describe Racecar::ConsumerSet do
       end
 
       describe "#store_offset" do
-        it "raises ErroneousStateError when RD_KAFKA_RESP_ERR__STATE(-172) is not raised" do
+        it "does not raise ErroneousStateError when RD_KAFKA_RESP_ERR__STATE(-172) is raised" do
           allow(logger).to receive(:warn)
           allow(rdconsumer).to receive(:store_offset).with(:message).and_raise(Rdkafka::RdkafkaError, -172) # state
-          expect {consumer_set.store_offset(:message) }.not_to raise_error(Racecar::ErroneousStateError)
+          expect { consumer_set.store_offset(:message) }.not_to raise_error
           expect(logger).to have_received(:warn)
         end
 
@@ -272,6 +314,16 @@ RSpec.describe Racecar::ConsumerSet do
         it "forwards to Rdkafka" do
           expect(rdconsumer).to receive(:close).once
           consumer_set.close
+        end
+
+        it "clears paused_tpls" do
+          allow(rdconsumer).to receive(:close)
+          consumer_set.instance_variable_set(:@paused_tpls, {"topic" => {0 => []}})
+          expect do
+          consumer_set.close
+          end.to change {
+            consumer_set.instance_variable_get(:@paused_tpls)
+          }.to({})
         end
       end
 
@@ -397,6 +449,35 @@ RSpec.describe Racecar::ConsumerSet do
         expect(rdconsumer2).not_to receive(:resume)
         expect(rdconsumer3).not_to receive(:resume)
         consumer_set.resume("unknowntopic", 0)
+      end
+
+      it "#resume allows to resume paused partitions that are no longer assigned to consumer" do
+        allow(rdconsumer1).to receive(:pause)
+        allow(rdconsumer1).to receive(:seek)
+        consumer_set.pause("feature", 0, 12345)
+
+        new_tpl_assignment = tpl(subscription("feature"), [1])
+        expect(rdconsumer1).to receive(:assignment).and_return(new_tpl_assignment)
+
+        paused_tpl = tpl(subscription("feature"), [0])
+        expect(rdconsumer1).to receive(:resume) do |tpl|
+          expect(tpl.count).to eq 1
+          expect(tpl).to be_kind_of Rdkafka::Consumer::TopicPartitionList
+          expect(tpl).to match(paused_tpl)
+        end
+        expect(rdconsumer2).to_not receive(:resume)
+        expect(rdconsumer3).to_not receive(:resume)
+        consumer_set.resume("feature", 0)
+      end
+
+      it "#resume removes the topic/partition from the paused_tpls hash" do
+        allow(rdconsumer1).to receive(:resume)
+        consumer_set.instance_variable_set(:@paused_tpls, {"feature" => {0 => []}})
+        expect do
+          consumer_set.resume("feature", 0)
+        end.to change {
+          consumer_set.instance_variable_get(:@paused_tpls)
+        }.to({})
       end
     end
 
