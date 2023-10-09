@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 2.10.0.beta1
+
+* Bump rdkafka gem version to 0.13.0
+* Support cooperative-sticky
+* Instrument produce delivery errors
+* Fix config load for liveness probe
+* Send exceptions to `process_batch` instrumenter
+* Docker test fixes
 * Test with Ruby 3.2
 
 ## v2.9.0, v2.9.0.beta1
