@@ -25,11 +25,7 @@ module Racecar
     def run
       $stderr.puts "=> Starting Racecar consumer #{consumer_name}..."
 
-      RailsConfigFileLoader.load! unless config.without_rails?
-
-      if File.exist?("config/racecar.rb")
-        require "./config/racecar"
-      end
+      ConfigLoader.load!
 
       # Find the consumer class by name.
       consumer_class = Kernel.const_get(consumer_name)
@@ -46,10 +42,6 @@ module Racecar
 
       if config.log_level
         Racecar.logger.level = Object.const_get("Logger::#{config.log_level.upcase}")
-      end
-
-      if config.datadog_enabled
-        configure_datadog
       end
 
       $stderr.puts "=> Wrooooom!"
@@ -150,17 +142,6 @@ module Racecar
           puts opts
           exit
         end
-      end
-    end
-
-    def configure_datadog
-      require_relative './datadog'
-
-      Datadog.configure do |datadog|
-        datadog.host      = config.datadog_host unless config.datadog_host.nil?
-        datadog.port      = config.datadog_port unless config.datadog_port.nil?
-        datadog.namespace = config.datadog_namespace unless config.datadog_namespace.nil?
-        datadog.tags      = config.datadog_tags unless config.datadog_tags.nil?
       end
     end
   end

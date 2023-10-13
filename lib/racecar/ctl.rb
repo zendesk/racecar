@@ -105,9 +105,9 @@ module Racecar
         raise Racecar::Error, "no message value specified"
       end
 
-      RailsConfigFileLoader.load!
+      ConfigLoader.load!
 
-      Racecar.config.validate!
+      config.validate!
 
       producer = Rdkafka::Config.new({
         "bootstrap.servers":  Racecar.config.brokers.join(","),
