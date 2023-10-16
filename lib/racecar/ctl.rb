@@ -36,7 +36,9 @@ module Racecar
       require "racecar/liveness_probe"
       parse_options!(args)
 
-      RailsConfigFileLoader.load! unless config.without_rails?
+      if ENV["RAILS_ENV"] && File.exist?("config/racecar.yml")
+        Racecar.config.load_file("config/racecar.yml", ENV["RAILS_ENV"])
+      end
 
       if File.exist?("config/racecar.rb")
         require "./config/racecar"
