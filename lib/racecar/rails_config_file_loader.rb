@@ -26,7 +26,11 @@ module Racecar
           console = ActiveSupport::Logger.new($stdout)
           console.formatter = Rails.logger.formatter
           console.level = Rails.logger.level
-          Rails.logger.extend(ActiveSupport::Logger.broadcast(console))
+          if ::Rails::VERSION::STRING < "7.1"
+            Rails.logger.extend(ActiveSupport::Logger.broadcast(console))
+          else
+            Rails.logger = ActiveSupport::BroadcastLogger.new(Rails.logger, console)
+          end
         end
       end
     end
