@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.10.0.beta2
+
+* Don't load rails env for liveness probe
+* Resolve Rails 7.1 logger incompatibility
+* Test with Ruby 3.3 preview
+
 ## 2.10.0.beta1
 
 * Bump rdkafka gem version to 0.13.0
