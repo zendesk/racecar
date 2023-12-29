@@ -17,12 +17,12 @@ jobs:
           - "3.0"
           - "3.1"
           - "3.2"
-          - "3.3.0-preview2"
+          - "3.3"
 
     steps:
-    - uses: zendesk/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Ruby
-      uses: zendesk/setup-ruby@v1
+      uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby-version }}
         bundler-cache: true
@@ -32,9 +32,9 @@ jobs:
   integration-specs:
     runs-on: ubuntu-latest
     steps:
-    - uses: zendesk/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Ruby
-      uses: zendesk/setup-ruby@v1
+      uses: ruby/setup-ruby@v1
       with:
         ruby-version: "2.7"
         bundler-cache: true
