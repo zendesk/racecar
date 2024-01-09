@@ -2,21 +2,17 @@
 
 ## Unreleased
 
-## 2.10.0.beta2
-
-* Don't load rails env for liveness probe
-* Resolve Rails 7.1 logger incompatibility
-* Test with Ruby 3.3 preview
-
-## 2.10.0.beta1
+## 2.10.0
 
 * Bump rdkafka gem version to 0.13.0
 * Support cooperative-sticky
 * Instrument produce delivery errors
+* Resolve Rails 7.1 logger incompatibility
+* Don't load rails env for liveness probe
 * Fix config load for liveness probe
 * Send exceptions to `process_batch` instrumenter
 * Docker test fixes
-* Test with Ruby 3.2
+* Test in CI with Ruby 3.2
 
 ## v2.9.0, v2.9.0.beta1
 
@@ -26,7 +22,7 @@
 * Add built-in liveness probe for Kubernetes deployments.
 
 ## v2.8.2
-* Handles ErroneousStateError, in previous versions the consumer would do several unecessary group leave/joins. The log level is also changed to WARN instead of ERROR. ([#295](https://github.com/zendesk/racecar/pull/295))
+* Handles ErroneousStateError, in previous versions the consumer would do several unnecessary group leave/joins. The log level is also changed to WARN instead of ERROR. ([#295](https://github.com/zendesk/racecar/pull/295))
 
 ## v2.8.1
 * Adds new ErroneousStateError to racecar in order to give more information on this new possible exception.
