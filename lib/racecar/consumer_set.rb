@@ -175,6 +175,7 @@ module Racecar
 
     # polls a message for the current consumer, handling any API edge cases.
     def poll_current_consumer(max_wait_time_ms)
+      @last_poll_read_nil_message = false
       msg = current.poll(max_wait_time_ms)
     rescue Rdkafka::RdkafkaError => e
       case e.code
@@ -212,9 +213,14 @@ module Racecar
     end
 
     def maybe_select_next_consumer
-      return unless @last_poll_read_nil_message
-      @last_poll_read_nil_message = false
-      select_next_consumer
+      case @config.multi_subscription_strategy
+      when "round-robin"
+        select_next_consumer
+      else # "exhaust-topic"
+        if @last_poll_read_nil_message
+          select_next_consumer
+        end
+      end
     end
 
     def select_next_consumer
