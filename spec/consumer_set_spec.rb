@@ -572,5 +572,59 @@ RSpec.describe Racecar::ConsumerSet do
       count.times { polled += consumer_set.batch_poll(100) rescue [] }
       expect(polled).to eq [:msg1, :msg1, :msg1, :msgN, :msgN, :msgN]
     end
+
+    context "when multiple consumers are configured as 'round-robin'" do
+      before do
+        config.multi_subscription_strategy = "round-robin"
+        allow(rdconsumer1).to receive(:poll).and_return(topic1_message)
+        allow(rdconsumer2).to receive(:poll).and_return(topic2_message)
+        allow(rdconsumer3).to receive(:poll).and_return(topic3_message)
+      end
+
+      let(:config) { Racecar::Config.new }
+      let(:interval) { 1000.0 }
+      let(:topic1_message) { double(:topic1_message) }
+      let(:topic2_message) { double(:topic2_message) }
+      let(:topic3_message) { double(:topic3_message) }
+
+
+      describe "#poll" do
+        it "consumes 1 message from each topic in turn" do
+          messages = 6.times.map {
+            consumer_set.poll(interval)
+          }
+
+          expect(messages).to eq([
+            topic1_message,
+            topic2_message,
+            topic3_message,
+            topic1_message,
+            topic2_message,
+            topic3_message,
+          ])
+        end
+      end
+
+      describe "#batch_poll" do
+        before do
+          config.fetch_messages = 1
+        end
+
+        it "consumes 1 batch from each topic in turn" do
+          messages = 6.times.map {
+            consumer_set.batch_poll(interval)
+          }
+
+          expect(messages).to eq([
+            [topic1_message],
+            [topic2_message],
+            [topic3_message],
+            [topic1_message],
+            [topic2_message],
+            [topic3_message],
+          ])
+        end
+      end
+    end
   end
 end
