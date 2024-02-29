@@ -414,7 +414,7 @@ Racecar supports [Datadog](https://www.datadoghq.com/) monitoring integration. I
 - `datadog_enabled` – Whether Datadog monitoring is enabled (defaults to `false`).
 - `datadog_host` – The host running the Datadog agent.
 - `datadog_port` – The port of the Datadog agent.
-- `datadog_socket_path` – The port of the Datadog agent.
+- `datadog_socket_path` – The unix domain socket of the Datadog agent (when set takes precedence over host/port).
 - `datadog_namespace` – The namespace to use for Datadog metrics.
 - `datadog_tags` – Tags that should always be set on Datadog metrics.
 
