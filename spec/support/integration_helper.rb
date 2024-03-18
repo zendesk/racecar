@@ -11,6 +11,7 @@ module IntegrationHelper
 
       before do
         listen_for_consumer_events
+        set_config_for_speed
       end
 
       after do
@@ -22,6 +23,7 @@ module IntegrationHelper
         stop_racecar
         wait_for_child_processes
         reset_signal_handlers
+        reset_config
       end
 
       after(:all) do
@@ -41,6 +43,7 @@ module IntegrationHelper
     return unless @cli_run_thread && @cli_run_thread.alive?
 
     racecar_cli.stop
+    $stderr.puts "Stopping racecar"
 
     @cli_run_thread.wakeup
     @cli_run_thread.join(2)
@@ -57,7 +60,7 @@ module IntegrationHelper
       )
     end.each(&:wait)
 
-    $stderr.puts "Published messages to topic: #{topic}; messages: #{messages}"
+    # $stderr.puts "Published messages to topic: #{topic}; messages: #{messages}"
   end
 
   def wait_for_messages(topic: output_topic, expected_message_count: input_messages.count)
@@ -86,10 +89,13 @@ module IntegrationHelper
   end
 
   def wait_for_assignments(n)
-    $stderr.print "Waiting for assignments: #{n}"
-    Timeout.timeout(5*n) do
-      until assignment_events.length >= n
+    $stderr.print "\nWaiting for assignments (#{n} consumers) "
+    Timeout.timeout(10*n) do
+      loop do
+        consumer_count = assignment_events.uniq { |e| e["consumer_id"] }.length
+        break if consumer_count == n
         sleep 0.5
+        print "."
       end
     end
   rescue Timeout::Error => e
@@ -199,6 +205,17 @@ module IntegrationHelper
     end
   end
 
+  def set_config_for_speed
+    Racecar.config.fetch_messages = 1
+    Racecar.config.max_wait_time = 0.1
+    Racecar.config.session_timeout = 6 # minimum allowed by default broker config
+    Racecar.config.heartbeat_interval = 0.5
+  end
+
+  def reset_config
+    Racecar.config = Racecar::Config.new
+  end
+
   def wait_for_child_processes
     Timeout.timeout(5) do
       Process.waitall
@@ -237,6 +254,7 @@ module IntegrationHelper
       def headers(message)
         {
           processed_by: self.class.consumer_id,
+          pid: Process.pid,
           processed_at: Process.clock_gettime(Process::CLOCK_MONOTONIC),
           partition: message.partition,
         }
@@ -253,6 +271,7 @@ module IntegrationHelper
 
     def write(data)
       write_end.write(JSON.dump(data) + "\n")
+      write_end.flush
     end
 
     def read
