@@ -191,10 +191,18 @@ module Racecar
       @instrumenter.instrument("start_process_message", instrumentation_payload)
       with_pause(message.topic, message.partition, message.offset..message.offset) do |pause|
         if processor.class.dlq_topic  && pause.pauses_count > processor.class.dlq_retries
-          @instrumenter.instrument("dlq", instrumentation_payload) do
-            processor.send(:produce, message.payload, topic: processor.class.dlq_topic, headers: instrumentation_payload)
-            processor.deliver!
-            consumer.store_offset(message)
+          begin
+            @instrumenter.instrument("dlq", instrumentation_payload) do
+              processor.send(:produce, message.payload, topic: processor.class.dlq_topic, headers: instrumentation_payload)
+              processor.deliver!
+              consumer.store_offset(message)
+            end
+          rescue => e
+            logger.error e.to_s
+            logger.error "Error moving msg to dlq"
+            instrumentation_payload[:dlq_produce_error] = true
+            config.error_handler.call(e, instrumentation_payload)
+            raise e
           end
         else
           begin
