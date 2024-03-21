@@ -191,11 +191,11 @@ module Racecar
       @instrumenter.instrument("start_process_message", instrumentation_payload)
       with_pause(message.topic, message.partition, message.offset..message.offset) do |pause|
         if processor.class.dlq_topic  && pause.pauses_count > processor.class.dlq_retries
-          # TODO: Add metatdata in headers or envelop
-          # TODO: Add instrumentation on dlq
-          processor.send(:produce, message.payload, topic: processor.class.dlq_topic)
-          processor.deliver! # actually deliver
-          consumer.store_offset(message) # commit this offset as done
+          @instrumenter.instrument("dlq", instrumentation_payload) do
+            processor.send(:produce, message.payload, topic: processor.class.dlq_topic, headers: instrumentation_payload)
+            processor.deliver!
+            consumer.store_offset(message)
+          end
         else
           begin
             @instrumenter.instrument("process_message", instrumentation_payload) do
