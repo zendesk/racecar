@@ -35,6 +35,16 @@ module Racecar
         raise ArgumentError, "Invalid value for pause_timeout: must be integer greater or equal -1"
       end
 
+      # why is it nested hash?
+      # its
+      # {
+      #   "topic" => {
+      #     "partition" => pause instance
+      #   }
+      #   "topic1" => {
+      #     "partition" => pause instance
+      #   }
+      # }
       @pauses = Hash.new {|h, k|
         h[k] = Hash.new {|h2, k2|
           h2[k2] = ::Racecar::Pause.new(
@@ -180,17 +190,33 @@ module Racecar
 
       @instrumenter.instrument("start_process_message", instrumentation_payload)
       with_pause(message.topic, message.partition, message.offset..message.offset) do |pause|
-        begin
-          @instrumenter.instrument("process_message", instrumentation_payload) do
-            processor.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
-            processor.deliver!
-            consumer.store_offset(message)
+        if processor.class.dlq_topic  && pause.pauses_count > processor.class.dlq_retries
+          begin
+            @instrumenter.instrument("dlq", instrumentation_payload) do
+              processor.send(:produce, message.payload, topic: processor.class.dlq_topic, headers: instrumentation_payload)
+              processor.deliver!
+              consumer.store_offset(message)
+            end
+          rescue => e
+            logger.error e.to_s
+            logger.error "Error moving msg to dlq"
+            instrumentation_payload[:dlq_produce_error] = true
+            config.error_handler.call(e, instrumentation_payload)
+            raise e
           end
-        rescue => e
-          instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
-          instrumentation_payload[:retries_count] = pause.pauses_count
-          config.error_handler.call(e, instrumentation_payload)
-          raise e
+        else
+          begin
+            @instrumenter.instrument("process_message", instrumentation_payload) do
+              processor.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
+              processor.deliver!
+              consumer.store_offset(message)
+            end
+          rescue => e
+            instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
+            instrumentation_payload[:retries_count] = pause.pauses_count
+            config.error_handler.call(e, instrumentation_payload)
+            raise e
+          end
         end
       end
     end

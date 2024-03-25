@@ -94,6 +94,11 @@ class TestNilConsumer < Racecar::Consumer
   subscribes_to "greetings"
 end
 
+class TestDlqConsumer < TestConsumer
+  dead_letter_queue topic: "dlq", retries: 2
+  subscribes_to "greetings"
+end
+
 class FakeConsumer
   def initialize(kafka, runner)
     @kafka = kafka
@@ -469,6 +474,7 @@ RSpec.describe Racecar::Runner do
       runner.run
     end
 
+
     context 'with instrumentation enabled' do
       let(:message_instrumentation) do
         {
@@ -760,6 +766,39 @@ RSpec.describe Racecar::Runner do
         expect(datadog).to receive(:close)
         runner.run
       end
+    end
+  end
+
+  context "with dlq enabled" do
+    let(:processor) { TestDlqConsumer.new }
+
+    it "delivers the bad messages to dlq topic", focus: true do
+      error = StandardError.new("surprise")
+      kafka.deliver_message(error, topic: "greetings")
+
+      runner.run
+
+      messages = kafka.messages_in("dlq")
+
+      expect(messages.map(&:payload)).to eq [error]
+    end
+
+    it "instruments dlq messages" do
+      allow(instrumenter).to receive(:instrument).and_call_original
+      error = StandardError.new("surprise")
+      kafka.deliver_message(error, topic: "greetings")
+
+      runner.run
+
+      expect(instrumenter).to have_received(:instrument).with("dlq", a_hash_including(:create_time, consumer_class: "TestDlqConsumer",  topic: "greetings", value: error))
+    end
+
+    it "retries before producing to dlq" do
+      error = StandardError.new("surprise")
+      kafka.deliver_message(error, topic: "greetings")
+
+      expect(config.error_handler).to receive(:call).exactly(3).times
+      runner.run
     end
   end
 end
