@@ -542,15 +542,14 @@ While `maxSurge` should always be 0, `maxUnavailable` can be increased to reduce
 Racecar comes with a built-in liveness probe, primarily for use with Kubernetes, but useful for any deployment environment where you can periodically run a process to check the health of your consumer.
 
 To use this feature:
-- set the `liveness_probe_enabled` config option to true.
-- configure your Kubernetes deployment to run `$ racecarctl liveness_probe`
+1. Set the `liveness_probe_enabled` config option to true.
+2. Configure your Kubernetes deployment liveness probe to run this command `$ racecarctl liveness_probe`
 
-
-When enabled (see config) Racecar will touch the file at `liveness_probe_file_path` each time it finishes polling Kafka and processing the messages in the batch (if any).
+When enabled (see config) Racecar will touch the file at the specified path each time it finishes polling Kafka and processing the messages in the batch (if any).
 
 The modified time of this file can be observed to determine when the consumer last exhibited 'liveness'.
 
-Running `racecarctl liveness_probe` will return a successful exit status if the last 'liveness' event happened within an acceptable time, `liveness_probe_max_interval`.
+Running `racecarctl liveness_probe` will return a successful exit status if the last 'liveness' event happened within an acceptable time, which you can set as `liveness_probe_max_interval`.
 
 `liveness_probe_max_interval` should be long enough to account for both the Kafka polling time of `max_wait_time` and the processing time of a full message batch.
 
@@ -558,9 +557,15 @@ On receiving `SIGTERM`, Racecar will gracefully shut down and delete this file, 
 
 You may wish to tolerate more than one failed probe run to accommodate for environmental variance and clock changes.
 
-See the [Configuration section](https://github.com/zendesk/racecar#configuration) for the various ways the liveness probe can be configured, environment variables being one option.
+The [Configuration section](https://github.com/zendesk/racecar#configuration) for the various ways the liveness probe can be configured. (We recommend environment variables).
 
-Here is an example Kubernetes liveness probe configuration:
+##### Slow racecar.rb / racecar.yml? Skip config files!
+
+If your config files need to do something expensive, such as load Rails, you can enable `RACECAR_LIVENESS_PROBE_SKIP_CONFIG_FILES`. The liveness probe command will then skip loading your configuration and execute quickly.
+
+Most other configuration values can be set via the environment, we recommend you do this for liveness probe settings.
+
+##### Example Kubernetes Configuration
 
 ```yaml
 apiVersion: apps/v1
@@ -576,8 +581,15 @@ spec:
         - SomeConsumer
 
         env:
+        # Skip config loading to run fast, only the following values are needed
+        - name: RACECAR_LIVENESS_PROBE_SKIP_CONFIG_FILES
+          value: "true"
         - name: RACECAR_LIVENESS_PROBE_ENABLED
           value: "true"
+        - name: RACECAR_LIVENESS_PROBE_FILE_PATH
+          value: "/tmp/racecar-liveness"
+        - name: RACECAR_LIVENESS_PROBE_MAX_INTERVAL
+          value: "5"
 
         livenessProbe:
           exec:
@@ -585,8 +597,8 @@ spec:
             - racecarctl
             - liveness_probe
 
-          # Allow up to 10 consecutive failures before terminating Pod:
-          failureThreshold: 10
+          # Allow up to 3 consecutive failures before terminating Pod:
+          failureThreshold: 3
 
           # Wait 30 seconds before starting the probes:
           initialDelaySeconds: 30

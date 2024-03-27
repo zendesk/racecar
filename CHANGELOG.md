@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Allow the liveness probe command to skip loading config files
+
 ## 2.11.0.beta3
 
 * Fix bug with domain socket support

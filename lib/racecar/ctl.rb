@@ -36,12 +36,14 @@ module Racecar
       require "racecar/liveness_probe"
       parse_options!(args)
 
-      if ENV["RAILS_ENV"] && File.exist?("config/racecar.yml")
-        Racecar.config.load_file("config/racecar.yml", ENV["RAILS_ENV"])
-      end
+      unless config.liveness_probe_skip_config_files
+        if File.exist?("config/racecar.rb")
+          require "./config/racecar"
+        end
 
-      if File.exist?("config/racecar.rb")
-        require "./config/racecar"
+        if ENV["RAILS_ENV"] && File.exist?("config/racecar.yml")
+          Racecar.config.load_file("config/racecar.yml", ENV["RAILS_ENV"])
+        end
       end
 
       Racecar.config.liveness_probe.check_liveness_within_interval!
