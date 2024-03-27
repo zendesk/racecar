@@ -414,6 +414,7 @@ Racecar supports [Datadog](https://www.datadoghq.com/) monitoring integration. I
 - `datadog_enabled` – Whether Datadog monitoring is enabled (defaults to `false`).
 - `datadog_host` – The host running the Datadog agent.
 - `datadog_port` – The port of the Datadog agent.
+- `datadog_socket_path` – The unix domain socket of the Datadog agent (when set takes precedence over host/port).
 - `datadog_namespace` – The namespace to use for Datadog metrics.
 - `datadog_tags` – Tags that should always be set on Datadog metrics.
 
@@ -695,7 +696,7 @@ In order to safely upgrade from Racecar v1 to v2, you need to completely shut do
 
 Racecar v2 requires a C library (zlib) to compress the messages before producing to the topic. If not already installed on you consumer docker container, please install using following command in Dockerfile of consumer
 
-``` 
+```
 apt-get update && apt-get install -y libzstd-dev
 ```
 
