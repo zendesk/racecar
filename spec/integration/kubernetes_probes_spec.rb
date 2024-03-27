@@ -68,6 +68,34 @@ RSpec.describe "kubernetes probes", type: :integration do
       end
     end
 
+    context "when the specific environment variables are set" do
+      let(:env_vars) do
+        {
+          "RACECAR_LIVENESS_PROBE_FILE_PATH" => file_path,
+          "RACECAR_LIVENESS_PROBE_MAX_INTERVAL" => max_interval.to_s,
+        }
+      end
+
+      it "does not load config/racecar.rb"
+      it "does not load config/racecar.yml"
+    end
+
+    context "configuring the probe with files" do
+      let(:env_vars) { {} }
+
+      it "loads config/racecar.rb"
+
+      context "when RAILS_ENV is set" do
+        let(:env_vars) { { "RAILS_ENV" => "anything" } }
+
+        it "loads config/racecar.yml"
+      end
+
+      context "RAILS_ENV is not set" do
+        it "does not load config/racecar.yml"
+      end
+    end
+
     let(:file_path) { "/tmp/racecar-liveness-file-#{SecureRandom.hex(4)}" }
     let(:max_interval) { 1 }
     let(:racecar_cli) { Racecar::Cli.new([consumer_class.name.to_s]) }
