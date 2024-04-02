@@ -158,6 +158,9 @@ module Racecar
     desc "The port of the Datadog agent"
     integer :datadog_port
 
+    desc "The unix domain socket of the Datadog agent (when set takes precedence over host/port)"
+    integer :datadog_socket_path
+
     desc "The namespace to use for Datadog metrics"
     string :datadog_namespace
 
