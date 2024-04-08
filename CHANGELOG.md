@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.11.0.beta3
+
+* Fix bug with domain socket support
+
 ## 2.11.0.beta2
 
 * Add unix domain socket support for Datadog StatsD metrics
