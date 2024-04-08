@@ -159,7 +159,7 @@ module Racecar
       Datadog.configure do |datadog|
         datadog.host        = config.datadog_host unless config.datadog_host.nil?
         datadog.port        = config.datadog_port unless config.datadog_port.nil?
-        datadog.socket_path = config.socket_path unless config.socket_path.nil?
+        datadog.socket_path = config.datadog_socket_path unless config.datadog_socket_path.nil?
         datadog.namespace   = config.datadog_namespace unless config.datadog_namespace.nil?
         datadog.tags        = config.datadog_tags unless config.datadog_tags.nil?
       end
