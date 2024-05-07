@@ -77,7 +77,10 @@ module Racecar
               # The raising can be avoided if max_wait_timeout below is greater than
               # config.message_timeout, but config is not available here (without
               # changing the interface).
-              handle.wait(max_wait_timeout: 60, wait_timeout: 0.1)
+              # NOTE(joseph): karfka-rdkafka no longer uses wait_timeout for long-polling
+              # and has been deprecated, hence removed in the fork.
+              # Keeping the old comment for reference sake.
+              handle.wait(max_wait_timeout: 60)
             rescue Rdkafka::AbstractHandle::WaitTimeoutError => e
               partition = MessageDeliveryError.partition_from_delivery_handle(handle)
               # ideally we could use the logger passed to the Runner, but it is not
