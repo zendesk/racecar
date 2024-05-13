@@ -37,8 +37,6 @@ module Racecar
       # Load config defined by the consumer class itself.
       config.load_consumer_class(consumer_class)
 
-      config.validate!
-
       if config.logfile
         $stderr.puts "=> Logging to #{config.logfile}"
         Racecar.logger = Logger.new(config.logfile)
