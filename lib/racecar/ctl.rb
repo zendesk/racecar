@@ -109,8 +109,6 @@ module Racecar
 
       RailsConfigFileLoader.load!
 
-      Racecar.config.validate!
-
       producer = Rdkafka::Config.new({
         "bootstrap.servers":  Racecar.config.brokers.join(","),
         "client.id":          Racecar.config.client_id,

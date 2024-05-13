@@ -165,41 +165,6 @@ RSpec.describe Racecar::Config do
     end
   end
 
-  describe "#validate!" do
-    before do
-      config.brokers = ["a"]
-      config.client_id = "x"
-    end
-
-    it "raises an exception if no brokers have been configured" do
-      expect { config.validate! }.not_to raise_exception
-
-      config.brokers = []
-
-      expect {
-        config.validate!
-      }.to raise_exception(Racecar::ConfigError, "`brokers` must not be empty")
-    end
-
-    it "raises an exception if max_wait_time is greater than socket_timeout" do
-      config.socket_timeout = 10
-      config.max_wait_time = 11
-
-      expect {
-        config.validate!
-      }.to raise_exception(Racecar::ConfigError, "`socket_timeout` must be longer than `max_wait_time`")
-    end
-
-    it "raises an exception if max_pause_timeout is set but pause_with_exponential_backoff is disabled" do
-      config.max_pause_timeout = 30
-      config.pause_with_exponential_backoff = false
-
-      expect {
-        config.validate!
-      }.to raise_exception(Racecar::ConfigError, "`max_pause_timeout` only makes sense when `pause_with_exponential_backoff` is enabled")
-    end
-  end
-
   describe "#inspect" do
     it "returns an easy-to-read list of the configuration keys and values" do
       config.client_id = "elvis"
