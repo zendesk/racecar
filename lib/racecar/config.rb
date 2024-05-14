@@ -216,20 +216,6 @@ module Racecar
         .join("\n")
     end
 
-    def validate!
-      if brokers.empty?
-        raise ConfigError, "`brokers` must not be empty"
-      end
-
-      if socket_timeout <= max_wait_time
-        raise ConfigError, "`socket_timeout` must be longer than `max_wait_time`"
-      end
-
-      if max_pause_timeout && !pause_with_exponential_backoff?
-        raise ConfigError, "`max_pause_timeout` only makes sense when `pause_with_exponential_backoff` is enabled"
-      end
-    end
-
     def load_consumer_class(consumer_class)
       self.consumer_class = consumer_class
       self.group_id = consumer_class.group_id || self.group_id
