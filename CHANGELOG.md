@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 2.11.0.beta3
+
+* Fix bug with domain socket support
+
+## 2.11.0.beta2
+
+* Add unix domain socket support for Datadog StatsD metrics
+* Bump minimum rdkafka gem version to 0.15.0
+* Bump minimum Ruby version to 3.0
+
+## 2.11.0.beta1
+
+* Configurable strategy for consuming multiple topics
+
 ## 2.10.0
 
 * Bump rdkafka gem version to 0.13.0

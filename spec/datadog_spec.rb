@@ -1,6 +1,35 @@
 # frozen_string_literal: true
 
 require "racecar/datadog"
+
+RSpec.describe Racecar::Datadog do
+  describe '.statsd' do
+    it 'configures with host/port by default' do
+      statsd = Racecar::Datadog.statsd
+      expect(statsd.host).to eq('127.0.0.1')
+      expect(statsd.port).to eq(8125)
+      expect(statsd.socket_path).to be_nil
+    end
+
+    it 'configures with host/port explicitly' do
+      Racecar::Datadog.host = '10.0.0.1'
+      Racecar::Datadog.port = 8555
+      statsd = Racecar::Datadog.statsd
+      expect(statsd.host).to eq('10.0.0.1')
+      expect(statsd.port).to eq(8555)
+      expect(statsd.socket_path).to be_nil
+    end
+
+    it 'configures with socket_path explicitly' do
+      Racecar::Datadog.socket_path = '/var/run/datadog/dsd.socket'
+      statsd = Racecar::Datadog.statsd
+      expect(statsd.socket_path).to eq('/var/run/datadog/dsd.socket')
+      expect(statsd.host).to be_nil
+      expect(statsd.port).to be_nil
+    end
+  end
+end
+
 RSpec.describe Racecar::Datadog::StatsdSubscriber do
   describe '#emit' do
     let(:subscriber)  { Racecar::Datadog::StatsdSubscriber.new }

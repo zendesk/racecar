@@ -158,6 +158,9 @@ module Racecar
     desc "The port of the Datadog agent"
     integer :datadog_port
 
+    desc "The unix domain socket of the Datadog agent (when set takes precedence over host/port)"
+    string :datadog_socket_path
+
     desc "The namespace to use for Datadog metrics"
     string :datadog_namespace
 
@@ -184,6 +187,9 @@ module Racecar
 
     desc "Used only by the liveness probe: Max time (in seconds) between liveness events before the process is considered not healthy"
     integer :liveness_probe_max_interval, default: 5
+
+    desc "Strategy for switching topics when there are multiple subscriptions. `exhaust-topic` will only switch when the consumer poll returns no messages. `round-robin` will switch after each poll regardless.\nWarning: `round-robin` will be the default in Racecar 3.x"
+    string :multi_subscription_strategy, allowed_values: %w(round-robin exhaust-topic), default: "exhaust-topic"
 
     # The error handler must be set directly on the object.
     attr_reader :error_handler

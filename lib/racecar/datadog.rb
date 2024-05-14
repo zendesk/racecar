@@ -19,7 +19,11 @@ module Racecar
       end
 
       def statsd
-        @statsd ||= ::Datadog::Statsd.new(host, port, namespace: namespace, tags: tags)
+        @statsd ||= if socket_path
+          ::Datadog::Statsd.new(socket_path: socket_path, namespace: namespace, tags: tags)
+        else
+          ::Datadog::Statsd.new(host, port, namespace: namespace, tags: tags)
+        end
       end
 
       def statsd=(statsd)
@@ -42,6 +46,15 @@ module Racecar
 
       def port=(port)
         @port = port
+        clear
+      end
+
+      def socket_path
+        @socket_path
+      end
+
+      def socket_path=(socket_path)
+        @socket_path = socket_path
         clear
       end
 
