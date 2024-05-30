@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.11.0.beta4
+
 * Allow the liveness probe command to skip loading config files
 
 ## 2.11.0.beta3
