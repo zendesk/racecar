@@ -68,6 +68,82 @@ RSpec.describe "kubernetes probes", type: :integration do
       end
     end
 
+    describe "config loading" do
+      let(:ruby_config_file) { File.expand_path("config/racecar.rb", tmp_dir) }
+      let(:yaml_config_file) { File.expand_path("config/racecar.yml", tmp_dir) }
+      let(:tmp_dir) { File.expand_path("/tmp/your_racecar_project", Dir.pwd) }
+      let(:ruby_config_indicator_file) { "ruby_config_was_loaded.truth" }
+      let(:yaml_config_indicator_file) { "yaml_config_was_loaded.truth" }
+      let(:ruby_config_file_contents) { <<~RUBY }
+        `touch ruby_config_was_loaded.truth`
+      RUBY
+      let(:yaml_config_file_contents) { <<~YAML }
+        production:
+          client_id: client_id
+          group_id: anything
+          <% `touch yaml_config_was_loaded.truth` %>
+      YAML
+
+      before do
+        @original_directory = Dir.pwd
+        FileUtils.mkdir_p(File.dirname(ruby_config_file))
+        File.write(ruby_config_file, ruby_config_file_contents)
+        File.write(yaml_config_file, yaml_config_file_contents)
+        Dir.chdir(tmp_dir)
+      end
+
+      after do
+        Dir.chdir(@original_directory)
+        FileUtils.rm_rf(tmp_dir)
+      end
+
+      context "when config file loading is disabled" do
+        let(:env_vars) do
+          {
+            "RACECAR_LIVENESS_PROBE_SKIP_CONFIG_FILES" => "true",
+            "RAILS_ENV" => "production",
+          }
+        end
+
+        it "does not load config/racecar.rb or config/racecar.yml" do
+          run_probe
+
+          aggregate_failures do
+            expect(Dir.glob("*")).not_to include(ruby_config_indicator_file)
+            expect(Dir.glob("*")).not_to include(yaml_config_indicator_file)
+          end
+        end
+      end
+
+      context "when config file loading is enabled " do
+        let(:env_vars) { {} }
+
+        it "loads config/racecar.rb" do
+          run_probe
+
+          expect(Dir.glob("*")).to include(ruby_config_indicator_file)
+        end
+
+        context "when RAILS_ENV is set" do
+          let(:env_vars) { { "RAILS_ENV" => "production" } }
+
+          it "loads config/racecar.yml" do
+            run_probe
+
+            expect(Dir.glob("*")).to include(yaml_config_indicator_file)
+          end
+        end
+
+        context "when RAILS_ENV is not set" do
+          it "does not load config/racecar.yml" do
+            run_probe
+
+            expect(Dir.glob("*")).not_to include(yaml_config_indicator_file)
+          end
+        end
+      end
+    end
+
     let(:file_path) { "/tmp/racecar-liveness-file-#{SecureRandom.hex(4)}" }
     let(:max_interval) { 1 }
     let(:racecar_cli) { Racecar::Cli.new([consumer_class.name.to_s]) }
@@ -88,8 +164,10 @@ RSpec.describe "kubernetes probes", type: :integration do
       }
     end
 
+    let!(:racecarctl) { File.expand_path("exe/racecarctl", Dir.pwd) }
+
     def run_probe
-      command = "exe/racecarctl liveness_probe"
+      command = "#{racecarctl} liveness_probe"
       output, status = Open3.capture2e(env_vars, command)
       $stderr.puts "Probe output: #{output}" if ENV["DEBUG"]
       status.success?
