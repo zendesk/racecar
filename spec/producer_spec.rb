@@ -46,4 +46,17 @@ RSpec.describe Racecar::Producer do
       expect {producer.produce_sync(value: value, topic: topic) }.to raise_error(Racecar::MessageDeliveryError)
     end
   end
+
+  context "for producer config" do
+    let(:config) do
+      test_config = Racecar::Config.new()
+      test_config.partitioner = "murmur2_random"
+      test_config
+    end
+
+    it "sets the partitioner corretly" do
+      internal_producer = producer.instance_variable_get("@internal_producer")
+      expect(internal_producer.instance_variable_get("@partitioner_name")).to eq("murmur2_random")
+    end
+  end
 end
