@@ -40,6 +40,7 @@ module Racecar
             "client.id"              => config.client_id,
             "statistics.interval.ms" => config.statistics_interval_ms,
             "message.timeout.ms"     => config.message_timeout * 1000,
+            "partitioner"            => config.partitioner.to_s
           }
           producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
           producer_config.merge!(config.rdkafka_producer)
