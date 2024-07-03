@@ -15,6 +15,12 @@ RSpec.describe Racecar::Producer do
     allow(producer).to receive(:internal_producer).and_return(double("Rdkafka::Producer", :produce => delivery_handle))
   end
 
+  after do
+    Racecar::Producer.shutdown!
+    Racecar::Producer.class_variable_set(:@@init_internal_producer, nil)
+  end
+
+
   describe "#produce_async" do
     it "sends the message without waiting for feedback or guarantees" do
       expect(producer.produce_async(value: value, topic: topic)).to be_nil
@@ -31,7 +37,7 @@ RSpec.describe Racecar::Producer do
   describe "#wait_for_delivery" do
     it "sends the message and waits for a delivery handle" do
       expect(delivery_handle).to receive(:wait).exactly(5).times
-      
+
       producer.wait_for_delivery do
         5.times do |message|
           producer.produce_async(value: message.to_s, topic: topic)
