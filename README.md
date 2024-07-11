@@ -486,7 +486,7 @@ metadata:
   name: my-racecar-deployment
   labels:
     app: my-racecar
-spec
+spec:
   replicas: 4 # <-- this is a good value if you have a multliple of 4 partitions
   selector:
     matchLabels:
