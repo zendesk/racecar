@@ -194,10 +194,23 @@ module Racecar
     desc "Strategy for switching topics when there are multiple subscriptions. `exhaust-topic` will only switch when the consumer poll returns no messages. `round-robin` will switch after each poll regardless.\nWarning: `round-robin` will be the default in Racecar 3.x"
     string :multi_subscription_strategy, allowed_values: %w(round-robin exhaust-topic), default: "exhaust-topic"
 
+    desc "How many worker processes to fork"
+    integer :forks, default: 0
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
     attr_accessor :subscriptions, :logger, :parallel_workers
+
+    attr_accessor :prefork, :postfork
+
+    def prefork
+      @prefork ||= lambda { |*_| }
+    end
+
+    def postfork
+      @postfork ||= lambda { |*_| }
+    end
 
     def statistics_interval_ms
       if Rdkafka::Config.statistics_callback
