@@ -12,13 +12,15 @@ module Racecar
       if delivery_report.error.to_i.zero?
         payload = {
           offset: delivery_report.offset,
-          partition: delivery_report.partition
+          partition: delivery_report.partition,
+          topic: delivery_report.topic_name
         }
         instrumenter.instrument("acknowledged_message", payload)
       else
         payload = {
           partition: delivery_report.partition,
-          exception: delivery_report.error
+          exception: delivery_report.error,
+          topic: delivery_report.topic_name
         }
         instrumenter.instrument("produce_delivery_error", payload)
       end
