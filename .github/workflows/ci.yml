@@ -6,6 +6,9 @@ on:
   push:
     branches: ["master"]
 
+env:
+  RUBYOPT: --enable=frozen-string-literal
+
 jobs:
   unit-specs:
     runs-on: ubuntu-latest
