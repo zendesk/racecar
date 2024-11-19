@@ -57,7 +57,7 @@ services:
   #     RACECAR_BROKERS: broker:29092
   #     DOCKER_SUDO: 'true'
   #   # When bringing up the stack, we just let the container exit. For running the
-  #   # specs, we'll use commands like `docker-compose run tests rspec`
+  #   # specs, we'll use commands like `docker compose run tests rspec`
   #   command: ["echo", "ready"]
   #   volumes:
   #     # The line below allows us to run docker commands from the container itself
