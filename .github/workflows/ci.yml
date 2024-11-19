@@ -38,7 +38,7 @@ jobs:
         ruby-version: "3.0"
         bundler-cache: true
     - name: Bring up docker-compose stack
-      run: docker-compose up -d
+      run: docker compose up -d
     - name: Build and test with RSpec
       env:
         RACECAR_BROKERS: localhost:9092

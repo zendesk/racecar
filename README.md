@@ -716,16 +716,16 @@ apt-get update && apt-get install -y libzstd-dev
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rspec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
-The integration tests run against a Kafka instance that is not automatically started from within `rspec`. You can set one up using the provided `docker-compose.yml` by running `docker-compose up`.
+The integration tests run against a Kafka instance that is not automatically started from within `rspec`. You can set one up using the provided `docker-compose.yml` by running `docker compose up`.
 
 ### Running RSpec within Docker
 
 There can be behavioural inconsistencies between running the specs on your machine, and in the CI pipeline. Due to this, there is now a Dockerfile included in the project, which is based on the CircleCI ruby 2.7.8 image. This could easily be extended with more Dockerfiles to cover different Ruby versions if desired. In order to run the specs via Docker:
 
 - Uncomment the `tests` service from the docker-compose.yml
-- Bring up the stack with `docker-compose up -d`
-- Execute the entire suite with `docker-compose run --rm tests bundle exec rspec`
-- Execute a single spec or directory with `docker-compose run --rm tests bundle exec rspec spec/integration/consumer_spec.rb`
+- Bring up the stack with `docker compose up -d`
+- Execute the entire suite with `docker compose run --rm tests bundle exec rspec`
+- Execute a single spec or directory with `docker compose run --rm tests bundle exec rspec spec/integration/consumer_spec.rb`
 
 Please note - your code directory is mounted as a volume, so you can make code changes without needing to rebuild
 
