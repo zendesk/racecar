@@ -4,6 +4,12 @@ require "racecar/datadog"
 
 RSpec.describe Racecar::Datadog do
   describe '.statsd' do
+    before do
+      Racecar::Datadog.socket_path = nil
+      Racecar::Datadog.host = nil
+      Racecar::Datadog.port = nil
+    end
+
     it 'configures with host/port by default' do
       statsd = Racecar::Datadog.statsd
       expect(statsd.host).to eq('127.0.0.1')
