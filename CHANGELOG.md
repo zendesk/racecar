@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Add tests against Ruby 3.4
+
 ## 2.11.0
 
 * Allow the liveness probe command to skip loading config files
