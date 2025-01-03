@@ -5,4 +5,4 @@ source 'https://rubygems.org'
 # Specify your gem's dependencies in racecar.gemspec
 gemspec
 
-gem 'activesupport', '~> 7.0.0'
+gem 'activesupport', '~> 6.1.0'
