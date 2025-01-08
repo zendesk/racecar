@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "securerandom"
+require "active_support/isolated_execution_state"
 
 module IntegrationHelper
   def self.included(klass)
