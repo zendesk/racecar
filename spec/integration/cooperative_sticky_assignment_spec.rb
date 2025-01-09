@@ -38,6 +38,7 @@ RSpec.describe "cooperative-sticky assignment", type: :integration do
       start_consumer
 
       wait_for_assignments(2)
+      reset_consumer_events
       publish_messages
       wait_for_a_few_messages
 
@@ -46,8 +47,8 @@ RSpec.describe "cooperative-sticky assignment", type: :integration do
       wait_for_all_messages
 
       aggregate_failures do
-        expect_consumer0_did_not_have_partitions_revoked_but_consumer1_did
         expect_consumer0_took_over_processing_from_consumer1
+        expect_consumer0_did_not_have_partitions_revoked_but_consumer1_did
       end
     end
 
@@ -87,6 +88,10 @@ RSpec.describe "cooperative-sticky assignment", type: :integration do
       consumer_index_by_id["#{Process.pid}-#{thread.object_id}"] = consumers.index(runner)
     end
 
+    def reset_consumer_events
+      @received_consumer_events = []
+    end
+
     def terminate_consumer1
       consumers[1].stop
     end
@@ -105,10 +110,6 @@ RSpec.describe "cooperative-sticky assignment", type: :integration do
   end
 
   def set_config
-    Racecar.config.fetch_messages = 1
-    Racecar.config.max_wait_time = 0.1
-    Racecar.config.session_timeout = 6 # minimum allowed by default broker config
-    Racecar.config.heartbeat_interval = 1.5
     Racecar.config.partition_assignment_strategy = "cooperative-sticky"
     Racecar.config.load_consumer_class(consumer_class)
   end
