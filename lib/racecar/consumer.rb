@@ -4,7 +4,7 @@ require "racecar/message_delivery_error"
 
 module Racecar
   class Consumer
-    Subscription = Struct.new(:topic, :start_from_beginning, :max_bytes_per_partition, :additional_config)
+    Subscription = Struct.new(:topic, :start_from_beginning, :additional_config)
 
     class << self
       attr_accessor :max_wait_time
@@ -22,19 +22,16 @@ module Racecar
       # @param topics [String] one or more topics to subscribe to.
       # @param start_from_beginning [Boolean] whether to start from the beginning or the end
       #   of each partition.
-      # @param max_bytes_per_partition [Integer] the maximum number of bytes to fetch from
-      #   each partition at a time.
       # @param additional_config [Hash] Configuration properties for consumer.
       #   See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
       # @return [nil]
       def subscribes_to(
         *topics,
         start_from_beginning: true,
-        max_bytes_per_partition: 1048576,
         additional_config: {}
       )
         topics.each do |topic|
-          subscriptions << Subscription.new(topic, start_from_beginning, max_bytes_per_partition, additional_config)
+          subscriptions << Subscription.new(topic, start_from_beginning, additional_config)
         end
       end
 
