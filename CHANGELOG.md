@@ -4,6 +4,7 @@
 
 * Add tests against Ruby 3.4
 * Drop support for Ruby 3.0
+* Allow rdkafka gem versions newer than 0.15.0
 
 ## 2.11.0
 
