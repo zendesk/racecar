@@ -68,10 +68,10 @@ module Racecar
         @instrumenter.instrument('deliver_messages', instrumentation_payload) do
           @delivery_handles.each do |handle|
             begin
-              # rdkafka-ruby checks every wait_timeout seconds if the message was
-              # successfully delivered, up to max_wait_timeout seconds before raising
-              # Rdkafka::AbstractHandle::WaitTimeoutError. librdkafka will (re)try to
-              # deliver all messages in the background, until "config.message_timeout"
+              # rdkafka-ruby checks with exponential backoff starting at 0 seconds wait
+              # if the message was successfully delivered, up to max_wait_timeout seconds
+              # before raising Rdkafka::AbstractHandle::WaitTimeoutError. librdkafka will 
+              # (re)try to deliver all messages in the background, until "config.message_timeout"
               # (message.timeout.ms) is exceeded. Phrased differently, rdkafka-ruby's
               # WaitTimeoutError is just informative.
               # The raising can be avoided if max_wait_timeout below is greater than
