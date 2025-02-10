@@ -8,7 +8,7 @@ on:
 
 jobs:
   unit-specs:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
@@ -30,7 +30,7 @@ jobs:
       run: bundle exec rspec --exclude-pattern='spec/integration/*_spec.rb'
 
   integration-specs:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
