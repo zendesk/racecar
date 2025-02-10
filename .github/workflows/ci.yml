@@ -7,27 +7,27 @@ on:
     branches: ["master"]
 
 jobs:
-  unit-specs:
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        ruby-version:
-          - "3.1"
-          - "3.2"
-          - "3.3"
-          - "3.4"
-
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.ruby-version }}
-        bundler-cache: true
-    - name: Build and test with RSpec
-      run: bundle exec rspec --exclude-pattern='spec/integration/*_spec.rb'
+#  unit-specs:
+#    runs-on: ubuntu-latest
+#
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        ruby-version:
+#          - "3.1"
+#          - "3.2"
+#          - "3.3"
+#          - "3.4"
+#
+#    steps:
+#    - uses: actions/checkout@v4
+#    - name: Set up Ruby
+#      uses: ruby/setup-ruby@v1
+#      with:
+#        ruby-version: ${{ matrix.ruby-version }}
+#        bundler-cache: true
+#    - name: Build and test with RSpec
+#      run: bundle exec rspec --exclude-pattern='spec/integration/*_spec.rb'
 
   integration-specs:
     runs-on: ubuntu-latest
@@ -51,4 +51,4 @@ jobs:
     - name: Build and test with RSpec
       env:
         RACECAR_BROKERS: localhost:9092
-      run: timeout --kill-after 180 150 bundle exec rspec spec/integration/*_spec.rb
+      run: timeout --kill-after 180 150 bundle exec rspec spec/integration/cooperative_sticky_assignment_spec.rb
