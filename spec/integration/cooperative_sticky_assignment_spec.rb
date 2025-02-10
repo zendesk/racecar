@@ -62,10 +62,15 @@ RSpec.describe "cooperative-sticky assignment", type: :integration do
     end
 
     def expect_consumer0_did_not_have_partitions_revoked_but_consumer1_did
+      puts "revocation_events: #{revocation_events}"
       revocations_by_consumer_thread_id = revocation_events.group_by { |e| e.fetch("consumer_id") }
+
+      puts "revocations_by_consumer_thread_id: #{revocations_by_consumer_thread_id}"
 
       revocations_by_consumer_index = revocations_by_consumer_thread_id
         .transform_keys { |consumer_id| consumer_index_by_id.fetch(consumer_id) }
+
+      puts "revocations_by_consumer_index: #{revocations_by_consumer_index}"
 
       expect(revocations_by_consumer_index.keys).to eq([1])
     end
