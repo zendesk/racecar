@@ -1,9 +1,18 @@
+GIT
+  remote: https://github.com/karafka/rdkafka-ruby.git
+  revision: 2900f6aa0d281ef8c12918c076b1cbab3f0d86fe
+  ref: 2900f6aa0d281ef8c12918c076b1cbab3f0d86fe
+  specs:
+    rdkafka (0.16.0)
+      ffi (~> 1.15)
+      mini_portile2 (~> 2.6)
+      rake (> 12)
+
 PATH
   remote: .
   specs:
     racecar (2.11.0)
       king_konf (~> 1.0.0)
-      rdkafka (>= 0.16.0)
 
 GEM
   remote: https://rubygems.org/
@@ -45,10 +54,6 @@ GEM
       byebug (~> 11.0)
       pry (>= 0.13, < 0.15)
     rake (13.0.6)
-    rdkafka (0.20.0)
-      ffi (~> 1.15)
-      mini_portile2 (~> 2.6)
-      rake (> 12)
     rspec (3.12.0)
       rspec-core (~> 3.12.0)
       rspec-expectations (~> 3.12.0)
@@ -77,6 +82,7 @@ DEPENDENCIES
   pry-byebug
   racecar!
   rake (> 10.0)
+  rdkafka!
   rspec (~> 3.0)
   timecop
 

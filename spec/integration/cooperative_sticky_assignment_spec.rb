@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "racecar/cli"
+require 'benchmark'
 
 RSpec.describe "cooperative-sticky assignment", type: :integration do
   before do
@@ -38,12 +39,18 @@ RSpec.describe "cooperative-sticky assignment", type: :integration do
       start_consumer
 
       wait_for_assignments(2)
-      publish_messages
-      wait_for_a_few_messages
+      time = Benchmark.measure do
+        publish_messages
+      end
+
+      wait_time = Benchmark.measure do wait_for_a_few_messages end
 
       terminate_consumer1
 
       wait_for_all_messages
+
+      puts "Time to publish messages: #{time.real}"
+      puts "Time to wait for messages: #{wait_time.real}"
 
       aggregate_failures do
         expect_consumer0_did_not_have_partitions_revoked_but_consumer1_did

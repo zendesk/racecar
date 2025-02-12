@@ -64,6 +64,8 @@ module Racecar
         consumer_set: consumer
       }
 
+      aggregate_time = 0
+
       # Main loop
       loop do
         break if @stop_requested
@@ -78,11 +80,16 @@ module Racecar
               process_batch(messages)
             end
           when :single then
-            message = consumer.poll(config.max_wait_time_ms)
-            process(message) if message
+            time = Benchmark.measure do
+              message = consumer.poll(config.max_wait_time_ms)
+              process(message) if message
+            end
+            aggregate_time += time.real
           end
         end
       end
+
+      puts "Time to process messages: #{aggregate_time}"
 
       logger.info "Gracefully shutting down"
       begin
