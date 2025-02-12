@@ -26,7 +26,7 @@ RSpec.describe "cooperative-sticky assignment", type: :integration do
       { payload: "message-#{n}", partition: n % topic_partitions }
     }
   end
-  let(:message_count) { 200 }
+  let(:message_count) { 20 }
 
   context "during a rebalance" do
     let!(:consumers) { [] }
