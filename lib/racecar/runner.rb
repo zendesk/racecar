@@ -6,6 +6,7 @@ require "racecar/message"
 require "racecar/message_delivery_error"
 require "racecar/erroneous_state_error"
 require "racecar/delivery_callback"
+require "benchmark"
 
 module Racecar
   class Runner
