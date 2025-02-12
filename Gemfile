@@ -6,4 +6,4 @@ source 'https://rubygems.org'
 gemspec
 
 gem 'activesupport', '~> 7.2.0'
-gem 'rdkafka', github: 'karafka/rdkafka-ruby', ref: 'bfdb0a26fb80824f69f003d579462562aae7c104'
+gem 'rdkafka', github: 'karafka/rdkafka-ruby', ref: '2900f6aa0d281ef8c12918c076b1cbab3f0d86fe'
