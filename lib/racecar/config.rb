@@ -29,6 +29,9 @@ module Racecar
     desc "The minimum number of messages in the local consumer queue"
     integer :min_message_queue_size, default: 2000
 
+    desc "Whether to process partitions concurrently"
+    boolean :concurrent_processing, default: false
+
     desc "Which partition assignment strategy to use, range, roundrobin or cooperative-sticky. -- https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md"
     string :partition_assignment_strategy, default: "range,roundrobin"
 

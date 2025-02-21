@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rdkafka"
+require "concurrent-ruby"
 require "racecar/pause"
 require "racecar/message"
 require "racecar/message_delivery_error"
@@ -35,8 +36,8 @@ module Racecar
         raise ArgumentError, "Invalid value for pause_timeout: must be integer greater or equal -1"
       end
 
-      @pauses = Hash.new {|h, k|
-        h[k] = Hash.new {|h2, k2|
+      @pauses = Concurrent::Hash.new {|h, k|
+        h[k] = Concurrent::Hash.new {|h2, k2|
           h2[k2] = ::Racecar::Pause.new(
             timeout:             timeout,
             max_timeout:         config.max_pause_timeout,
@@ -71,15 +72,10 @@ module Racecar
 
         @instrumenter.instrument("start_main_loop", instrumentation_payload)
         @instrumenter.instrument("main_loop", instrumentation_payload) do
-          case process_method
-          when :batch then
-            msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
-            msg_per_part.each_value do |messages|
-              process_batch(messages)
-            end
-          when :single then
-            message = consumer.poll(config.max_wait_time_ms)
-            process(message) if message
+          if batch_processing?
+            batch_inner_loop
+          else
+            single_message_inner_loop
           end
         end
       end
@@ -108,6 +104,33 @@ module Racecar
 
     attr_reader :pauses
 
+    def consumer
+      @consumer ||= ConsumerSet.new(config, logger, @instrumenter)
+    end
+
+    def batch_inner_loop
+      msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
+
+      if config.concurrent_processing?
+        futures = msg_per_part.each_value.map { |messages|
+          Concurrent::Promises.future { process_batch(messages) }
+        }
+
+        # Wait for all the batches to be processed before committing offsets.
+        # TODO: add a timeout to `wait` to avoid blocking indefinitely.
+        Concurrent::Promises.zip(*futures).wait
+      else
+        msg_per_part.each_value do |messages|
+          process_batch(messages)
+        end
+      end
+    end
+
+    def single_message_inner_loop
+      message = consumer.poll(config.max_wait_time_ms)
+      process(message) if message
+    end
+
     def process_method
       @process_method ||= begin
         case
@@ -129,10 +152,8 @@ module Racecar
       end
     end
 
-    def consumer
-      @consumer ||= begin
-        ConsumerSet.new(config, logger, @instrumenter)
-      end
+    def batch_processing?
+      process_method == :batch
     end
 
     def producer

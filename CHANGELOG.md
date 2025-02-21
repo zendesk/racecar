@@ -5,6 +5,7 @@
 * Add tests against Ruby 3.4
 * Drop support for Ruby 3.0
 * Allow rdkafka gem versions newer than 0.15.0
+* Allow processing topic partitions concurrently with the `concurrent_processing` option. When this is enabled, multiple threads will be used to process messages, although messages within a single partition will always be processed in-order and therefore sequentially.
 
 ## 2.11.0
 
