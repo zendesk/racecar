@@ -198,7 +198,7 @@ class FakeDeliveryHandle
     FakeDeliveryReport.new(0, 0, 0, "test")
   end
 
-  def wait(max_wait_timeout: 60, wait_timeout: 0.1)
+  def wait(max_wait_timeout: 60)
     @kafka.produced_messages << @msg
     @delivery_callback.call(report) if @delivery_callback
   end
