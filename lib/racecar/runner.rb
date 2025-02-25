@@ -74,9 +74,15 @@ module Racecar
           case process_method
           when :batch then
             msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
-            msg_per_part.each_value do |messages|
-              process_batch(messages)
+
+            threads = msg_per_part.each.map do |partition, messages|
+              thread = Thread.new { process_batch(messages) }
+              thread.name = "racecar-#{processor.class}-partition-#{partition}"
+              thread.abort_on_exception = true
+              thread
             end
+
+            threads.each(&:join)
           when :single then
             message = consumer.poll(config.max_wait_time_ms)
             process(message) if message
