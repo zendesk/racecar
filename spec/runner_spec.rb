@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "stringio"
+require "concurrent-ruby"
 
 class TestConsumer < Racecar::Consumer
   subscribes_to "greetings"
@@ -8,8 +9,8 @@ class TestConsumer < Racecar::Consumer
   attr_reader :messages
 
   def initialize
-    @messages = []
-    @processor_queue = []
+    @messages = Concurrent::Array.new
+    @processor_queue = Concurrent::Array.new
     @torn_down = false
   end
 
@@ -41,8 +42,8 @@ class TestBatchConsumer < Racecar::Consumer
   attr_reader :messages
 
   def initialize
-    @messages = []
-    @processor_queue = []
+    @messages = Concurrent::Array.new
+    @processor_queue = Concurrent::Array.new
   end
 
   def on_message(&block)
@@ -51,7 +52,7 @@ class TestBatchConsumer < Racecar::Consumer
   end
 
   def process_batch(messages)
-    @messages += messages
+    @messages.concat(messages)
 
     messages.each do |message|
       processor = @processor_queue.shift || proc {}
@@ -102,13 +103,13 @@ class FakeConsumer
     @topic = nil
     @committed_offset = "not set yet"
     @internal_offset = 0
-    @_paused = false
     @previous_messages = []
+    @pauses = Concurrent::Hash.new {|h, k| h[k] = Concurrent::Set.new }
 
     @poll_count = 0
   end
 
-  attr_reader :topic, :committed_offset, :_paused
+  attr_reader :topic, :committed_offset
 
   def subscribe(topic, **)
     @topic ||= topic
@@ -145,12 +146,20 @@ class FakeConsumer
 
   def pause(tpl)
     raise "not a TopicPartitionList" unless tpl.is_a?(Rdkafka::Consumer::TopicPartitionList)
-    @_paused = true
+    tpl.to_h.each do |topic, partitions|
+      @pauses[topic].merge(partitions.map(&:partition))
+    end
   end
 
   def resume(tpl)
     raise "not a TopicPartitionList" unless tpl.is_a?(Rdkafka::Consumer::TopicPartitionList)
-    @_paused = false
+    tpl.to_h.each do |topic, partitions|
+      @pauses[topic].subtract(partitions.map(&:partition))
+    end
+  end
+
+  def paused?(topic, partition)
+    @pauses.key?(topic) && @pauses[topic].include?(partition)
   end
 
   def seek(message)
@@ -224,9 +233,9 @@ class FakeRdkafka
 
   def initialize(runner:)
     @runner = runner
-    @received_messages = Hash.new { |h, k| h[k] = [] }
-    @produced_messages = []
-    @consumers = []
+    @received_messages = Concurrent::Hash.new { |h, k| h[k] = Concurrent::Array.new }
+    @produced_messages = Concurrent::Array.new
+    @consumers = Concurrent::Array.new
   end
 
   def deliver_message(payload, topic:, partition: 0)
@@ -239,8 +248,9 @@ class FakeRdkafka
   end
 
   def consumer(*options)
-    consumers << FakeConsumer.new(self, @runner)
-    consumers.last
+    consumer = FakeConsumer.new(self, @runner)
+    @consumers << consumer
+    consumer
   end
 
   def producer(*)
@@ -275,9 +285,9 @@ RSpec.shared_examples "offset handling" do |topic|
   end
 
   it "stores offset after processing" do
-    kafka.deliver_message("2", topic: topic) # offset 0
-    kafka.deliver_message("2", topic: topic) # offset 1
-    kafka.deliver_message("2", topic: topic) # offset 2
+    kafka.deliver_message("2", topic: topic, partition: 0) # offset 0
+    kafka.deliver_message("2", topic: topic, partition: 0) # offset 1
+    kafka.deliver_message("2", topic: topic, partition: 0) # offset 2
 
     runner.run
 
@@ -321,12 +331,11 @@ RSpec.shared_examples "pause handling" do
   end
 
   it "pauses on failing messages" do
-    kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+    kafka.deliver_message(StandardError.new("surprise"), topic: "greetings", partition: 0)
 
     runner.run
 
-    expect(kafka.consumers.first._paused).to eq true
-    runner.run
+    expect(kafka.consumers.first.paused?("greetings", 0)).to eq true
   end
 
   it "resumes paused partitions" do
@@ -334,36 +343,36 @@ RSpec.shared_examples "pause handling" do
     later = Time.local(2019, 6, 18, 14, 0, 30)
 
     Timecop.freeze(now)
-    kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+    kafka.deliver_message(StandardError.new("surprise"), topic: "greetings", partition: 0)
     runner.run
 
     # expect no op
     runner.send(:resume_paused_partitions)
-    expect(kafka.consumers.first._paused).to eq true
+    expect(kafka.consumers.first.paused?("greetings", 0)).to eq true
 
     # expect to resume
     Timecop.freeze(later)
     runner.send(:resume_paused_partitions)
-    expect(kafka.consumers.first._paused).to eq false
+    expect(kafka.consumers.first.paused?("greetings", 0)).to eq false
   end
 
   it "seeks to given message and returns it on resume" do
     now = Time.local(2019, 6, 18, 14, 0, 0)
     later = Time.local(2019, 6, 18, 14, 0, 30)
 
-    kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
-    kafka.deliver_message("never get here", topic: "greetings")
+    kafka.deliver_message(StandardError.new("surprise"), topic: "greetings", partition: 0)
+    kafka.deliver_message("never get here", topic: "greetings", partition: 0)
 
     Timecop.freeze(now)
     runner.run
-    expect(kafka.consumers.first._paused).to eq true
+    expect(kafka.consumers.first.paused?("greetings", 0)).to eq true
 
     Timecop.freeze(later)
     runner.send(:resume_paused_partitions)
-    expect(kafka.consumers.first._paused).to eq false
+    expect(kafka.consumers.first.paused?("greetings", 0)).to eq false
 
     runner.run
-    expect(kafka.consumers.first._paused).to eq true
+    expect(kafka.consumers.first.paused?("greetings", 0)).to eq true
   end
 
   context 'with instrumentation enabled' do
@@ -651,6 +660,24 @@ RSpec.describe Racecar::Runner do
       specify 'batch processing errors are propagated to the instrumenter' do
         kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
         expect { runner.run }.to change { instrumenter.event_raised_errors?("process_batch") }.to(true)
+      end
+    end
+
+    context "when concurrent processing has been enabled" do
+      include_examples "offset handling", "greetings"
+      include_examples "pause handling"
+
+      before do
+        config.concurrent_processing = true
+      end
+
+      it "batch processes partitions concurrently" do
+        kafka.deliver_message "A", topic: "greetings", partition: 0
+        kafka.deliver_message "B", topic: "greetings", partition: 1
+
+        runner.run
+
+        expect(processor.messages.map(&:value).sort).to eq ["A", "B"]
       end
     end
   end

@@ -21,6 +21,7 @@ The framework is based on [rdkafka-ruby](https://github.com/appsignal/rdkafka-ru
    9. [Operations](#operations)
    10. [Upgrading from v1 to v2](#upgrading-from-v1-to-v2)
    11. [Compression](#compression)
+   12. [Concurrent processing](#concurrent-processing)
 3. [Development](#development)
 4. [Contributing](#contributing)
 5. [Support and Discussion](#support-and-discussion)
@@ -338,6 +339,7 @@ end
 #### Batches
 
 - `fetch_messages` - The number of messages to fetch in a single batch. This can be set on a per consumer basis.
+- `concurrent_processing` – Whether to enable [concurrent processing](#concurrent-processing) of partitions. Default is `false`.
 
 #### Logging
 
@@ -711,6 +713,10 @@ Racecar v2 requires a C library (zlib) to compress the messages before producing
 ```
 apt-get update && apt-get install -y libzstd-dev
 ```
+
+### Concurrent Processing
+
+The partitions of a topic assigned to a consumer can be processed concurrently if the `concurrent_processing` option is set to `true`. When this is enabled, multiple threads will be used to process messages, although messages within a single partition will always be processed in-order and therefore sequentially. This option is set to `false` by default.
 
 ## Development
 
