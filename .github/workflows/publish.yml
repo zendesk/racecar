@@ -1,12 +1,25 @@
-name: Publish Gem
+name: Publish to RubyGems.org
 
 on:
   push:
-    tags: v*
+    branches: main
+    paths: lib/racecar/version.rb
+  workflow_dispatch:
 
 jobs:
-  call-workflow:
-    uses: zendesk/gw/.github/workflows/ruby-gem-publication.yml@main
-    secrets:
-      RUBY_GEMS_API_KEY: ${{ secrets.RUBY_GEMS_API_KEY }}
-      RUBY_GEMS_TOTP_DEVICE: ${{ secrets.RUBY_GEMS_TOTP_DEVICE }}
+  publish:
+    runs-on: ubuntu-latest
+    environment: rubygems-publish
+    if: github.repository_owner == 'zendesk'
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+      - name: Install dependencies
+        run: bundle install --jobs 4
+      - uses: rubygems/release-gem@v1
