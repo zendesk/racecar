@@ -30,13 +30,13 @@ GEM
     diff-lcs (1.5.0)
     dogstatsd-ruby (5.5.0)
     drb (2.2.1)
-    ffi (1.16.3)
+    ffi (1.17.1)
     i18n (1.12.0)
       concurrent-ruby (~> 1.0)
     king_konf (1.0.1)
     logger (1.6.4)
     method_source (1.0.0)
-    mini_portile2 (2.8.5)
+    mini_portile2 (2.8.8)
     minitest (5.25.4)
     pry (0.14.2)
       coderay (~> 1.1)
@@ -44,8 +44,8 @@ GEM
     pry-byebug (3.10.1)
       byebug (~> 11.0)
       pry (>= 0.13, < 0.15)
-    rake (13.0.6)
-    rdkafka (0.18.0)
+    rake (13.2.1)
+    rdkafka (0.21.0)
       ffi (~> 1.15)
       mini_portile2 (~> 2.6)
       rake (> 12)
@@ -81,4 +81,4 @@ DEPENDENCIES
   timecop
 
 BUNDLED WITH
-   2.6.2
+   2.6.5
