@@ -729,6 +729,22 @@ There can be behavioural inconsistencies between running the specs on your machi
 
 Please note - your code directory is mounted as a volume, so you can make code changes without needing to rebuild
 
+### Releasing a new version
+
+A new version is published to RubyGems.org every time a change to `version.rb` is pushed to the `main` branch.
+In short, follow these steps:
+1. Update `version.rb`,
+2. run `bundle lock` to update `Gemfile.lock`,
+3. merge this change into `main`, and
+4. look at [the action](https://github.com/zendesk/racecar/actions/workflows/publish.yml) for output.
+
+To create a pre-release from a non-main branch:
+1. change the version in `version.rb` to something like `2.13.0.pre.1` or `3.0.0.beta.2`,
+2. push this change to your branch,
+3. go to [Actions → “Publish to RubyGems.org” on GitHub](https://github.com/zendesk/racecar/actions/workflows/publish.yml),
+4. click the “Run workflow” button,
+5. pick your branch from a dropdown.
+
 ## Contributing
 
 Bug reports and pull requests are welcome on [GitHub](https://github.com/zendesk/racecar). Feel free to [join our Slack team](https://ruby-kafka-slack.herokuapp.com/) and ask how best to contribute!
