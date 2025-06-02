@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+* [Racecar::Config] **breaking change** renames `max_bytes` configuration to `fetch_max_bytes` which is the correct name of the configuration that we pass to librdkafka.
+* [Racecar::ConsumerSet] removes `max_bytes_per_partition` hardcoded config and moves to [Racecar:::Config] with the correct naming `message_max_bytes`.
 
 ## 2.12.0
 
