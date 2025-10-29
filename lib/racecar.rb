@@ -54,9 +54,8 @@ module Racecar
 
   def self.producer
     Thread.current[:racecar_producer] ||= begin
-      if config.datadog_enabled
-        require "racecar/datadog"
-      end
+      config.configure_datadog
+
       Racecar::Producer.new(config: config, logger: logger, instrumenter: instrumenter)
     end
   end
