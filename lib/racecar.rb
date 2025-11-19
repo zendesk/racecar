@@ -8,6 +8,7 @@ require "racecar/consumer"
 require "racecar/consumer_set"
 require "racecar/runner"
 require "racecar/parallel_runner"
+require "racecar/forking_runner"
 require "racecar/producer"
 require "racecar/config"
 require "racecar/version"
@@ -74,6 +75,8 @@ module Racecar
 
     if config.parallel_workers && config.parallel_workers > 1
       ParallelRunner.new(runner: runner, config: config, logger: logger)
+    elsif config.forks && config.forks > 0
+      ForkingRunner.new(runner: runner, config: config, logger: logger)
     else
       runner
     end
