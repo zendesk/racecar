@@ -44,7 +44,7 @@ GEM
     pry-byebug (3.10.1)
       byebug (~> 11.0)
       pry (>= 0.13, < 0.15)
-    rake (13.0.6)
+    rake (13.3.1)
     rdkafka (0.21.0)
       ffi (~> 1.15)
       mini_portile2 (~> 2.6)
