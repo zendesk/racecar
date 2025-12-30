@@ -37,7 +37,7 @@ GEM
     logger (1.6.4)
     method_source (1.0.0)
     mini_portile2 (2.8.5)
-    minitest (5.25.4)
+    minitest (5.27.0)
     pry (0.14.2)
       coderay (~> 1.1)
       method_source (~> 1.0)
