@@ -10,6 +10,7 @@ module Racecar
       attr_accessor :max_wait_time
       attr_accessor :group_id
       attr_accessor :producer, :consumer, :parallel_workers, :fetch_messages
+      attr_reader :dlq_topic, :dlq_retries
 
       def subscriptions
         @subscriptions ||= []
@@ -36,6 +37,11 @@ module Racecar
         topics.each do |topic|
           subscriptions << Subscription.new(topic, start_from_beginning, max_bytes_per_partition, additional_config)
         end
+      end
+
+      def dead_letter_queue(topic:, retries: 3)
+        @dlq_topic = topic
+        @dlq_retries = retries
       end
 
       # Rebalance hooks for subclasses to override
