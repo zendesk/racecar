@@ -1,0 +1,22 @@
+{
+  "name": "racecar-devcontainer",
+  "dockerComposeFile": [
+    "docker-compose.yml"
+  ],
+  "service": "racecar",
+  "workspaceFolder": "/workspaces/racecar",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash"
+      },
+      "extensions": [
+        "rebornix.Ruby"
+      ]
+    }
+  },
+  "forwardPorts": [
+    3000, 8080
+  ],
+  "postCreateCommand": "bundle install"
+}
