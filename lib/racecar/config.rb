@@ -194,6 +194,9 @@ module Racecar
     desc "Strategy for switching topics when there are multiple subscriptions. `exhaust-topic` will only switch when the consumer poll returns no messages. `round-robin` will switch after each poll regardless.\nWarning: `round-robin` will be the default in Racecar 3.x"
     string :multi_subscription_strategy, allowed_values: %w(round-robin exhaust-topic), default: "exhaust-topic"
 
+    desc "Number of seconds waiting for a consumer thread pool to shutdown gracefully before killing threads. Default is 60 seconds."
+    integer :shutdown_timeout, default: 60
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 

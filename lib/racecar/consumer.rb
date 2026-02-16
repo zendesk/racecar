@@ -10,7 +10,7 @@ module Racecar
     class << self
       attr_accessor :max_wait_time
       attr_accessor :group_id
-      attr_accessor :producer, :consumer, :parallel_workers, :fetch_messages
+      attr_accessor :producer, :consumer, :parallel_workers, :parallel_batches_executors, :fetch_messages
 
       def subscriptions
         @subscriptions ||= []
@@ -126,10 +126,6 @@ module Racecar
       end
     end
 
-    def heartbeat
-      warn "DEPRECATION WARNING: Manual heartbeats are not supported and not needed with librdkafka."
-    end
-
     # Thread-safe helper method that executes a block with exclusive access.
     # Useful for protecting critical sections when using parallel message processing.
     #
@@ -179,6 +175,10 @@ module Racecar
       @key_based_mutexes ||= Concurrent::Map.new do |map, key|
         map[key] = Mutex.new
       end
+    end
+
+    def heartbeat
+      warn "DEPRECATION WARNING: Manual heartbeats are not supported and not needed with librdkafka."
     end
   end
 end
