@@ -109,6 +109,66 @@ class ParallelProcessingConsumer < Racecar::Consumer
 end
 ```
 
+#### Processing messages in a thread pool (experimental)
+
+Warning - limited battle testing in production environments; use at your own risk!
+
+If you want to process messages in parallel within a single consumer process, you can set up a thread pool. This is useful if your processing is IO-bound and you want to take advantage of that without having to run multiple processes. If enabled, every message (or message batch) will be processed in a thread from the pool in parallel with other messages.
+
+```ruby
+class ThreadPoolConsumer < Racecar::Consumer
+  subscribes_to "some-topic"
+
+  self.parallel_batches_executors = 5
+
+  def process_batch(messages)
+    ...
+  end
+end
+```
+
+If any of your operations need to be thread safe, please use dedicated method `Racecar::Consumer.thread_safe` to wrap them:
+
+```ruby
+class ThreadPoolConsumer < Racecar::Consumer
+  subscribes_to "some-topic"
+
+  self.parallel_batches_executors = 5
+
+  def process_batch(messages)
+    # This is not thread safe, so we wrap it in a thread safe block.
+    thread_safe do
+      File.open("some-file", "a") do |file|
+        messages.each do |message|
+          file << message.value
+        end
+      end
+    end
+  end
+end
+```
+
+`thread_safe` allows also to use key-based locking to allow multiple threads to execute the block in parallel as long as they don't share the same key:
+
+```ruby
+class ThreadPoolConsumer < Racecar::Consumer
+  subscribes_to "some-topic"
+
+  self.parallel_batches_executors = 5
+
+  def process_batch(messages)
+    messages.each do |message|
+      thread_safe(key: message.key) do
+        # This block will be executed in parallel for messages with different keys, but sequentially for messages with the same key.
+        File.open("some-file-#{message.key}", "a") do |file|
+          file << message.value
+        end
+      end
+    end
+  end
+end
+```
+
 #### Initializing consumers
 
 You can optionally add an `initialize` method if you need to do any set-up work before processing messages, e.g.
