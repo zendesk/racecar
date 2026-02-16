@@ -6,6 +6,7 @@ require "racecar/message"
 require "racecar/message_delivery_error"
 require "racecar/erroneous_state_error"
 require "racecar/delivery_callback"
+require 'concurrent-ruby'
 
 module Racecar
   class Runner
@@ -46,6 +47,10 @@ module Racecar
       }
     end
 
+    def thread_pool
+      @thread_pool ||= Concurrent::FixedThreadPool.new(thread_count)
+    end
+
     def run
       install_signal_handlers
       @stop_requested = false
@@ -75,11 +80,15 @@ module Racecar
           when :batch then
             msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
             msg_per_part.each_value do |messages|
-              process_batch(messages)
+              thread_pool.post do
+                process_batch(messages)
+              end
             end
           when :single then
             message = consumer.poll(config.max_wait_time_ms)
-            process(message) if message
+            thread_pool.post do
+              process(message) if message
+            end
           end
         end
       end
