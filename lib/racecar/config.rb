@@ -240,6 +240,10 @@ module Racecar
       if max_pause_timeout && !pause_with_exponential_backoff?
         raise ConfigError, "`max_pause_timeout` only makes sense when `pause_with_exponential_backoff` is enabled"
       end
+
+      if shutdown_timeout <= 1
+        raise ConfigError, "`shutdown_timeout` must be greater than 0"
+      end
     end
 
     def load_consumer_class(consumer_class)

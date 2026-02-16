@@ -35,6 +35,16 @@ class TestConsumer < Racecar::Consumer
   end
 end
 
+class TestMultiThreadingConsumer < TestConsumer
+  subscribes_to "greetings"
+
+  self.parallel_batches_executors = 3
+
+  def initialize
+    super
+  end
+end
+
 class TestBatchConsumer < Racecar::Consumer
   subscribes_to "greetings"
 
@@ -519,6 +529,35 @@ RSpec.describe Racecar::Runner do
       specify 'message processing errors are propagated to the instrumenter' do
         kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
         expect { runner.run }.to change { instrumenter.event_raised_errors?("process_message") }.to(true)
+      end
+    end
+
+    context "with a consumer with multithreading enabled" do
+      let(:processor) { TestMultiThreadingConsumer.new }
+
+      it "processes messages on thread pool" do
+        expect(Concurrent::FixedThreadPool).to receive(:new).with(3).and_call_original
+        allow_any_instance_of(Concurrent::FixedThreadPool).to receive(:post).and_call_original
+
+        kafka.deliver_message("hello world", topic: "greetings")
+
+        runner.run
+
+        expect(processor.messages.map(&:value)).to eq ["hello world"]
+      end
+    end
+
+    context "with a consumer without multithreading enabled" do
+      let(:processor) { TestConsumer.new }
+
+      it "does not process messages on thread pool" do
+        expect(Concurrent::FixedThreadPool).not_to receive(:new).with(anything)
+
+        kafka.deliver_message("hello world", topic: "greetings")
+
+        runner.run
+
+        expect(processor.messages.map(&:value)).to eq ["hello world"]
       end
     end
   end

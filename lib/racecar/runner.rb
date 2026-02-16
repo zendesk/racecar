@@ -49,7 +49,7 @@ module Racecar
     end
 
     def setup_multithreading
-      if processor.respond_to?(:parallel_batches_executors) && processor.parallel_batches_executors > 0
+      if !processor.parallel_batches_executors.nil? && processor.parallel_batches_executors > 0
         logger.info "Running with parallel batch processing with #{processor.parallel_batches_executors} threads"
         @thread_pool_size = processor.parallel_batches_executors
       else

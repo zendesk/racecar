@@ -7,6 +7,12 @@ module Racecar
   class Consumer
     Subscription = Struct.new(:topic, :start_from_beginning, :max_bytes_per_partition, :additional_config)
 
+    attr_writer :parallel_batches_executors
+
+    def parallel_batches_executors
+      @parallel_batches_executors || self.class.parallel_batches_executors
+    end
+
     class << self
       attr_accessor :max_wait_time
       attr_accessor :group_id
