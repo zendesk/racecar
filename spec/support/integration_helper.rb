@@ -245,6 +245,66 @@ module IntegrationHelper
     end
   end
 
+  def echo_thread_safe_consumer_class
+    Class.new(Racecar::Consumer) do
+      class << self
+        attr_accessor :output_topic, :pipe_to_test, :shared_counter, :key_counters
+      end
+
+      def self.on_partitions_assigned(event)
+        message = { event: "partitions_assigned", partitions: event.partition_numbers, consumer_id: consumer_id}
+        pipe_to_test.write(message)
+      end
+
+      def self.on_partitions_revoked(event)
+        message = { event: "partitions_revoked", partitions: event.partition_numbers, consumer_id: consumer_id}
+        pipe_to_test.write(message)
+      end
+
+      def self.consumer_id
+        "#{Process.pid}-#{Thread.current.object_id}"
+      end
+
+      def initialize
+        super
+        self.class.shared_counter = 0
+        self.class.key_counters = Hash.new(0)
+      end
+
+      def process(message)
+        case message.value
+        when "test_global_sync"
+          # Test global synchronization
+          result = thread_safe do
+            current_count = self.class.shared_counter
+            sleep(0.1) # Small delay to increase chance of race condition without sync
+            self.class.shared_counter = current_count + 1
+            "result_#{self.class.shared_counter}"
+          end
+
+          produce(result, topic: self.class.output_topic, partition: message.partition, key: message.key)
+
+        when "test_key_sync"
+          # Test key-based synchronization
+          user_id = message.key
+          result = thread_safe(key: user_id) do
+            current_count = self.class.key_counters[user_id]
+            sleep(0.1)
+            self.class.key_counters[user_id] = current_count + 1
+            "key_#{user_id}_count_#{self.class.key_counters[user_id]}"
+          end
+
+          produce(result, topic: self.class.output_topic, partition: message.partition, key: message.key)
+
+        else
+          produce(message.value, topic: self.class.output_topic, partition: message.partition, key: message.key)
+        end
+
+        deliver!
+      end
+    end
+  end
+
   class JSONPipe
     def initialize(actual_pipe = IO.pipe)
       @read_end = actual_pipe[0]

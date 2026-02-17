@@ -78,6 +78,23 @@ RSpec.describe Racecar::Config do
     }.to raise_exception(KingKonf::ConfigError)
   end
 
+  it "requires `shutdown_timeout` to be valid" do
+    expect {
+      config.shutdown_timeout = 30
+      config.validate!
+    }.not_to raise_exception
+
+    expect {
+      config.shutdown_timeout = -1
+      config.validate!
+    }.to raise_exception(Racecar::ConfigError)
+
+    expect {
+      config.shutdown_timeout = 0
+      config.validate!
+    }.to raise_exception(Racecar::ConfigError)
+  end
+
   describe "#load_env" do
     it "sets the brokers from RACECAR_BROKERS" do
       with_env("RACECAR_BROKERS", "hansel,gretel") do

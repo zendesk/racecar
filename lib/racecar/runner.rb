@@ -6,6 +6,7 @@ require "racecar/message"
 require "racecar/message_delivery_error"
 require "racecar/erroneous_state_error"
 require "racecar/delivery_callback"
+require 'concurrent-ruby'
 
 module Racecar
   class Runner
@@ -22,6 +23,7 @@ module Racecar
       end
 
       setup_pauses
+      setup_multithreading
     end
 
     def setup_pauses
@@ -44,6 +46,15 @@ module Racecar
           )
         }
       }
+    end
+
+    def setup_multithreading
+      if multi_threading_enabled?
+        logger.info "Running with parallel batch processing with #{processor.parallel_batches_executors} threads"
+        @thread_pool_size = processor.parallel_batches_executors
+      else
+        @thread_pool_size = 0
+      end
     end
 
     def run
@@ -75,17 +86,23 @@ module Racecar
           when :batch then
             msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
             msg_per_part.each_value do |messages|
-              process_batch(messages)
+              execute_on_thread_pool_or_current_thread do
+                process_batch(messages)
+              end
             end
           when :single then
             message = consumer.poll(config.max_wait_time_ms)
-            process(message) if message
+            execute_on_thread_pool_or_current_thread do
+              process(message) if message
+            end
           end
         end
       end
 
       logger.info "Gracefully shutting down"
       begin
+        shutdown_thread_pool
+
         processor.deliver!
         processor.teardown
         consumer.commit
@@ -106,7 +123,30 @@ module Racecar
 
     private
 
-    attr_reader :pauses
+    attr_reader :pauses, :thread_pool_size
+
+    def thread_pool(thread_count)
+      @thread_pool ||= Concurrent::FixedThreadPool.new(thread_count)
+    end
+
+    def shutdown_thread_pool
+      return unless @thread_pool
+
+      logger.info "Shutting down thread pool..."
+
+      @thread_pool.shutdown
+
+      if @thread_pool.wait_for_termination(config.shutdown_timeout)
+        logger.info "Thread pool shutdown completed successfully"
+      else
+        logger.warn "Thread pool shutdown timed out, forcing termination"
+        # Force shutdown if tasks don't complete in time
+        @thread_pool.kill
+      end
+    rescue => e
+      logger.error "Error during thread pool shutdown: #{e.message}"
+      @thread_pool.kill if @thread_pool
+    end
 
     def process_method
       @process_method ||= begin
@@ -288,6 +328,18 @@ module Racecar
           end
         end
       end
+    end
+
+    def execute_on_thread_pool_or_current_thread(&block)
+      if thread_pool_size > 0
+        thread_pool(thread_pool_size).post(&block)
+      else
+        block.call
+      end
+    end
+
+    def multi_threading_enabled?
+      !processor.parallel_batches_executors.nil? && processor.parallel_batches_executors > 0
     end
   end
 end

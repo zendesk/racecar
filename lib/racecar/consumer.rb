@@ -1,15 +1,22 @@
 # frozen_string_literal: true
 
 require "racecar/message_delivery_error"
+require "concurrent-ruby"
 
 module Racecar
   class Consumer
     Subscription = Struct.new(:topic, :start_from_beginning, :max_bytes_per_partition, :additional_config)
 
+    attr_writer :parallel_batches_executors
+
+    def parallel_batches_executors
+      @parallel_batches_executors || self.class.parallel_batches_executors
+    end
+
     class << self
       attr_accessor :max_wait_time
       attr_accessor :group_id
-      attr_accessor :producer, :consumer, :parallel_workers, :fetch_messages
+      attr_accessor :producer, :consumer, :parallel_workers, :parallel_batches_executors, :fetch_messages
 
       def subscriptions
         @subscriptions ||= []
@@ -122,6 +129,57 @@ module Racecar
           timestamp: create_time,
           headers: headers,
         )
+      end
+    end
+
+    # Thread-safe helper method that executes a block with exclusive access.
+    # Useful for protecting critical sections when using parallel message processing.
+    #
+    # @example Basic usage
+    #   def process(message)
+    #     thread_safe do
+    #       @counter += 1
+    #       save_to_shared_resource(message)
+    #     end
+    #   end
+    #
+    # @example Key-based synchronization
+    #   def process(message)
+    #     user_id = JSON.parse(message.value)["user_id"]
+    #     thread_safe(key: user_id) do
+    #       user = User.find(user_id)
+    #       user.process_message(message)
+    #     end
+    #   end
+    #
+    # @param key [Object] Optional key for key-based synchronization
+    # @yield The block to execute thread-safely
+    # @return [Object] The result of the block
+    def thread_safe(key: nil, &block)
+      mutex = if key
+        key_based_mutex(key)
+      else
+        global_mutex
+      end
+
+      mutex.synchronize(&block)
+    end
+
+    private
+
+    # Global mutex for this consumer instance
+    def global_mutex
+      @global_mutex ||= Mutex.new
+    end
+
+    # Key-based mutex cache for fine-grained locking
+    def key_based_mutex(key)
+      key_based_mutexes[key]
+    end
+
+    def key_based_mutexes
+      @key_based_mutexes ||= Concurrent::Map.new do |map, key|
+        map[key] = Mutex.new
       end
     end
 

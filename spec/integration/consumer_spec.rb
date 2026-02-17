@@ -141,6 +141,100 @@ RSpec.describe "running a Racecar consumer", type: :integration do
         end
       end
     end
+
+    context "when multithreading batch processing is enabled" do
+      let(:input_messages) do
+        6.times.map { |n|
+          { payload: "message-#{n}", partition: n % topic_partitions }
+        }
+      end
+      let(:topic_partitions) { 6 }
+      let(:parallelism) { nil }
+      let(:parallel_batches_executors) { 3 }
+
+      before do
+        consumer_class.parallel_batches_executors = parallel_batches_executors
+      end
+
+      it "ensures processing is not disrupted" do
+        start_racecar
+
+        wait_for_assignments(1)
+        publish_messages
+        wait_for_messages
+
+        batch_count_by_executor = incoming_messages.group_by { |m| m.headers.fetch("processed_by") }.transform_values(&:count)
+
+        expect(incoming_messages.map(&:topic).uniq).to eq([output_topic])
+        expect(incoming_messages.map(&:payload))
+          .to match_array(input_messages.map { |m| m[:payload] })
+        expect(batch_count_by_executor.values).to eq([2, 2, 2])
+      end
+
+      context "when consumer is using a thread_safe block" do
+        let(:consumer_class) { IntegrationTestConsumer = echo_thread_safe_consumer_class }
+
+        context "with global synchronization" do
+          let(:input_messages) do
+            5.times.map { |n|
+              { payload: "test_global_sync", partition: n % topic_partitions, key: "msg_#{n}" }
+            }
+          end
+
+          it "ensures thread-safe access to shared resources" do
+            start_racecar
+
+            wait_for_assignments(1)
+            publish_messages
+            wait_for_messages
+
+            expect(incoming_messages.count).to eq(5)
+
+            expect(consumer_class.shared_counter).to eq(5)
+
+            results = incoming_messages.map(&:payload).sort
+            expected_results = (1..5).map { |i| "result_#{i}" }
+            expect(results).to match_array(expected_results)
+          end
+        end
+
+        context "with key-based synchronization" do
+          let(:input_messages) do
+            messages = []
+            ["user1", "user2"].each do |user|
+              3.times do |n|
+                messages << { payload: "test_key_sync", partition: n % topic_partitions, key: user }
+              end
+            end
+            messages
+          end
+
+          it "provides separate synchronization for different keys" do
+            start_racecar
+
+            wait_for_assignments(1)
+            publish_messages
+            wait_for_messages
+
+            expect(incoming_messages.count).to eq(6)
+
+            results_by_user = incoming_messages.group_by(&:key)
+
+            expect(results_by_user["user1"].count).to eq(3)
+            expect(results_by_user["user2"].count).to eq(3)
+
+            expect(consumer_class.key_counters["user1"]).to eq(3)
+            expect(consumer_class.key_counters["user2"]).to eq(3)
+
+            user1_results = results_by_user["user1"].map(&:payload).sort
+            user2_results = results_by_user["user2"].map(&:payload).sort
+
+            expect(user1_results).to match_array(%w[key_user1_count_1 key_user1_count_2 key_user1_count_3])
+            expect(user2_results).to match_array(%w[key_user2_count_1 key_user2_count_2 key_user2_count_3])
+          end
+        end
+      end
+    end
   end
 
   after do
