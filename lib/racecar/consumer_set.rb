@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "thread"
+
 module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10
@@ -16,6 +18,7 @@ module Racecar
 
       @last_poll_read_nil_message = false
       @paused_tpls = Hash.new { |h, k| h[k] = {} }
+      @consumer_mutex = Mutex.new
     end
 
     def poll(max_wait_time_ms = @config.max_wait_time_ms)
@@ -49,7 +52,13 @@ module Racecar
     end
 
     def store_offset(message)
-      current.store_offset(message)
+      if @config.partition_threading_enabled
+        @consumer_mutex.synchronize do
+          current.store_offset(message)
+        end
+      else
+        current.store_offset(message)
+      end
     rescue Rdkafka::RdkafkaError => e
       if e.code == :state # -172
         @logger.warn "Attempted to store_offset, but we're not subscribed to it: #{ErroneousStateError.new(e)}"
@@ -121,6 +130,36 @@ module Racecar
       consumer.resume(filtered_tpl)
       @paused_tpls[topic].delete(partition)
       @paused_tpls.delete(topic) if @paused_tpls[topic].empty?
+    end
+
+    def thread_safe_pause(topic, partition, offset)
+      if @config.partition_threading_enabled
+        @consumer_mutex.synchronize do
+          pause(topic, partition, offset)
+        end
+      else
+        pause(topic, partition, offset)
+      end
+    end
+
+    def thread_safe_resume(topic, partition)
+      if @config.partition_threading_enabled
+        @consumer_mutex.synchronize do
+          resume(topic, partition)
+        end
+      else
+        resume(topic, partition)
+      end
+    end
+
+    def thread_safe_commit
+      if @config.partition_threading_enabled
+        @consumer_mutex.synchronize do
+          commit
+        end
+      else
+        commit
+      end
     end
 
     alias :each :each_subscribed
