@@ -94,6 +94,12 @@ module Racecar
       @delivery_handles.clear
     end
 
+    def all_partition_ids
+      topics = subscriptions.map(&:topic)
+
+      topics.map { |topic| partitions_per_topic(topic) }.flatten.uniq
+    end
+
     protected
 
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
@@ -127,6 +133,15 @@ module Racecar
 
     def heartbeat
       warn "DEPRECATION WARNING: Manual heartbeats are not supported and not needed with librdkafka."
+    end
+
+    def partitions_per_topic(topic)
+      result = []
+      @consumer&.each_subscribed do |consumer|
+        partitions = consumer.assignment.to_h[topic]&.map(&:partition) || []
+        result << partitions
+      end
+      result.flatten.uniq
     end
   end
 end

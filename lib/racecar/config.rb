@@ -194,6 +194,12 @@ module Racecar
     desc "Strategy for switching topics when there are multiple subscriptions. `exhaust-topic` will only switch when the consumer poll returns no messages. `round-robin` will switch after each poll regardless.\nWarning: `round-robin` will be the default in Racecar 3.x"
     string :multi_subscription_strategy, allowed_values: %w(round-robin exhaust-topic), default: "exhaust-topic"
 
+    desc "Determines if processing every partition per topic in separate threads is enabled"
+    boolean :partition_threading_enabled, default: false
+
+    desc "Max number of threads to process partitions in parallel. Only applies if `partition_threading_enabled` is enabled. Defaults to the number of partitions assigned to the consumer."
+    integer :max_parallel_threads
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
