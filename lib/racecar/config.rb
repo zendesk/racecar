@@ -72,7 +72,10 @@ module Racecar
     float :message_timeout, default: 5*60
 
     desc "Maximum amount of data the broker shall return for a Fetch request"
-    integer :max_bytes, default: 10485760
+    integer :fetch_max_bytes, default: 10485760
+
+    desc "Maximum request message size"
+    integer :message_max_bytes, default: 1048576
 
     desc "A prefix used when generating consumer group names"
     string :group_id_prefix
