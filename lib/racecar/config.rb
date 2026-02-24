@@ -308,6 +308,20 @@ module Racecar
       )
     end
 
+    def configure_datadog
+      return unless datadog_enabled
+
+      require_relative './datadog'
+
+      Datadog.configure do |config|
+        config.host        = datadog_host unless datadog_host.nil?
+        config.port        = datadog_port unless datadog_port.nil?
+        config.socket_path = datadog_socket_path unless datadog_socket_path.nil?
+        config.namespace   = datadog_namespace unless datadog_namespace.nil?
+        config.tags        = datadog_tags unless datadog_tags.nil?
+      end
+    end
+
     private
 
     def rdkafka_security_config
