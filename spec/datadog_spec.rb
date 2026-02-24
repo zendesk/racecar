@@ -433,14 +433,18 @@ RSpec.describe Racecar::Datadog::ProducerSubscriber do
   describe '#acknowledged_message' do
     let(:event) do
       create_event(
-        'deliver_messages',
+        'acknowledged_message',
         client_id: 'racecar',
-        delivered_message_count: 10
+        offset: 123,
+        partition: 1,
+        topic: 'test_topic'
       )
     end
     let(:metric_tags) do
       %w[
           client:racecar
+          topic:test_topic
+          partition:1
         ]
     end
 
