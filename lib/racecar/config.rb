@@ -197,7 +197,7 @@ module Racecar
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 
-    attr_accessor :subscriptions, :logger, :parallel_workers, :threaded
+    attr_accessor :subscriptions, :logger, :parallel_workers, :threaded, :dynamic_partition_scaling
 
     def statistics_interval_ms
       if Rdkafka::Config.statistics_callback
@@ -241,6 +241,10 @@ module Racecar
       if threaded && parallel_workers && parallel_workers > 1
         raise ConfigError, "`threaded` and `parallel_workers` cannot be used together"
       end
+
+      if dynamic_partition_scaling && !threaded
+        raise ConfigError, "`dynamic_partition_scaling` requires `threaded` to be enabled"
+      end
     end
 
     def load_consumer_class(consumer_class)
@@ -257,6 +261,7 @@ module Racecar
 
       self.parallel_workers = consumer_class.parallel_workers
       self.threaded = consumer_class.threaded
+      self.dynamic_partition_scaling = consumer_class.dynamic_partition_scaling
       self.subscriptions = consumer_class.subscriptions
       self.max_wait_time = consumer_class.max_wait_time || self.max_wait_time
       self.fetch_messages = consumer_class.fetch_messages || self.fetch_messages

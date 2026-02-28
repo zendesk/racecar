@@ -9,9 +9,11 @@ RSpec.describe Racecar::ThreadedRunner do
       c.subscriptions = subscriptions
       c.group_id = "test-group"
       c.threaded = true
+      c.dynamic_partition_scaling = dynamic_partition_scaling
     end
   end
   let(:subscriptions) { [Racecar::Consumer::Subscription.new("test-topic", true, 1048576, {})] }
+  let(:dynamic_partition_scaling) { false }
   let(:logger) { Logger.new(StringIO.new) }
   let(:instrumenter) { Racecar::NullInstrumenter }
 
@@ -31,6 +33,19 @@ RSpec.describe Racecar::ThreadedRunner do
       logger: logger,
       instrumenter: instrumenter
     )
+  end
+
+  def stub_runners_with_stop
+    runners = []
+    allow(Racecar::Runner).to receive(:new).and_wrap_original do |method, *args, **kwargs|
+      method.call(*args, **kwargs).tap do |runner|
+        runners << runner
+        allow(runner).to receive(:run) do
+          sleep 0.1 until runner.instance_variable_get(:@stop_requested)
+        end
+      end
+    end
+    runners
   end
 
   describe "#run" do
@@ -55,15 +70,7 @@ RSpec.describe Racecar::ThreadedRunner do
       end
 
       it "stops all runners when stop is called" do
-        runners = []
-        allow(Racecar::Runner).to receive(:new).and_wrap_original do |method, *args, **kwargs|
-          method.call(*args, **kwargs).tap do |runner|
-            runners << runner
-            allow(runner).to receive(:run) do
-              sleep 0.1 until runner.instance_variable_get(:@stop_requested)
-            end
-          end
-        end
+        runners = stub_runners_with_stop
 
         Thread.new do
           sleep 0.1
@@ -152,6 +159,87 @@ RSpec.describe Racecar::ThreadedRunner do
       it "raises an error" do
         expect { threaded_runner.run }.to raise_error(Racecar::Error, /Could not discover partitions/)
       end
+    end
+  end
+
+  describe "dynamic_partition_scaling" do
+    let(:dynamic_partition_scaling) { true }
+
+    before do
+      stub_const("Racecar::ThreadedRunner::METADATA_POLL_INTERVAL", 0.1)
+    end
+
+    it "spawns additional threads when partition count increases" do
+      call_count = 0
+      allow(threaded_runner).to receive(:fetch_partition_counts) do
+        call_count += 1
+        if call_count <= 1
+          { "test-topic" => 2 }
+        else
+          { "test-topic" => 4 }
+        end
+      end
+
+      runners = []
+      allow(Racecar::Runner).to receive(:new).and_wrap_original do |method, *args, **kwargs|
+        method.call(*args, **kwargs).tap do |runner|
+          runners << runner
+          allow(runner).to receive(:run) do
+            sleep 0.1 until runner.instance_variable_get(:@stop_requested)
+          end
+        end
+      end
+
+      Thread.new do
+        sleep 0.5
+        threaded_runner.stop
+      end
+
+      threaded_runner.run
+
+      expect(runners.size).to eq(4)
+    end
+
+    it "does not spawn threads when partition count stays the same" do
+      allow(threaded_runner).to receive(:fetch_partition_counts).and_return({ "test-topic" => 2 })
+
+      runners = []
+      allow(Racecar::Runner).to receive(:new).and_wrap_original do |method, *args, **kwargs|
+        method.call(*args, **kwargs).tap do |runner|
+          runners << runner
+          allow(runner).to receive(:run) do
+            sleep 0.1 until runner.instance_variable_get(:@stop_requested)
+          end
+        end
+      end
+
+      Thread.new do
+        sleep 0.5
+        threaded_runner.stop
+      end
+
+      threaded_runner.run
+
+      expect(runners.size).to eq(2)
+    end
+
+    it "handles metadata poll failures gracefully" do
+      call_count = 0
+      allow(threaded_runner).to receive(:fetch_partition_counts) do
+        call_count += 1
+        raise "Connection refused" if call_count > 1
+        { "test-topic" => 2 }
+      end
+
+      runners = stub_runners_with_stop
+
+      Thread.new do
+        sleep 0.5
+        threaded_runner.stop
+      end
+
+      expect { threaded_runner.run }.not_to raise_error
+      expect(runners.size).to eq(2)
     end
   end
 
