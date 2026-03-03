@@ -8,6 +8,7 @@ require "racecar/consumer"
 require "racecar/consumer_set"
 require "racecar/runner"
 require "racecar/parallel_runner"
+require "racecar/threaded_runner"
 require "racecar/producer"
 require "racecar/config"
 require "racecar/version"
@@ -70,12 +71,18 @@ module Racecar
   end
 
   def self.runner(processor)
-    runner = Runner.new(processor, config: config, logger: logger, instrumenter: config.instrumenter)
-
-    if config.parallel_workers && config.parallel_workers > 1
+    if config.threaded
+      ThreadedRunner.new(
+        consumer_class: config.consumer_class,
+        config: config,
+        logger: logger,
+        instrumenter: config.instrumenter
+      )
+    elsif config.parallel_workers && config.parallel_workers > 1
+      runner = Runner.new(processor, config: config, logger: logger, instrumenter: config.instrumenter)
       ParallelRunner.new(runner: runner, config: config, logger: logger)
     else
-      runner
+      Runner.new(processor, config: config, logger: logger, instrumenter: config.instrumenter)
     end
   end
 end
