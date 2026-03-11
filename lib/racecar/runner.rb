@@ -6,10 +6,14 @@ require "racecar/message"
 require "racecar/message_delivery_error"
 require "racecar/erroneous_state_error"
 require "racecar/delivery_callback"
+require "racecar/threads_orchestrator"
+require "racecar/processing"
 
 module Racecar
   class Runner
-    attr_reader :processor, :config, :logger
+    include Processing
+
+    attr_reader :processor, :config, :logger, :threads_orchestrator
 
     def initialize(processor, config:, logger:, instrumenter: NullInstrumenter)
       @processor, @config, @logger = processor, config, logger
@@ -22,6 +26,20 @@ module Racecar
       end
 
       setup_pauses
+
+      @threads_orchestrator = if config.multithreaded_processing_enabled
+                                orchestrator = ThreadsOrchestrator.new(
+                                  config:         config,
+                                  pauses:         pauses,
+                                  processor:      processor,
+                                  instrumenter:   @instrumenter,
+                                  logger:         logger,
+                                  reset_producer: method(:reset_producer!),
+                                  )
+
+                                orchestrator.consumer = consumer
+                                orchestrator
+                              end
     end
 
     def setup_pauses
@@ -59,7 +77,7 @@ module Racecar
         config:       @config,
       )
 
-      instrumentation_payload = {
+      loop_payload = {
         consumer_class: processor.class.to_s,
         consumer_set: consumer
       }
@@ -69,8 +87,8 @@ module Racecar
         break if @stop_requested
         resume_paused_partitions
 
-        @instrumenter.instrument("start_main_loop", instrumentation_payload)
-        @instrumenter.instrument("main_loop", instrumentation_payload) do
+        @instrumenter.instrument("start_main_loop", loop_payload)
+        @instrumenter.instrument("main_loop", loop_payload) do
           case process_method
           when :batch then
             msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
@@ -86,6 +104,9 @@ module Racecar
 
       logger.info "Gracefully shutting down"
       begin
+        if config.multithreaded_processing_enabled
+          threads_orchestrator.shutdown_and_wait
+        end
         processor.deliver!
         processor.teardown
         consumer.commit
@@ -97,11 +118,17 @@ module Racecar
     ensure
       producer.close
       Racecar::Datadog.close if config.datadog_enabled
-      @instrumenter.instrument("shut_down", instrumentation_payload || {})
+      @instrumenter.instrument("shut_down", loop_payload || {})
     end
 
     def stop
       @stop_requested = true
+    end
+
+    def consumer
+      @consumer ||= begin
+        ConsumerSet.new(config, logger, @instrumenter, threads_orchestrator)
+      end
     end
 
     private
@@ -126,12 +153,6 @@ module Racecar
         else
           raise NotImplementedError, "Consumer class `#{processor.class}` must implement a `process` or `process_batch` method"
         end
-      end
-    end
-
-    def consumer
-      @consumer ||= begin
-        ConsumerSet.new(config, logger, @instrumenter)
       end
     end
 
@@ -167,50 +188,43 @@ module Racecar
     end
 
     def process(message)
-      instrumentation_payload = {
-        consumer_class: processor.class.to_s,
-        topic:          message.topic,
-        partition:      message.partition,
-        offset:         message.offset,
-        create_time:    message.timestamp,
-        key:            message.key,
-        value:          message.payload,
-        headers:        message.headers
-      }
+      if config.multithreaded_processing_enabled
+        wrapped_message = Racecar::Message.new(message, retries_count: pauses[message.topic][message.partition].pauses_count)
+        threads_orchestrator.push_messages(wrapped_message)
+        return
+      end
 
-      @instrumenter.instrument("start_process_message", instrumentation_payload)
+      payload = instrumentation_payload(message)
+
       with_pause(message.topic, message.partition, message.offset..message.offset) do |pause|
         begin
-          @instrumenter.instrument("process_message", instrumentation_payload) do
+          instrument_process_message(payload) do
             processor.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
             processor.deliver!
             consumer.store_offset(message)
           end
         rescue => e
-          instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
-          instrumentation_payload[:retries_count] = pause.pauses_count
-          config.error_handler.call(e, instrumentation_payload)
+          handle_processing_error(e, payload, pause: pause)
           raise e
         end
       end
     end
 
     def process_batch(messages)
-      first, last = messages.first, messages.last
-      instrumentation_payload = {
-        consumer_class: processor.class.to_s,
-        topic:          first.topic,
-        partition:      first.partition,
-        first_offset:   first.offset,
-        last_offset:    last.offset,
-        last_create_time: last.timestamp,
-        message_count:  messages.size
-      }
+      if config.multithreaded_processing_enabled
+        wrapped_messages = messages.map do |message|
+          Racecar::Message.new(message, retries_count: pauses[message.topic][message.partition].pauses_count)
+        end
+        threads_orchestrator.push_messages(wrapped_messages)
+        return
+      end
 
-      @instrumenter.instrument("start_process_batch", instrumentation_payload)
+      payload = instrumentation_payload_for_batch(messages)
+      first, last = messages.first, messages.last
+
       with_pause(first.topic, first.partition, first.offset..last.offset) do |pause|
         begin
-          @instrumenter.instrument("process_batch", instrumentation_payload) do
+          instrument_process_batch(payload) do
             racecar_messages = messages.map do |message|
               Racecar::Message.new(message, retries_count: pause.pauses_count)
             end
@@ -219,24 +233,13 @@ module Racecar
             consumer.store_offset(messages.last)
           end
         rescue => e
-          instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
-          instrumentation_payload[:retries_count] = pause.pauses_count
-          config.error_handler.call(e, instrumentation_payload)
+          handle_processing_error(e, payload, pause: pause)
           raise e
         end
       end
     end
 
-    # librdkafka will continue to try to deliver already queued messages, even if ruby-rdkafka
-    # raised before that. This method detects any unrecoverable errors and resets the producer
-    # as a last ditch effort.
-    # The function returns true if there were unrecoverable errors, or false otherwise.
-    def reset_producer_on_unrecoverable_delivery_errors(error)
-      return false unless error.is_a?(Racecar::MessageDeliveryError)
-      return false unless error.code == :msg_timed_out # -192
-
-      logger.error error.to_s
-      logger.error "Racecar will reset the producer to force a new broker connection."
+    def reset_producer!
       @producer.close
       @producer = nil
       processor.configure(
@@ -245,8 +248,6 @@ module Racecar
         instrumenter: @instrumenter,
         config:       @config,
       )
-
-      true
     end
 
     def with_pause(topic, partition, offsets)
@@ -272,13 +273,13 @@ module Racecar
 
       pauses.each do |topic, partitions|
         partitions.each do |partition, pause|
-          instrumentation_payload = {
-            topic:      topic,
-            partition:  partition,
-            duration:   pause.pause_duration,
+          payload = {
+            topic:          topic,
+            partition:      partition,
+            duration:       pause.pause_duration,
             consumer_class: processor.class.to_s,
           }
-          @instrumenter.instrument("pause_status", instrumentation_payload)
+          @instrumenter.instrument("pause_status", payload)
 
           if pause.paused? && pause.expired?
             logger.info "Automatically resuming partition #{topic}/#{partition}, pause timeout expired"

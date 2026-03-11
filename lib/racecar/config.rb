@@ -194,6 +194,16 @@ module Racecar
     desc "Strategy for switching topics when there are multiple subscriptions. `exhaust-topic` will only switch when the consumer poll returns no messages. `round-robin` will switch after each poll regardless.\nWarning: `round-robin` will be the default in Racecar 3.x"
     string :multi_subscription_strategy, allowed_values: %w(round-robin exhaust-topic), default: "exhaust-topic"
 
+    desc "Whether multithreaded processing is enabled"
+    boolean :multithreaded_processing_enabled, default: false
+
+    desc "Max size of the queue of messages waiting to be processed when multithreaded processing is enabled"
+    integer :multithreaded_processing_max_queue_size, default: 1000
+
+    desc "Whether to fetch all messages in a batch when multithreaded processing is enabled. If false, messages will be fetched one by one even if `process_batch` was used.
+                    If set to true, then the whole FIFO queue will be emptied on each processing execution, and batches passed to `process_batch` may be of variable size. Defaults to true."
+    boolean :multithreaded_processing_fetch_full_batch, default: true
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 

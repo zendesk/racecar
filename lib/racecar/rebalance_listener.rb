@@ -1,8 +1,10 @@
 module Racecar
   class RebalanceListener
-    def initialize(consumer_class, instrumenter)
-      @consumer_class = consumer_class
+    def initialize(config, instrumenter, threads_orchestrator)
+      @consumer_class = config.consumer_class
+      @config = config
       @instrumenter = instrumenter
+      @threads_orchestrator = threads_orchestrator
       @rdkafka_consumer = nil
     end
 
@@ -24,6 +26,13 @@ module Racecar
 
       instrument("partitions_revoked", partitions: event.partition_numbers) do
         consumer_class.on_partitions_revoked(event)
+        if @config.multithreaded_processing_enabled
+          rdkafka_topic_partition_list.to_h.each do |topic, partitions_metadata|
+            partitions_metadata.flatten.map(&:partition).each do |partition|
+              @threads_orchestrator.set_to_rebalance(topic, partition)
+            end
+          end
+        end
       end
     end
 
