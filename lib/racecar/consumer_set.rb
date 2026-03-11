@@ -1,21 +1,24 @@
 # frozen_string_literal: true
 
+require "racecar/delivery_callback"
+
 module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10
 
-    def initialize(config, logger, instrumenter = NullInstrumenter)
+    def initialize(config, logger, partition_processors, instrumenter = NullInstrumenter)
       @config, @logger = config, logger
       @instrumenter = instrumenter
+      @partition_processors = partition_processors
       raise ArgumentError, "Subscriptions must not be empty when subscribing" if @config.subscriptions.empty?
 
       @consumers = []
       @consumer_id_iterator = (0...@config.subscriptions.size).cycle
+      @producer_mutex = Mutex.new
 
       @previous_retries = 0
 
       @last_poll_read_nil_message = false
-      @paused_tpls = Hash.new { |h, k| h[k] = {} }
     end
 
     def poll(max_wait_time_ms = @config.max_wait_time_ms)
@@ -48,8 +51,9 @@ module Racecar
       messages
     end
 
-    def store_offset(message)
-      current.store_offset(message)
+    def store_offset(message, raw_consumer = nil)
+      consumer = raw_consumer || current
+      consumer.store_offset(message)
     rescue Rdkafka::RdkafkaError => e
       if e.code == :state # -172
         @logger.warn "Attempted to store_offset, but we're not subscribed to it: #{ErroneousStateError.new(e)}"
@@ -66,13 +70,29 @@ module Racecar
 
     def close
       each_subscribed(&:close)
-      @paused_tpls.clear
+    ensure
+      reset_producer!
+    end
+
+    def producer
+      @producer_mutex.synchronize do
+        @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |p|
+          p.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
+        end
+      end
+    end
+
+    def reset_producer!
+      @producer_mutex.synchronize do
+        @producer&.close
+        @producer = nil
+      end
     end
 
     def current
       @consumers[@consumer_id_iterator.peek] ||= begin
         consumer_config = Rdkafka::Config.new(rdkafka_config(current_subscription))
-        listener = RebalanceListener.new(@config.consumer_class, @instrumenter)
+        listener = RebalanceListener.new(@config, @instrumenter, @partition_processors)
         consumer_config.consumer_rebalance_listener = listener
         consumer = consumer_config.consumer
         listener.rdkafka_consumer = consumer
@@ -86,44 +106,38 @@ module Racecar
 
     def each_subscribed
       if block_given?
-        @consumers.each { |c| yield c }
+        @consumers.compact.each { |c| yield c }
       else
-        @consumers.each
+        @consumers.compact.each
       end
     end
 
-    def pause(topic, partition, offset)
+    def pause(topic, partition, offset = nil)
       consumer, filtered_tpl = find_consumer_by(topic, partition)
-      if !consumer
+      unless consumer
         @logger.info "Attempted to pause #{topic}/#{partition}, but we're not subscribed to it"
         return
       end
 
       consumer.pause(filtered_tpl)
-      fake_msg = OpenStruct.new(topic: topic, partition: partition, offset: offset)
-      consumer.seek(fake_msg)
-
-      @paused_tpls[topic][partition] = [consumer, filtered_tpl]
+      if offset
+        fake_msg = OpenStruct.new(topic: topic, partition: partition, offset: offset)
+        consumer.seek(fake_msg)
+      end
     end
 
     def resume(topic, partition)
       consumer, filtered_tpl = find_consumer_by(topic, partition)
 
-      if !consumer && @paused_tpls[topic][partition]
-        consumer, filtered_tpl = @paused_tpls[topic][partition]
-      end
-
-      if !consumer
+      unless consumer
         @logger.info "Attempted to resume #{topic}/#{partition}, but we're not subscribed to it"
         return
       end
 
       consumer.resume(filtered_tpl)
-      @paused_tpls[topic].delete(partition)
-      @paused_tpls.delete(topic) if @paused_tpls[topic].empty?
     end
 
-    alias :each :each_subscribed
+  alias :each :each_subscribed
 
     # Subscribe to all topics eagerly, even if there's still messages elsewhere. Usually
     # that's not needed and Kafka might rebalance if topics are not polled frequently
@@ -268,6 +282,19 @@ module Racecar
     def remaining_time_ms(limit_ms, started_at_time)
       r = limit_ms - ((Time.now - started_at_time)*1000).round
       r <= 0 ? 0 : r
+    end
+
+    def producer_config
+      cfg = {
+        "bootstrap.servers"      => @config.brokers.join(","),
+        "client.id"              => @config.client_id,
+        "statistics.interval.ms" => @config.statistics_interval_ms,
+        "message.timeout.ms"     => @config.message_timeout * 1000,
+        "partitioner"            => @config.partitioner.to_s,
+      }
+      cfg["compression.codec"] = @config.producer_compression_codec.to_s unless @config.producer_compression_codec.nil?
+      cfg.merge!(@config.rdkafka_producer)
+      cfg
     end
   end
 end
