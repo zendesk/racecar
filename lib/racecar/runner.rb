@@ -6,40 +6,44 @@ require "racecar/message"
 require "racecar/message_delivery_error"
 require "racecar/erroneous_state_error"
 require "racecar/delivery_callback"
-require "racecar/threads_orchestrator"
 require "racecar/processing"
+require "racecar/single_threaded_processor"
+require "racecar/multi_threaded_processor"
+require 'racecar/producer_methods'
 
 module Racecar
   class Runner
     include Processing
+    include ProducerMethods
 
-    attr_reader :processor, :config, :logger, :threads_orchestrator
+    attr_reader :consumer_class_instance, :config, :logger, :processor
 
-    def initialize(processor, config:, logger:, instrumenter: NullInstrumenter)
-      @processor, @config, @logger = processor, config, logger
+    def initialize(consumer_class_instance, config:, logger:, instrumenter: NullInstrumenter)
+      @consumer_class_instance, @config, @logger = consumer_class_instance, config, logger
       @instrumenter = instrumenter
       @stop_requested = false
       Rdkafka::Config.logger = logger
 
-      if processor.respond_to?(:statistics_callback)
-        Rdkafka::Config.statistics_callback = processor.method(:statistics_callback).to_proc
+      if consumer_class_instance.respond_to?(:statistics_callback)
+        Rdkafka::Config.statistics_callback = consumer_class_instance.method(:statistics_callback).to_proc
       end
 
       setup_pauses
 
-      @threads_orchestrator = if config.multithreaded_processing_enabled
-                                orchestrator = ThreadsOrchestrator.new(
-                                  config:         config,
-                                  pauses:         pauses,
-                                  processor:      processor,
-                                  instrumenter:   @instrumenter,
-                                  logger:         logger,
-                                  reset_producer: method(:reset_producer!),
-                                  )
+      processor_args = {
+        config: config,
+        logger: logger,
+        instrumenter: @instrumenter,
+        consumer_class_instance: consumer_class_instance,
+        consumer: consumer,
+        pauses: pauses,
+      }
 
-                                orchestrator.consumer = consumer
-                                orchestrator
-                              end
+      @processor = if config.multithreaded_processing_enabled
+                                    MultiThreadedProcessor.new(**processor_args)
+                                  else
+                                    SingleThreadedProcessor.new(**processor_args)
+                                  end
     end
 
     def setup_pauses
@@ -70,7 +74,7 @@ module Racecar
 
       # Configure the consumer with a producer so it can produce messages and
       # with a consumer so that it can support advanced use-cases.
-      processor.configure(
+      consumer_class_instance.configure(
         producer:     producer,
         consumer:     consumer,
         instrumenter: @instrumenter,
@@ -78,7 +82,7 @@ module Racecar
       )
 
       loop_payload = {
-        consumer_class: processor.class.to_s,
+        consumer_class: consumer_class_instance.class.to_s,
         consumer_set: consumer
       }
 
@@ -93,22 +97,20 @@ module Racecar
           when :batch then
             msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
             msg_per_part.each_value do |messages|
-              process_batch(messages)
+              processor.process_batch(messages)
             end
           when :single then
             message = consumer.poll(config.max_wait_time_ms)
-            process(message) if message
+            processor.process(message) if message
           end
         end
       end
 
       logger.info "Gracefully shutting down"
       begin
-        if config.multithreaded_processing_enabled
-          threads_orchestrator.shutdown_and_wait
-        end
-        processor.deliver!
-        processor.teardown
+        processor.shutdown_and_wait
+        consumer_class_instance.deliver!
+        consumer_class_instance.teardown
         consumer.commit
       ensure
         @instrumenter.instrument('leave_group') do
@@ -127,7 +129,7 @@ module Racecar
 
     def consumer
       @consumer ||= begin
-        ConsumerSet.new(config, logger, @instrumenter, threads_orchestrator)
+        ConsumerSet.new(config, logger, @instrumenter, processor)
       end
     end
 
@@ -138,43 +140,22 @@ module Racecar
     def process_method
       @process_method ||= begin
         case
-        when processor.respond_to?(:process_batch)
-          if processor.method(:process_batch).arity != 1
+        when consumer_class_instance.respond_to?(:process_batch)
+          if consumer_class_instance.method(:process_batch).arity != 1
             raise Racecar::Error, "Invalid method signature for `process_batch`. The method must take exactly 1 argument."
           end
 
           :batch
-        when processor.respond_to?(:process)
-          if processor.method(:process).arity != 1
+        when consumer_class_instance.respond_to?(:process)
+          if consumer_class_instance.method(:process).arity != 1
             raise Racecar::Error, "Invalid method signature for `process`. The method must take exactly 1 argument."
           end
 
           :single
         else
-          raise NotImplementedError, "Consumer class `#{processor.class}` must implement a `process` or `process_batch` method"
+          raise NotImplementedError, "Consumer class `#{consumer_class_instance.class}` must implement a `process` or `process_batch` method"
         end
       end
-    end
-
-    def producer
-      @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |producer|
-        producer.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
-      end
-    end
-
-    def producer_config
-      # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-      producer_config = {
-        "bootstrap.servers"      => config.brokers.join(","),
-        "client.id"              => config.client_id,
-        "statistics.interval.ms" => config.statistics_interval_ms,
-        "message.timeout.ms"     => config.message_timeout * 1000,
-        "partitioner"            => config.partitioner.to_s,
-      }
-
-      producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
-      producer_config.merge!(config.rdkafka_producer)
-      producer_config
     end
 
     def install_signal_handlers
@@ -187,87 +168,6 @@ module Racecar
       trap("USR1") { $stderr.puts config.inspect }
     end
 
-    def process(message)
-      if config.multithreaded_processing_enabled
-        wrapped_message = Racecar::Message.new(message, retries_count: pauses[message.topic][message.partition].pauses_count)
-        threads_orchestrator.push_messages(wrapped_message)
-        return
-      end
-
-      payload = instrumentation_payload(message)
-
-      with_pause(message.topic, message.partition, message.offset..message.offset) do |pause|
-        begin
-          instrument_process_message(payload) do
-            processor.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
-            processor.deliver!
-            consumer.store_offset(message)
-          end
-        rescue => e
-          handle_processing_error(e, payload, pause: pause)
-          raise e
-        end
-      end
-    end
-
-    def process_batch(messages)
-      if config.multithreaded_processing_enabled
-        wrapped_messages = messages.map do |message|
-          Racecar::Message.new(message, retries_count: pauses[message.topic][message.partition].pauses_count)
-        end
-        threads_orchestrator.push_messages(wrapped_messages)
-        return
-      end
-
-      payload = instrumentation_payload_for_batch(messages)
-      first, last = messages.first, messages.last
-
-      with_pause(first.topic, first.partition, first.offset..last.offset) do |pause|
-        begin
-          instrument_process_batch(payload) do
-            racecar_messages = messages.map do |message|
-              Racecar::Message.new(message, retries_count: pause.pauses_count)
-            end
-            processor.process_batch(racecar_messages)
-            processor.deliver!
-            consumer.store_offset(messages.last)
-          end
-        rescue => e
-          handle_processing_error(e, payload, pause: pause)
-          raise e
-        end
-      end
-    end
-
-    def reset_producer!
-      @producer.close
-      @producer = nil
-      processor.configure(
-        producer:     producer,
-        consumer:     consumer,
-        instrumenter: @instrumenter,
-        config:       @config,
-      )
-    end
-
-    def with_pause(topic, partition, offsets)
-      pause = pauses[topic][partition]
-      return yield pause if config.pause_timeout == 0
-
-      begin
-        yield pause
-        # We've successfully processed a batch from the partition, so we can clear the pause.
-        pauses[topic][partition].reset!
-      rescue => e
-        desc = "#{topic}/#{partition}"
-        logger.error "Failed to process #{desc} at #{offsets}: #{e}"
-
-        logger.warn "Pausing partition #{desc} for #{pause.backoff_interval} seconds"
-        consumer.pause(topic, partition, offsets.first)
-        pause.pause!
-      end
-    end
-
     def resume_paused_partitions
       return if config.pause_timeout == 0
 
@@ -277,7 +177,7 @@ module Racecar
             topic:          topic,
             partition:      partition,
             duration:       pause.pause_duration,
-            consumer_class: processor.class.to_s,
+            consumer_class: consumer_class_instance.class.to_s,
           }
           @instrumenter.instrument("pause_status", payload)
 

@@ -65,12 +65,12 @@ module Racecar
     config.instrumenter
   end
 
-  def self.run(processor)
-    runner(processor).run
+  def self.run(consumer_class_instance)
+    runner(consumer_class_instance).run
   end
 
-  def self.runner(processor)
-    runner = Runner.new(processor, config: config, logger: logger, instrumenter: config.instrumenter)
+  def self.runner(consumer_class_instance)
+    runner = Runner.new(consumer_class_instance, config: config, logger: logger, instrumenter: config.instrumenter)
 
     if config.parallel_workers && config.parallel_workers > 1
       ParallelRunner.new(runner: runner, config: config, logger: logger)

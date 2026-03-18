@@ -3,7 +3,7 @@
 require "racecar/processing"
 
 module Racecar
-  class ThreadsOrchestrator
+  class MultiThreadedProcessor
     include Processing
 
     attr_reader :thread_queues, :threads
@@ -12,7 +12,7 @@ module Racecar
       "#{topic}-#{partition}"
     end
 
-    def initialize(config:, pauses:, processor:, instrumenter:, logger:, reset_producer: nil)
+    def initialize(config:, pauses:, consumer_class_instance:, instrumenter:, logger:, consumer:)
       @logger = logger
       @threads = {}
       @thread_queues = {}
@@ -21,29 +21,21 @@ module Racecar
       @finalize_mutex = Mutex.new
       @config = config
       @pauses = pauses
-      @processor = processor
+      @consumer_class_instance = consumer_class_instance
       @instrumenter = instrumenter
-      @reset_producer = reset_producer
-    end
-
-    def consumer=(consumer)
       @consumer = consumer
     end
 
-    def push_messages(messages)
-      topic = messages.is_a?(Array) ? messages.first.topic : messages.topic
-      partition = messages.is_a?(Array) ? messages.first.partition : messages.partition
-      thread_key = self.class.thread_key(topic, partition)
-      unless @thread_queues[thread_key] && @threads[thread_key]&.alive?
-        spawn_thread(thread_key) do |current_thread_key, processed_messages|
-          process_messages(current_thread_key, processed_messages)
-        end
-        logger.debug "Spawned thread for topic: #{topic}, partition: #{partition}"
-      end
-      Array(messages).each { |m| @thread_queues[thread_key] << m }
-      wakeup(thread_key)
+    def process(message)
+      wrapped_message = Racecar::Message.new(message, retries_count: pauses[message.topic][message.partition].pauses_count)
+      push_messages(wrapped_message)
+    end
 
-      maybe_apply_backpressure(thread_key, topic, partition, messages)
+    def process_batch(messages)
+      wrapped_messages = messages.map do |message|
+        Racecar::Message.new(message, retries_count: pauses[message.topic][message.partition].pauses_count)
+      end
+      push_messages(wrapped_messages)
     end
 
     def set_to_rebalance(topic, partition)
@@ -69,7 +61,23 @@ module Racecar
 
     private
 
-    attr_reader :config, :pauses, :processor, :consumer, :logger
+    attr_reader :config, :pauses, :consumer_class_instance, :consumer, :logger
+
+    def push_messages(messages)
+      topic = messages.is_a?(Array) ? messages.first.topic : messages.topic
+      partition = messages.is_a?(Array) ? messages.first.partition : messages.partition
+      thread_key = self.class.thread_key(topic, partition)
+      unless @thread_queues[thread_key] && @threads[thread_key]&.alive?
+        spawn_thread(thread_key) do |current_thread_key, processed_messages|
+          process_messages(current_thread_key, processed_messages)
+        end
+        logger.debug "Spawned thread for topic: #{topic}, partition: #{partition}"
+      end
+      Array(messages).each { |m| @thread_queues[thread_key] << m }
+      wakeup(thread_key)
+
+      maybe_apply_backpressure(thread_key, topic, partition, messages)
+    end
 
     def spawn_thread(thread_key)
       prepare_initial_values(thread_key)
@@ -91,15 +99,15 @@ module Racecar
       maybe_resume_the_partition(thread_key, topic, partition)
       exit_on_rebalance(thread_key)
 
-      if processor.respond_to?(:process_batch)
+      if consumer_class_instance.respond_to?(:process_batch)
         instrument_process_batch(instrumentation_payload_for_batch(original_messages(msgs))) do
-          processor.process_batch(msgs)
+          consumer_class_instance.process_batch(msgs)
           finalize_messages_processing(msgs.last)
         end
       else
         msg = msgs.first
         instrument_process_message(instrumentation_payload(msg.original_message)) do
-          processor.process(msg)
+          consumer_class_instance.process(msg)
           finalize_messages_processing(msg)
         end
       end
@@ -156,10 +164,10 @@ module Racecar
           elsif !metadata[:shutting_down]
             pause = pauses[msgs.first.topic][msgs.first.partition]
             original_msgs = original_messages(msgs)
-            payload = processor.respond_to?(:process_batch) ?
+            payload = consumer_class_instance.respond_to?(:process_batch) ?
               instrumentation_payload_for_batch(original_msgs) :
               instrumentation_payload(original_msgs.first)
-            handle_processing_error(e, payload, pause: pause)
+            handle_processing_error(e, payload, pause: pause, with_synchronization: true)
             pause.pause!
             sleep(pause.backoff_interval)
           else
@@ -184,13 +192,13 @@ module Racecar
 
     def finalize_messages_processing(msg)
       @finalize_mutex.synchronize do
-        processor.deliver!
+        consumer_class_instance.deliver!
         consumer.store_offset(msg)
       end
     end
 
     def acquire_messages_from_queue(thread_key)
-      if config.multithreaded_processing_fetch_full_batch && processor.respond_to?(:process_batch)
+      if config.multithreaded_processing_fetch_full_batch && consumer_class_instance.respond_to?(:process_batch)
         msgs = []
         while !@thread_queues[thread_key].empty? && msgs.size < config.fetch_messages
           msgs << @thread_queues[thread_key].pop
@@ -203,13 +211,6 @@ module Racecar
 
     def original_messages(messages)
       Array(messages).map(&:original_message)
-    end
-
-    def reset_producer!
-      return unless @reset_producer
-      @finalize_mutex.synchronize do
-        @reset_producer.call
-      end
     end
   end
 end
