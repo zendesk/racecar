@@ -5,6 +5,7 @@ require "racecar/processing"
 module Racecar
   class MultiThreadedProcessor
     include Processing
+    include ProducerMethods
 
     attr_reader :thread_queues, :threads
 
@@ -12,7 +13,7 @@ module Racecar
       "#{topic}-#{partition}"
     end
 
-    def initialize(config:, pauses:, consumer_class_instance:, instrumenter:, logger:, consumer:)
+    def initialize(config:, pauses:, consumer_class_instance:, instrumenter:, logger:)
       @logger = logger
       @threads = {}
       @thread_queues = {}
@@ -23,6 +24,9 @@ module Racecar
       @pauses = pauses
       @consumer_class_instance = consumer_class_instance
       @instrumenter = instrumenter
+    end
+
+    def consumer=(consumer)
       @consumer = consumer
     end
 
@@ -73,7 +77,7 @@ module Racecar
         end
         logger.debug "Spawned thread for topic: #{topic}, partition: #{partition}"
       end
-      Array(messages).each { |m| @thread_queues[thread_key] << m }
+      @thread_queues[thread_key] << Array(messages)
       wakeup(thread_key)
 
       maybe_apply_backpressure(thread_key, topic, partition, messages)
@@ -85,7 +89,7 @@ module Racecar
         Thread.current.name = "Racecar thread for #{thread_key}"
         loop do
           maybe_stop_or_exit(thread_key)
-          msgs = acquire_messages_from_queue(thread_key)
+          msgs = @thread_queues[thread_key].pop
           process_with_error_handling_and_retrying(thread_key, msgs) do
             yield thread_key, msgs
           end
@@ -100,13 +104,17 @@ module Racecar
       exit_on_rebalance(thread_key)
 
       if consumer_class_instance.respond_to?(:process_batch)
-        instrument_process_batch(instrumentation_payload_for_batch(original_messages(msgs))) do
+        payload = instrumentation_payload_for_batch(original_messages(msgs))
+        @instrumenter.instrument("start_process_batch", payload)
+        instrument_process_batch(payload) do
           consumer_class_instance.process_batch(msgs)
           finalize_messages_processing(msgs.last)
         end
       else
         msg = msgs.first
-        instrument_process_message(instrumentation_payload(msg.original_message)) do
+        payload = instrumentation_payload(msg.original_message)
+        @instrumenter.instrument("start_process_message", payload)
+        instrument_process_message(payload) do
           consumer_class_instance.process(msg)
           finalize_messages_processing(msg)
         end
@@ -127,7 +135,9 @@ module Racecar
 
     def maybe_resume_the_partition(thread_key, topic, partition)
       if @thread_queues[thread_key].size < 0.5 * config.multithreaded_processing_max_queue_size
-        consumer.resume(topic, partition)
+        @finalize_mutex.synchronize do
+          consumer.resume(topic, partition)
+        end
       end
     end
 
@@ -155,6 +165,7 @@ module Racecar
       loop do
         begin
           yield
+          pauses[msgs.first.topic][msgs.first.partition].reset!
           break
         rescue => e
           metadata = thread_metadata(thread_key)
@@ -185,7 +196,9 @@ module Racecar
 
     def maybe_apply_backpressure(thread_key, topic, partition, messages)
       if @thread_queues[thread_key].size >= config.multithreaded_processing_max_queue_size
-        consumer.pause(topic, partition, Array(messages).last.offset + 1)
+        @finalize_mutex.synchronize do
+          consumer.pause(topic, partition, Array(messages).last.offset + 1)
+        end
         logger.debug "Paused partition #{topic}/#{partition}: queue reached capacity (#{@thread_queues[thread_key].size}/#{config.multithreaded_processing_max_queue_size})"
       end
     end
@@ -195,18 +208,6 @@ module Racecar
         consumer_class_instance.deliver!
         consumer.store_offset(msg)
       end
-    end
-
-    def acquire_messages_from_queue(thread_key)
-      if config.multithreaded_processing_fetch_full_batch && consumer_class_instance.respond_to?(:process_batch)
-        msgs = []
-        while !@thread_queues[thread_key].empty? && msgs.size < config.fetch_messages
-          msgs << @thread_queues[thread_key].pop
-        end
-      else
-        msgs = [@thread_queues[thread_key].pop]
-      end
-      msgs
     end
 
     def original_messages(messages)

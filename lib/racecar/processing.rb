@@ -48,15 +48,11 @@ module Racecar
     end
 
     def instrument_process_message(payload, &block)
-      @instrumenter.instrument("start_process_message", payload) do
-        @instrumenter.instrument("process_message", payload, &block)
-      end
+      @instrumenter.instrument("process_message", payload, &block)
     end
 
     def instrument_process_batch(payload, &block)
-      @instrumenter.instrument("start_process_batch", payload) do
-        @instrumenter.instrument("process_batch", payload, &block)
-      end
+      @instrumenter.instrument("process_batch", payload, &block)
     end
 
     def reset_producer!(with_synchronization: false)

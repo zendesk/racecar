@@ -35,15 +35,15 @@ module Racecar
         logger: logger,
         instrumenter: @instrumenter,
         consumer_class_instance: consumer_class_instance,
-        consumer: consumer,
         pauses: pauses,
       }
 
       @processor = if config.multithreaded_processing_enabled
-                                    MultiThreadedProcessor.new(**processor_args)
-                                  else
-                                    SingleThreadedProcessor.new(**processor_args)
-                                  end
+                     MultiThreadedProcessor.new(**processor_args)
+                   else
+                     SingleThreadedProcessor.new(**processor_args)
+                   end
+      @processor.consumer = consumer
     end
 
     def setup_pauses

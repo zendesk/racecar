@@ -25,6 +25,7 @@ RSpec.describe "multithreaded processing", type: :integration do
 
     it "processes all messages and uses a dedicated thread per partition" do
       start_racecar
+      wait_for_assignments(1)
       publish_messages
       wait_for_messages
 

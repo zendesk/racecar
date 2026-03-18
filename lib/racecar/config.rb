@@ -200,10 +200,6 @@ module Racecar
     desc "Max size of the queue of messages waiting to be processed when multithreaded processing is enabled"
     integer :multithreaded_processing_max_queue_size, default: 1000
 
-    desc "Whether to fetch all messages in a batch when multithreaded processing is enabled. If false, messages will be fetched one by one even if `process_batch` was used.
-                    If set to true, then the whole FIFO queue will be emptied on each processing execution, and batches passed to `process_batch` may be of variable size. Defaults to true."
-    boolean :multithreaded_processing_fetch_full_batch, default: true
-
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'racecar/producer_methods'
+require 'racecar/processing'
 
 module Racecar
   class SingleThreadedProcessor
@@ -9,13 +10,16 @@ module Racecar
 
     attr_reader :consumer_class_instance, :config, :logger, :instrumenter, :consumer, :pauses
 
-    def initialize(config:, logger:, instrumenter:, consumer_class_instance:, consumer:, pauses:)
+    def initialize(config:, logger:, instrumenter:, consumer_class_instance:, pauses:)
       @config = config
       @logger = logger
       @instrumenter = instrumenter
       @consumer_class_instance = consumer_class_instance
-      @consumer = consumer
       @pauses = pauses
+    end
+
+    def consumer=(consumer)
+      @consumer = consumer
     end
 
     def shutdown_and_wait
@@ -28,6 +32,7 @@ module Racecar
 
     def process(message)
       payload = instrumentation_payload(message)
+      @instrumenter.instrument("start_process_message", payload)
 
       with_pause(message.topic, message.partition, message.offset..message.offset) do |pause|
         begin
@@ -46,6 +51,7 @@ module Racecar
     def process_batch(messages)
       payload = instrumentation_payload_for_batch(messages)
       first, last = messages.first, messages.last
+      @instrumenter.instrument("start_process_batch", payload)
 
       with_pause(first.topic, first.partition, first.offset..last.offset) do |pause|
         begin
