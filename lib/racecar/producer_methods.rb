@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "rdkafka"
+require "racecar/delivery_callback"
+
 module Racecar
   module ProducerMethods
     def producer

@@ -129,7 +129,7 @@ module Racecar
 
     def consumer
       @consumer ||= begin
-        ConsumerSet.new(config, logger, @instrumenter, processor)
+        ConsumerSet.new(config, logger, processor, @instrumenter)
       end
     end
 

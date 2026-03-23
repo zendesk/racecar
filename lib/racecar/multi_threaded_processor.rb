@@ -2,6 +2,7 @@
 
 require "racecar/processing"
 require "racecar/thread_manager"
+require "racecar/producer_methods"
 
 module Racecar
   class MultiThreadedProcessor
@@ -108,6 +109,9 @@ module Racecar
     def maybe_resume_the_partition(manager, topic, partition)
       if manager.queue_size < 0.5 * config.multithreaded_processing_max_queue_size
         ThreadManager.synchronize do
+          if consumer.respond_to?(:paused?)
+            return unless consumer.paused?(topic, partition)
+          end
           consumer.resume(topic, partition)
         end
       end

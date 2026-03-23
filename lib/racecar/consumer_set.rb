@@ -4,7 +4,7 @@ module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10
 
-    def initialize(config, logger, instrumenter = NullInstrumenter, processor)
+    def initialize(config, logger, processor, instrumenter = NullInstrumenter)
       @config, @logger = config, logger
       @instrumenter = instrumenter
       @processor = processor

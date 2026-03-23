@@ -2,7 +2,7 @@
 
 module Racecar
   class Pause
-    attr_reader :pauses_count, :backoff_interval
+    attr_reader :pauses_count
 
     def initialize(timeout: nil, max_timeout: nil, exponential_backoff: false)
       @started_at = nil
