@@ -89,7 +89,6 @@ module Racecar
       # Main loop
       loop do
         break if @stop_requested
-        resume_paused_partitions
 
         @instrumenter.instrument("start_main_loop", loop_payload)
         @instrumenter.instrument("main_loop", loop_payload) do
@@ -166,29 +165,6 @@ module Racecar
 
       # Print the consumer config to STDERR on USR1.
       trap("USR1") { $stderr.puts config.inspect }
-    end
-
-    def resume_paused_partitions
-      return if config.pause_timeout == 0
-
-      pauses.each do |topic, partitions|
-        partitions.each do |partition, pause|
-          payload = {
-            topic:          topic,
-            partition:      partition,
-            duration:       pause.pause_duration,
-            consumer_class: consumer_class_instance.class.to_s,
-          }
-          @instrumenter.instrument("pause_status", payload)
-
-          if pause.paused? && pause.expired?
-            logger.info "Automatically resuming partition #{topic}/#{partition}, pause timeout expired"
-            consumer.resume(topic, partition)
-            pause.resume!
-            # TODO: # During re-balancing we might have lost the paused partition. Check if partition is still in group before seek. ?
-          end
-        end
-      end
     end
   end
 end

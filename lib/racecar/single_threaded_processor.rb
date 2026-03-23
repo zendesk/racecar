@@ -46,6 +46,8 @@ module Racecar
           raise e
         end
       end
+
+      resume_all_paused_partitions
     end
 
     def process_batch(messages)
@@ -68,6 +70,8 @@ module Racecar
           raise e
         end
       end
+
+      resume_all_paused_partitions
     end
 
     private

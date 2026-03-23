@@ -68,11 +68,34 @@ module Racecar
       end
 
       if with_synchronization
-        @finalize_mutex.synchronize do
+        ThreadManager.synchronize do
           resetting_proc.call
         end
       else
         resetting_proc.call
+      end
+    end
+
+    def resume_all_paused_partitions
+      return if config.pause_timeout == 0
+
+      pauses.each do |topic, partitions|
+        partitions.each do |partition, pause|
+          payload = {
+            topic:          topic,
+            partition:      partition,
+            duration:       pause.pause_duration,
+            consumer_class: consumer_class_instance.class.to_s,
+          }
+          @instrumenter.instrument("pause_status", payload)
+
+          if pause.paused? && pause.expired?
+            logger.info "Automatically resuming partition #{topic}/#{partition}, pause timeout expired"
+            consumer.resume(topic, partition)
+            pause.resume!
+            # TODO: # During re-balancing we might have lost the paused partition. Check if partition is still in group before seek. ?
+          end
+        end
       end
     end
   end

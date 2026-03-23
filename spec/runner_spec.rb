@@ -339,12 +339,12 @@ RSpec.shared_examples "pause handling" do
     runner.run
 
     # expect no op
-    runner.send(:resume_paused_partitions)
+    runner.processor.resume_all_paused_partitions
     expect(kafka.consumers.first._paused).to eq true
 
     # expect to resume
     Timecop.freeze(later)
-    runner.send(:resume_paused_partitions)
+    runner.processor.resume_all_paused_partitions
     expect(kafka.consumers.first._paused).to eq false
   end
 
@@ -360,7 +360,7 @@ RSpec.shared_examples "pause handling" do
     expect(kafka.consumers.first._paused).to eq true
 
     Timecop.freeze(later)
-    runner.send(:resume_paused_partitions)
+    runner.processor.resume_all_paused_partitions
     expect(kafka.consumers.first._paused).to eq false
 
     runner.run
