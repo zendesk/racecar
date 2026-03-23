@@ -15,6 +15,7 @@ module Racecar
       @logger     = logger
       @queue      = Queue.new
       @mutex      = Mutex.new
+      @cv         = ConditionVariable.new
       @metadata   = { rebalancing: false, shutting_down: false }
       @thread     = nil
     end
@@ -31,7 +32,10 @@ module Racecar
     end
 
     def push(messages)
-      @queue << Array(messages)
+      @mutex.synchronize do
+        @queue << Array(messages)
+        @cv.signal
+      end
     end
 
     def queue_size
@@ -53,13 +57,11 @@ module Racecar
     end
 
     def set_rebalancing
-      @mutex.synchronize { @metadata[:rebalancing] = true }
-      wakeup
+      @mutex.synchronize { @metadata[:rebalancing] = true; @cv.signal }
     end
 
     def set_shutting_down
-      @mutex.synchronize { @metadata[:shutting_down] = true }
-      wakeup
+      @mutex.synchronize { @metadata[:shutting_down] = true; @cv.signal }
     end
 
     def metadata
@@ -69,13 +71,13 @@ module Racecar
     private
 
     def wait_for_messages_or_exit
-      while @queue.empty?
-        m = metadata
-        if m[:rebalancing] || m[:shutting_down]
-          @logger.debug "Thread for #{@thread_key} exiting"
-          Thread.exit
-        else
-          Thread.stop
+      @mutex.synchronize do
+        while @queue.empty?
+          if @metadata[:rebalancing] || @metadata[:shutting_down]
+            @logger.debug "Thread for #{@thread_key} exiting"
+            Thread.exit
+          end
+          @cv.wait(@mutex)
         end
       end
     end
