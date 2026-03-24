@@ -30,6 +30,11 @@ module Racecar
       # no-op for single-threaded processor
     end
 
+    def synchronize_per_process(&block)
+      # no-op for single-threaded processor
+      block.call
+    end
+
     def process(message)
       payload = instrumentation_payload(message)
       @instrumenter.instrument("start_process_message", payload)

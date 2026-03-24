@@ -235,7 +235,7 @@ RSpec.describe "multithreaded processing", type: :integration do
       publish_messages
 
       runner    = consumers.first
-      topic_key = "#{input_topic}-0"
+      topic_key = "#{input_topic}/0"
 
       # Wait until the processing thread is spawned (first message has arrived)
       wait_until { runner.processor.thread_queues.key?(topic_key) }

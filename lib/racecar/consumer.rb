@@ -43,14 +43,23 @@ module Racecar
       def on_partitions_revoked(rebalance_event); end
     end
 
-    def configure(producer:, consumer:, instrumenter: NullInstrumenter, config: Racecar.config)
+    def configure(producer:, consumer:, instrumenter: NullInstrumenter, config: Racecar.config, synchronization_wrapper: nil)
       @producer = producer
-      @delivery_handles = []
+
+      # thread-safety
+      if @delivery_handles
+        thread_key = Thread.current[ThreadManager::THREAD_KEY] || "main"
+        @delivery_handles[thread_key] ||= []
+      else
+        @delivery_handles = {}
+      end
 
       @consumer = consumer
 
       @instrumenter = instrumenter
       @config = config
+
+      @synchronization_wrapper = synchronization_wrapper
     end
 
     def teardown; end
@@ -61,12 +70,16 @@ module Racecar
     # (e.g. downtime, configuration issue) or specific to the message being sent. The
     # caller must handle the latter cases or run into head of line blocking.
     def deliver!
-      @delivery_handles ||= []
-      if @delivery_handles.any?
-        instrumentation_payload = { delivered_message_count: @delivery_handles.size }
+      thread_key = Thread.current[ThreadManager::THREAD_KEY] || "main"
+      current_handles = maybe_synchronize do
+        @delivery_handles ||= {}
+        @delivery_handles[thread_key] ||= []
+      end
+      if current_handles.any?
+        instrumentation_payload = { delivered_message_count: current_handles.size }
 
         @instrumenter.instrument('deliver_messages', instrumentation_payload) do
-          @delivery_handles.each do |handle|
+          current_handles.each do |handle|
             begin
               # rdkafka-ruby checks with exponential backoff starting at 0 seconds wait
               # if the message was successfully delivered, up to max_wait_timeout seconds
@@ -91,14 +104,20 @@ module Racecar
           end
         end
       end
-      @delivery_handles.clear
+    ensure
+      current_handles&.clear
     end
 
     protected
 
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
     def produce(payload, topic:, key: nil, partition: nil, partition_key: nil, headers: nil, create_time: nil)
-      @delivery_handles ||= []
+      thread_key = Thread.current[ThreadManager::THREAD_KEY] || "main"
+      current_handles = maybe_synchronize do
+        @delivery_handles ||= {}
+        @delivery_handles[thread_key] ||= []
+        @delivery_handles[thread_key]
+      end
       message_size = payload.respond_to?(:bytesize) ? payload.bytesize : 0
       instrumentation_payload = {
         value: payload,
@@ -109,24 +128,34 @@ module Racecar
         topic: topic,
         message_size: message_size,
         create_time: Time.now,
-        buffer_size: @delivery_handles.size,
+        buffer_size: current_handles.size,
       }
 
       @instrumenter.instrument("produce_message", instrumentation_payload) do
-        @delivery_handles << @producer.produce(
-          topic: topic,
-          payload: payload,
-          key: key,
-          partition: partition,
-          partition_key: partition_key,
-          timestamp: create_time,
-          headers: headers,
-        )
+        maybe_synchronize do
+          @delivery_handles[thread_key] << @producer.produce(
+            topic: topic,
+            payload: payload,
+            key: key,
+            partition: partition,
+            partition_key: partition_key,
+            timestamp: create_time,
+            headers: headers,
+            )
+        end
       end
     end
 
     def heartbeat
       warn "DEPRECATION WARNING: Manual heartbeats are not supported and not needed with librdkafka."
+    end
+
+    def maybe_synchronize(&block)
+      if @synchronization_wrapper
+        @synchronization_wrapper.call(&block)
+      else
+        block.call
+      end
     end
   end
 end

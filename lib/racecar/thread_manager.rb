@@ -2,13 +2,9 @@
 
 module Racecar
   class ThreadManager
-    @finalize_mutex = Mutex.new
-
-    def self.synchronize(&block)
-      @finalize_mutex.synchronize(&block)
-    end
-
     attr_reader :thread, :queue
+
+    THREAD_KEY = 'thread_key'.freeze
 
     def initialize(thread_key:, logger:)
       @thread_key = thread_key
@@ -23,6 +19,7 @@ module Racecar
     def spawn(&block)
       @thread = Thread.new do
         Thread.current.name = "Racecar thread for #{@thread_key}"
+        Thread.current[ThreadManager::THREAD_KEY] = @thread_key
         loop do
           wait_for_messages_or_exit
           msgs = @queue.pop
@@ -48,12 +45,6 @@ module Racecar
 
     def join
       @thread&.join
-    end
-
-    def wakeup
-      @thread&.wakeup
-    rescue ThreadError
-      # thread died between the alive check and wakeup, safe to ignore
     end
 
     def set_rebalancing

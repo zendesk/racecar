@@ -79,12 +79,17 @@ module Racecar
         consumer:     consumer,
         instrumenter: @instrumenter,
         config:       @config,
+        synchronization_wrapper: @processor.method(:synchronize_per_process)
       )
 
       loop_payload = {
         consumer_class: consumer_class_instance.class.to_s,
         consumer_set: consumer
       }
+
+      unless config.multithreaded_processing_enabled
+        Thread.current[ThreadManager::THREAD_KEY] = "main"
+      end
 
       # Main loop
       loop do

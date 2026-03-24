@@ -9,8 +9,12 @@ module Racecar
     include Processing
     include ProducerMethods
 
+    def synchronize_per_process(&block)
+      @finalize_mutex.synchronize(&block)
+    end
+
     def self.thread_key(topic, partition)
-      "#{topic}-#{partition}"
+      "#{topic}/#{partition}"
     end
 
     def initialize(config:, pauses:, consumer_class_instance:, instrumenter:, logger:)
@@ -20,6 +24,7 @@ module Racecar
       @pauses          = pauses
       @consumer_class_instance = consumer_class_instance
       @instrumenter    = instrumenter
+      @finalize_mutex = Mutex.new
     end
 
     def consumer=(consumer)
@@ -78,7 +83,6 @@ module Racecar
       end
 
       manager.push(messages)
-      manager.wakeup
       maybe_apply_backpressure(manager, topic, partition, messages)
     end
 
@@ -108,7 +112,7 @@ module Racecar
 
     def maybe_resume_the_partition(manager, topic, partition)
       if manager.queue_size < 0.5 * config.multithreaded_processing_max_queue_size
-        ThreadManager.synchronize do
+        synchronize_per_process do
           if consumer.respond_to?(:paused?)
             return unless consumer.paused?(topic, partition)
           end
@@ -151,7 +155,7 @@ module Racecar
 
     def maybe_apply_backpressure(manager, topic, partition, messages)
       if manager.queue_size >= config.multithreaded_processing_max_queue_size
-        ThreadManager.synchronize do
+        synchronize_per_process do
           consumer.pause(topic, partition, Array(messages).last.offset + 1)
         end
         logger.debug "Paused partition #{topic}/#{partition}: queue reached capacity (#{manager.queue_size}/#{config.multithreaded_processing_max_queue_size})"
@@ -159,8 +163,8 @@ module Racecar
     end
 
     def finalize_messages_processing(msg)
-      ThreadManager.synchronize do
-        consumer_class_instance.deliver!
+      consumer_class_instance.deliver!
+      synchronize_per_process do
         consumer.store_offset(msg)
       end
     end

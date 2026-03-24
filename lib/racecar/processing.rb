@@ -64,11 +64,12 @@ module Racecar
           consumer:     consumer,
           instrumenter: @instrumenter,
           config:       @config,
+          synchronization_wrapper: with_synchronization ? method(:synchronize_per_process) : nil,
           )
       end
 
       if with_synchronization
-        ThreadManager.synchronize do
+        synchronize_per_process do
           resetting_proc.call
         end
       else
