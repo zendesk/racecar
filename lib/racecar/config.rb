@@ -200,6 +200,12 @@ module Racecar
     desc "Max size of the queue of messages waiting to be processed when multithreaded processing is enabled"
     integer :multithreaded_processing_max_queue_size, default: 1000
 
+    desc "Timeout in seconds for the main thread to wait for a processing thread to finish when shutting down the consumer with multithreaded processing enabled"
+    integer :multithreaded_processing_shutdown_timeout, default: 300
+
+    desc "Multi threaded queue resume threshold as a percentage of `multithreaded_processing_max_queue_size`. Defaults to 0.5, meaning that the consumer will attempt to resume a paused partition when the queue size drops below 50% of the max queue size."
+    float :multithreaded_processing_resume_threshold, default: 0.5
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 

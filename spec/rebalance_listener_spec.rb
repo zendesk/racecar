@@ -1,7 +1,7 @@
 require "racecar/rebalance_listener"
 
 RSpec.describe Racecar::RebalanceListener do
-  subject(:listener) { Racecar::RebalanceListener.new(config, instrumenter, processor) }
+  subject(:listener) { Racecar::RebalanceListener.new(config, instrumenter, partition_processors, runner_mutex) }
 
   let(:consumer_class) { class_double(Racecar::Consumer, on_partitions_assigned: nil, on_partitions_revoked: nil) }
   let(:instrumenter) { Racecar::NullInstrumenter }
@@ -10,7 +10,8 @@ RSpec.describe Racecar::RebalanceListener do
   let(:partitions_by_topic_hash) {
     { "topic_name" => [double(:partition, partition: 0, offset: 0, err: 0)] }
   }
-  let(:processor) { double(:processor, set_to_rebalance: lambda {|_, _|}) }
+  let(:partition_processors) { double(:partition_processors, :[] => nil) }
+  let(:runner_mutex) { double(:runner_mutex, :synchronize => lambda {}) }
   let(:config) do
     c = Racecar::Config.new
     c.consumer_class = consumer_class

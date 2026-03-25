@@ -4,6 +4,28 @@ module Racecar
   class Pause
     attr_reader :pauses_count
 
+    def self.instantiate_pauses(config)
+      timeout = if config.pause_timeout == -1
+                  nil
+                elsif config.pause_timeout == 0
+                  # no op, handled elsewhere
+                elsif config.pause_timeout > 0
+                  config.pause_timeout
+                else
+                  raise ArgumentError, "Invalid value for pause_timeout: must be integer greater or equal -1"
+                end
+
+      Hash.new {|h, k|
+        h[k] = Hash.new {|h2, k2|
+          h2[k2] = ::Racecar::Pause.new(
+            timeout:             timeout,
+            max_timeout:         config.max_pause_timeout,
+            exponential_backoff: config.pause_with_exponential_backoff
+          )
+        }
+      }
+    end
+
     def initialize(timeout: nil, max_timeout: nil, exponential_backoff: false)
       @started_at = nil
       @pauses_count = 0

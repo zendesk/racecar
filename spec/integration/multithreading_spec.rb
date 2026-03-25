@@ -110,7 +110,7 @@ RSpec.describe "multithreaded processing", type: :integration do
 
       expect_all_messages_processed
 
-      revoked_threads = revoked_consumer.processor.threads.values
+      revoked_threads = revoked_consumer.partition_processors.values.map(&:thread)
       expect(revoked_threads).not_to be_empty
       revoked_threads.each { |t| t.join(5) }
       expect(revoked_threads).to all(satisfy("be dead") { |t| !t.alive? })
@@ -167,11 +167,11 @@ RSpec.describe "multithreaded processing", type: :integration do
       expect_all_messages_processed
 
       # Each worker is assigned 5 partitions (15 / 3) and spawns one thread per partition
-      threads_per_worker = consumers.map { |c| c.processor.threads.size }
+      threads_per_worker = consumers.map { |c| c.partition_processors.values.size }
       expect(threads_per_worker).to all(eq(topic_partitions / workers_count))
 
       # Threads across all workers are distinct — no two workers share a thread
-      all_thread_ids = consumers.flat_map { |c| c.processor.threads.values.map(&:object_id) }
+      all_thread_ids = consumers.flat_map { |c| c.partition_processors.values.map(&:object_id) }
       expect(all_thread_ids.uniq.size).to eq(topic_partitions)
     end
   end
@@ -238,8 +238,8 @@ RSpec.describe "multithreaded processing", type: :integration do
       topic_key = "#{input_topic}/0"
 
       # Wait until the processing thread is spawned (first message has arrived)
-      wait_until { runner.processor.thread_queues.key?(topic_key) }
-      thread_queue = runner.processor.thread_queues[topic_key]
+      wait_until { runner.partition_processors[topic_key].queue.size > 0 }
+      thread_queue = runner.partition_processors[topic_key].queue
 
       # The partition must be paused once the queue reaches max capacity
       wait_until { runner.consumer.paused?(input_topic, 0) }

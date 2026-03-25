@@ -16,9 +16,11 @@ RSpec.describe Racecar::ConsumerSet do
   let(:config)              { Racecar::Config.new }
   let(:rdconsumer)          { double("rdconsumer", subscribe: true) }
   let(:rdconfig)            { double("rdconfig", consumer: rdconsumer, "consumer_rebalance_listener=": nil) }
+  let(:partitions_processors) { double("partitions_processors") }
+  let(:runner_mutex)        { Mutex.new }
   let(:logger)              { Logger.new(StringIO.new) }
   let(:instrumenter)        { Racecar::NullInstrumenter }
-  let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger, instrumenter) }
+  let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger, partitions_processors, runner_mutex, instrumenter) }
   let(:max_poll_exceeded_error) { Rdkafka::RdkafkaError.new(-147) }
   let(:not_coordinator_error) { Rdkafka::RdkafkaError.new(16) }
 

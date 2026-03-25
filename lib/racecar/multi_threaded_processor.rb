@@ -1,176 +1,157 @@
 # frozen_string_literal: true
 
-require "racecar/processing"
-require "racecar/thread_manager"
-require "racecar/producer_methods"
+require 'racecar/pause'
 
 module Racecar
   class MultiThreadedProcessor
-    include Processing
-    include ProducerMethods
+    attr_reader :thread, :queue, :config, :processor, :logger, :consumer, :consumer_class_instance, :instrumenter, :pauses
 
-    def synchronize_per_process(&block)
-      @finalize_mutex.synchronize(&block)
-    end
+    THREAD_KEY = 'thread_key'.freeze
 
     def self.thread_key(topic, partition)
       "#{topic}/#{partition}"
     end
 
-    def initialize(config:, pauses:, consumer_class_instance:, instrumenter:, logger:)
-      @logger          = logger
-      @thread_managers = {}
-      @config          = config
-      @pauses          = pauses
+    def initialize(topic:, partition:, logger:, config:, runner_mutex:, consumer:, consumer_class_instance:, instrumenter:)
+      @topic      = topic
+      @partition  = partition
+      @logger     = logger
+      @config     = config
+      @runner_mutex = runner_mutex
+      @consumer   = consumer
       @consumer_class_instance = consumer_class_instance
-      @instrumenter    = instrumenter
-      @finalize_mutex = Mutex.new
-    end
+      @instrumenter = instrumenter
+      @pauses = Pause.instantiate_pauses(config)
 
-    def consumer=(consumer)
-      @consumer = consumer
-    end
-
-    def threads
-      @thread_managers.transform_values(&:thread)
-    end
-
-    def thread_queues
-      @thread_managers.transform_values(&:queue)
+      setup_multi_threaded_processing
     end
 
     def process(message)
-      wrapped_message = Racecar::Message.new(message, retries_count: pauses[message.topic][message.partition].pauses_count)
-      push_messages(wrapped_message)
+      push(message)
     end
 
     def process_batch(messages)
-      wrapped_messages = messages.map do |message|
-        Racecar::Message.new(message, retries_count: pauses[message.topic][message.partition].pauses_count)
+      push(messages)
+    end
+
+    def rebalancing=(value)
+      @rebalancing = value
+      processor.rebalancing = value
+      @mutex.synchronize do
+        @cv.signal
       end
-      push_messages(wrapped_messages)
     end
 
-    def set_to_rebalance(topic, partition)
-      thread_key = self.class.thread_key(topic, partition)
-      @thread_managers[thread_key]&.set_rebalancing
-    end
-
-    def shutdown_and_wait
-      @thread_managers.each_value(&:set_shutting_down)
-      @thread_managers.each_value(&:join)
+    def shutting_down=(value)
+      @shutting_down = value
+      processor.shutting_down = value
+      @mutex.synchronize do
+        @cv.signal
+      end
     end
 
     private
 
-    attr_reader :config, :pauses, :consumer_class_instance, :consumer, :logger
+    def setup_multi_threaded_processing
+      @processor  = Processor.new(
+        config: config,
+        logger: logger,
+        instrumenter: instrumenter,
+        consumer_class_instance: consumer_class_instance,
+        runner_mutex: @runner_mutex,
+        consumer: consumer,
+        pauses: pauses
+      )
+      @queue      = Queue.new
+      @mutex      = Mutex.new
+      @cv         = ConditionVariable.new
+      @thread     = nil
 
-    def push_messages(messages)
-      topic     = messages.is_a?(Array) ? messages.first.topic     : messages.topic
-      partition = messages.is_a?(Array) ? messages.first.partition : messages.partition
-      thread_key = self.class.thread_key(topic, partition)
-
-      manager = @thread_managers[thread_key]
-      unless manager&.alive?
-        manager = ThreadManager.new(thread_key: thread_key, logger: logger)
-        @thread_managers[thread_key] = manager
-        manager.spawn do |msgs|
-          process_with_error_handling_and_retrying(manager, msgs) do
-            process_messages(manager, msgs)
+      spawn_thread do |msgs, use_process_batch|
+        if use_process_batch
+          processor.process_batch(msgs)
+        else
+          msgs.each do |msg|
+            processor.process(msg)
           end
         end
-        logger.debug "Spawned thread for topic: #{topic}, partition: #{partition}"
-      end
-
-      manager.push(messages)
-      maybe_apply_backpressure(manager, topic, partition, messages)
-    end
-
-    def process_messages(manager, msgs)
-      topic     = msgs.first.topic
-      partition = msgs.first.partition
-      maybe_resume_the_partition(manager, topic, partition)
-      exit_on_rebalance(manager)
-
-      if consumer_class_instance.respond_to?(:process_batch)
-        payload = instrumentation_payload_for_batch(original_messages(msgs))
-        @instrumenter.instrument("start_process_batch", payload)
-        instrument_process_batch(payload) do
-          consumer_class_instance.process_batch(msgs)
-          finalize_messages_processing(msgs.last)
-        end
-      else
-        msg = msgs.first
-        payload = instrumentation_payload(msg.original_message)
-        @instrumenter.instrument("start_process_message", payload)
-        instrument_process_message(payload) do
-          consumer_class_instance.process(msg)
-          finalize_messages_processing(msg)
-        end
       end
     end
 
-    def maybe_resume_the_partition(manager, topic, partition)
-      if manager.queue_size < 0.5 * config.multithreaded_processing_max_queue_size
-        synchronize_per_process do
-          if consumer.respond_to?(:paused?)
-            return unless consumer.paused?(topic, partition)
-          end
-          consumer.resume(topic, partition)
-        end
-      end
-    end
-
-    def exit_on_rebalance(manager)
-      if manager.metadata[:rebalancing]
-        Thread.exit
-      end
-    end
-
-    def process_with_error_handling_and_retrying(manager, msgs)
-      loop do
-        begin
-          yield
-          pauses[msgs.first.topic][msgs.first.partition].reset!
-          break
+    def spawn_thread(&block)
+      use_process_batch = consumer_class_instance.respond_to?(:process_batch)
+      @thread = Thread.new do
+        Thread.current.name = "Racecar thread for #{thread_key}"
+        Thread.current[MultiThreadedProcessor::THREAD_KEY] = thread_key
+        loop do
+          wait_for_messages_or_exit
+          maybe_resume_the_partition
+          msgs = @queue.pop
+          block.call(msgs, use_process_batch)
+          maybe_apply_backpressure(msgs)
         rescue => e
-          metadata = manager.metadata
-          if metadata[:rebalancing]
+          logger.error "Error in processing thread for #{thread_key}: #{e.class} - #{e.message}"
+        end
+      end
+    end
+
+    def push(messages)
+      @mutex.synchronize do
+        @queue << Array(messages)
+        @cv.signal
+      end
+    end
+
+    def queue_size
+      @queue.size
+    end
+
+    def alive?
+      @thread&.alive?
+    end
+
+    def join
+      @thread&.join
+    end
+
+    def wait_for_messages_or_exit
+      @mutex.synchronize do
+        while @queue.empty?
+          if processor.shutting_down || processor.rebalancing
+            @logger.debug "Thread for #{thread_key} exiting"
             Thread.exit
-          elsif !metadata[:shutting_down]
-            pause = pauses[msgs.first.topic][msgs.first.partition]
-            original_msgs = original_messages(msgs)
-            payload = consumer_class_instance.respond_to?(:process_batch) ?
-              instrumentation_payload_for_batch(original_msgs) :
-              instrumentation_payload(original_msgs.first)
-            handle_processing_error(e, payload, pause: pause, with_synchronization: true)
-            pause.pause!
-            sleep(pause.backoff_interval)
-          else
-            break
           end
+          @cv.wait(@mutex)
+        end
+        if processor.rebalancing
+          @logger.debug "Thread for #{thread_key} exiting"
+          Thread.exit
         end
       end
     end
 
-    def maybe_apply_backpressure(manager, topic, partition, messages)
-      if manager.queue_size >= config.multithreaded_processing_max_queue_size
-        synchronize_per_process do
-          consumer.pause(topic, partition, Array(messages).last.offset + 1)
+    def maybe_apply_backpressure(messages)
+      if queue_size >= config.multithreaded_processing_max_queue_size
+        @runner_mutex.synchronize do
+          consumer.pause(@topic, @partition, Array(messages).last.offset + 1)
         end
-        logger.debug "Paused partition #{topic}/#{partition}: queue reached capacity (#{manager.queue_size}/#{config.multithreaded_processing_max_queue_size})"
+        logger.debug "Paused partition #{@topic}/#{@partition}: queue reached capacity (#{queue_size}/#{config.multithreaded_processing_max_queue_size})"
       end
     end
 
-    def finalize_messages_processing(msg)
-      consumer_class_instance.deliver!
-      synchronize_per_process do
-        consumer.store_offset(msg)
+    def maybe_resume_the_partition
+      if queue_size < config.multithreaded_processing_resume_threshold * config.multithreaded_processing_max_queue_size
+        @runner_mutex.synchronize do
+          if consumer.respond_to?(:paused?)
+            return unless consumer.paused?(@topic, @partition)
+          end
+          consumer.resume(@topic, @partition)
+        end
       end
     end
 
-    def original_messages(messages)
-      Array(messages).map(&:original_message)
+    def thread_key
+      self.class.thread_key(@topic, @partition)
     end
   end
 end

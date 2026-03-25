@@ -7,7 +7,7 @@ require "racecar/message_delivery_error"
 require "racecar/erroneous_state_error"
 require "racecar/delivery_callback"
 require "racecar/processing"
-require "racecar/single_threaded_processor"
+require "racecar/processor"
 require "racecar/multi_threaded_processor"
 require 'racecar/producer_methods'
 
@@ -16,56 +16,23 @@ module Racecar
     include Processing
     include ProducerMethods
 
-    attr_reader :consumer_class_instance, :config, :logger, :processor
+    attr_reader :consumer_class_instance, :config, :logger, :partition_processors
 
     def initialize(consumer_class_instance, config:, logger:, instrumenter: NullInstrumenter)
       @consumer_class_instance, @config, @logger = consumer_class_instance, config, logger
       @instrumenter = instrumenter
       @stop_requested = false
+      @partition_processors = {}
+      @mutex = Mutex.new
       Rdkafka::Config.logger = logger
 
       if consumer_class_instance.respond_to?(:statistics_callback)
         Rdkafka::Config.statistics_callback = consumer_class_instance.method(:statistics_callback).to_proc
       end
-
-      setup_pauses
-
-      processor_args = {
-        config: config,
-        logger: logger,
-        instrumenter: @instrumenter,
-        consumer_class_instance: consumer_class_instance,
-        pauses: pauses,
-      }
-
-      @processor = if config.multithreaded_processing_enabled
-                     MultiThreadedProcessor.new(**processor_args)
-                   else
-                     SingleThreadedProcessor.new(**processor_args)
-                   end
-      @processor.consumer = consumer
     end
 
-    def setup_pauses
-      timeout = if config.pause_timeout == -1
-        nil
-      elsif config.pause_timeout == 0
-        # no op, handled elsewhere
-      elsif config.pause_timeout > 0
-        config.pause_timeout
-      else
-        raise ArgumentError, "Invalid value for pause_timeout: must be integer greater or equal -1"
-      end
-
-      @pauses = Hash.new {|h, k|
-        h[k] = Hash.new {|h2, k2|
-          h2[k2] = ::Racecar::Pause.new(
-            timeout:             timeout,
-            max_timeout:         config.max_pause_timeout,
-            exponential_backoff: config.pause_with_exponential_backoff
-          )
-        }
-      }
+    def self.topic_partition_key(topic, partition)
+      "#{topic}/#{partition}"
     end
 
     def run
@@ -79,7 +46,7 @@ module Racecar
         consumer:     consumer,
         instrumenter: @instrumenter,
         config:       @config,
-        synchronization_wrapper: @processor.method(:synchronize_per_process)
+        runner_mutex: @mutex,
       )
 
       loop_payload = {
@@ -88,7 +55,7 @@ module Racecar
       }
 
       unless config.multithreaded_processing_enabled
-        Thread.current[ThreadManager::THREAD_KEY] = "main"
+        Thread.current[MultiThreadedProcessor::THREAD_KEY] = "main"
       end
 
       # Main loop
@@ -100,19 +67,25 @@ module Racecar
           case process_method
           when :batch then
             msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
-            msg_per_part.each_value do |messages|
-              processor.process_batch(messages)
+            msg_per_part.each_value do |messages_per_partition|
+              messages_per_partition.group_by(&:topic).each_value do |messages_per_topic_and_partition|
+                processor = assign_and_get_processor(messages_per_topic_and_partition)
+                processor.process_batch(messages_per_topic_and_partition)
+              end
             end
           when :single then
             message = consumer.poll(config.max_wait_time_ms)
-            processor.process(message) if message
+            if message
+              processor = assign_and_get_processor(message)
+              processor.process(message)
+            end
           end
         end
       end
 
       logger.info "Gracefully shutting down"
       begin
-        processor.shutdown_and_wait
+        shutdown_processors_and_wait
         consumer_class_instance.deliver!
         consumer_class_instance.teardown
         consumer.commit
@@ -133,13 +106,11 @@ module Racecar
 
     def consumer
       @consumer ||= begin
-        ConsumerSet.new(config, logger, processor, @instrumenter)
+        ConsumerSet.new(config, logger, @partition_processors, @mutex, @instrumenter)
       end
     end
 
     private
-
-    attr_reader :pauses
 
     def process_method
       @process_method ||= begin
@@ -170,6 +141,41 @@ module Racecar
 
       # Print the consumer config to STDERR on USR1.
       trap("USR1") { $stderr.puts config.inspect }
+    end
+
+    def assign_and_get_processor(messages)
+      @mutex.synchronize do
+        topic, partition = topic_and_partition_for_messages(messages)
+        key = Runner.topic_partition_key(topic, partition)
+        return partition_processors[key] if partition_processors[key]
+
+        processor_args = {
+          config: config,
+          logger: logger,
+          instrumenter: @instrumenter,
+          consumer_class_instance: consumer_class_instance,
+          runner_mutex: @mutex,
+          consumer: consumer,
+        }
+        processor = if config.multithreaded_processing_enabled
+                      MultiThreadedProcessor.new(**processor_args, topic: topic, partition: partition)
+                    else
+                      @single_threaded_pauses ||= Pause.instantiate_pauses(config)
+                      Processor.new(**processor_args, pauses: @single_threaded_pauses)
+                    end
+
+        partition_processors[key] = processor
+      end
+    end
+
+    def shutdown_processors_and_wait
+      processors_snapshot = @mutex.synchronize { partition_processors.values }
+      processors_snapshot.each { |processor| processor.shutting_down = true if processor }
+      processors_snapshot.each do |processor|
+        if processor.respond_to?(:thread)
+          processor.thread.join(config.multithreaded_processing_shutdown_timeout)
+        end
+      end
     end
   end
 end

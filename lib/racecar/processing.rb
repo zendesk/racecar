@@ -64,12 +64,13 @@ module Racecar
           consumer:     consumer,
           instrumenter: @instrumenter,
           config:       @config,
-          synchronization_wrapper: with_synchronization ? method(:synchronize_per_process) : nil,
-          )
+          runner_mutex: @runner_mutex,
+          with_synchronization: with_synchronization
+        )
       end
 
       if with_synchronization
-        synchronize_per_process do
+        @runner_mutex.synchronize do
           resetting_proc.call
         end
       else
@@ -98,6 +99,12 @@ module Racecar
           end
         end
       end
+    end
+
+    def topic_and_partition_for_messages(messages)
+      topic     = messages.is_a?(Array) ? messages.first.topic     : messages.topic
+      partition = messages.is_a?(Array) ? messages.first.partition : messages.partition
+      [topic, partition]
     end
   end
 end

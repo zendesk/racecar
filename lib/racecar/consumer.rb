@@ -43,23 +43,24 @@ module Racecar
       def on_partitions_revoked(rebalance_event); end
     end
 
-    def configure(producer:, consumer:, instrumenter: NullInstrumenter, config: Racecar.config, synchronization_wrapper: nil)
+    def configure(producer:, consumer:, instrumenter: NullInstrumenter, config: Racecar.config, runner_mutex: nil, with_synchronization: false)
       @producer = producer
+      @runner_mutex = runner_mutex
 
       # thread-safety
-      if @delivery_handles
-        thread_key = Thread.current[ThreadManager::THREAD_KEY] || "main"
-        @delivery_handles[thread_key] ||= []
-      else
-        @delivery_handles = {}
+      maybe_synchronize(should_synchronize: !with_synchronization) do
+        if @delivery_handles
+          thread_key = Thread.current[MultiThreadedProcessor::THREAD_KEY] || "main"
+          @delivery_handles[thread_key] ||= []
+        else
+          @delivery_handles = {}
+        end
       end
 
       @consumer = consumer
 
       @instrumenter = instrumenter
       @config = config
-
-      @synchronization_wrapper = synchronization_wrapper
     end
 
     def teardown; end
@@ -70,7 +71,7 @@ module Racecar
     # (e.g. downtime, configuration issue) or specific to the message being sent. The
     # caller must handle the latter cases or run into head of line blocking.
     def deliver!
-      thread_key = Thread.current[ThreadManager::THREAD_KEY] || "main"
+      thread_key = Thread.current[MultiThreadedProcessor::THREAD_KEY] || "main"
       current_handles = maybe_synchronize do
         @delivery_handles ||= {}
         @delivery_handles[thread_key] ||= []
@@ -112,7 +113,7 @@ module Racecar
 
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
     def produce(payload, topic:, key: nil, partition: nil, partition_key: nil, headers: nil, create_time: nil)
-      thread_key = Thread.current[ThreadManager::THREAD_KEY] || "main"
+      thread_key = Thread.current[MultiThreadedProcessor::THREAD_KEY] || "main"
       current_handles = maybe_synchronize do
         @delivery_handles ||= {}
         @delivery_handles[thread_key] ||= []
@@ -150,9 +151,9 @@ module Racecar
       warn "DEPRECATION WARNING: Manual heartbeats are not supported and not needed with librdkafka."
     end
 
-    def maybe_synchronize(&block)
-      if @synchronization_wrapper
-        @synchronization_wrapper.call(&block)
+    def maybe_synchronize(should_synchronize: true, &block)
+      if @runner_mutex && should_synchronize
+        @runner_mutex.synchronize(&block)
       else
         block.call
       end
