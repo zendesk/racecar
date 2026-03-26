@@ -23,10 +23,6 @@ module Racecar
       @rdkafka_message.timestamp
     end
 
-    def original_message
-      @rdkafka_message
-    end
-
     def ==(other)
       @rdkafka_message == other.instance_variable_get(:@rdkafka_message)
     end

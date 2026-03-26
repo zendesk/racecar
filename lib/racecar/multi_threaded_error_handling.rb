@@ -18,7 +18,7 @@ module Racecar
             pause = pauses[topic][partition]
             handle_processing_error(e, payload, pause: pause, with_synchronization: true)
             pause.pause!
-            sleep(pause.backoff_interval) if config.pause_timeout > 0
+            sleep(pause.backoff_interval) unless config.pause_timeout == 0
           else
             break
           end

@@ -9,12 +9,12 @@ class TestConsumer < Racecar::Consumer
 
   def initialize
     @messages = []
-    @consumer_class_instance_queue = []
+    @callbacks = []
     @torn_down = false
   end
 
   def on_message(&block)
-    @consumer_class_instance_queue << block
+    @callbacks << block
     self
   end
 
@@ -22,8 +22,8 @@ class TestConsumer < Racecar::Consumer
     raise message.value if message.value.is_a?(StandardError)
     @messages << message
 
-    consumer_class_instance = @consumer_class_instance_queue.shift || proc {}
-    consumer_class_instance.call(message)
+    callback = @callbacks.shift || proc {}
+    callback.call(message)
   end
 
   def teardown
@@ -42,11 +42,11 @@ class TestBatchConsumer < Racecar::Consumer
 
   def initialize
     @messages = []
-    @consumer_class_instance_queue = []
+    @callbacks = []
   end
 
   def on_message(&block)
-    @consumer_class_instance_queue << block
+    @callbacks << block
     self
   end
 
@@ -54,9 +54,9 @@ class TestBatchConsumer < Racecar::Consumer
     @messages += messages
 
     messages.each do |message|
-      consumer_class_instance = @consumer_class_instance_queue.shift || proc {}
+      callback = @callbacks.shift || proc {}
       raise message.value if message.value.is_a?(StandardError)
-      consumer_class_instance.call(message)
+      callback.call(message)
     end
   end
 end

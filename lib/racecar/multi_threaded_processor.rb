@@ -4,7 +4,7 @@ require 'racecar/pause'
 
 module Racecar
   class MultiThreadedProcessor
-    attr_reader :thread, :queue, :config, :processor, :logger, :consumer, :consumer_class_instance, :instrumenter, :pauses
+    attr_reader :thread, :queue, :config, :processor, :logger, :consumer, :consumer_class_instance, :instrumenter
 
     THREAD_KEY = 'thread_key'.freeze
 
@@ -35,7 +35,6 @@ module Racecar
     end
 
     def rebalancing=(value)
-      @rebalancing = value
       processor.rebalancing = value
       @mutex.synchronize do
         @cv.signal
@@ -43,7 +42,6 @@ module Racecar
     end
 
     def shutting_down=(value)
-      @shutting_down = value
       processor.shutting_down = value
       @mutex.synchronize do
         @cv.signal
@@ -60,7 +58,7 @@ module Racecar
         consumer_class_instance: consumer_class_instance,
         runner_mutex: @runner_mutex,
         consumer: consumer,
-        pauses: pauses
+        pauses: @pauses
       )
       @queue      = Queue.new
       @mutex      = Mutex.new
@@ -104,14 +102,6 @@ module Racecar
 
     def queue_size
       @queue.size
-    end
-
-    def alive?
-      @thread&.alive?
-    end
-
-    def join
-      @thread&.join
     end
 
     def wait_for_messages_or_exit

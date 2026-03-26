@@ -27,10 +27,6 @@ module Racecar
       extend(error_handling_mod)
     end
 
-    def consumer=(consumer)
-      @consumer = consumer
-    end
-
     def process(message)
       payload = instrumentation_payload(message)
       @instrumenter.instrument("start_process_message", payload)

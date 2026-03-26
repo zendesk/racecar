@@ -10,8 +10,8 @@ RSpec.describe Racecar::RebalanceListener do
   let(:partitions_by_topic_hash) {
     { "topic_name" => [double(:partition, partition: 0, offset: 0, err: 0)] }
   }
-  let(:partition_processors) { double(:partition_processors, :[] => nil) }
-  let(:runner_mutex) { double(:runner_mutex, :synchronize => lambda {}) }
+  let(:partition_processors) { { "topic_name/0": double(:processor) } }
+  let(:runner_mutex) { double(:runner_mutex) }
   let(:config) do
     c = Racecar::Config.new
     c.consumer_class = consumer_class
@@ -20,6 +20,7 @@ RSpec.describe Racecar::RebalanceListener do
 
   before do
     listener.rdkafka_consumer = rdkafka_consumer
+    allow(runner_mutex).to receive(:synchronize).and_yield
   end
 
   describe "#on_partitions_assigned" do

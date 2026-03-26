@@ -9,7 +9,7 @@ require "racecar/delivery_callback"
 require "racecar/processing"
 require "racecar/processor"
 require "racecar/multi_threaded_processor"
-require 'racecar/producer_methods'
+require "racecar/producer_methods"
 
 module Racecar
   class Runner
