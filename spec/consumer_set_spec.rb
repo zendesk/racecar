@@ -289,14 +289,18 @@ RSpec.describe Racecar::ConsumerSet do
       describe "#store_offset" do
         it "does not raise ErroneousStateError when RD_KAFKA_RESP_ERR__STATE(-172) is raised" do
           allow(logger).to receive(:warn)
-          allow(rdconsumer).to receive(:store_offset).with(:message).and_raise(Rdkafka::RdkafkaError, -172) # state
-          expect { consumer_set.store_offset(:message) }.not_to raise_error
+          message = double(:message, topic: "topic", partition: 0, offset: 12345)
+          allow(consumer_set).to receive(:find_consumer_by).with("topic", 0).and_return([rdconsumer, tpl(subscription("topic"), [0])])
+          allow(rdconsumer).to receive(:store_offset).with(message).and_raise(Rdkafka::RdkafkaError, -172) # state
+          expect { consumer_set.store_offset(message) }.not_to raise_error
           expect(logger).to have_received(:warn)
         end
 
         it "raises other rdkafka errors" do
-          allow(rdconsumer).to receive(:store_offset).with(:message).and_raise(Rdkafka::RdkafkaError, -1)
-          expect {consumer_set.store_offset(:message) }.to raise_error(Rdkafka::RdkafkaError)
+          message = double(:message, topic: "topic", partition: 0, offset: 12345)
+          allow(consumer_set).to receive(:find_consumer_by).with("topic", 0).and_return([rdconsumer, tpl(subscription("topic"), [0])])
+          allow(rdconsumer).to receive(:store_offset).with(message).and_raise(Rdkafka::RdkafkaError, -1)
+          expect {consumer_set.store_offset(message) }.to raise_error(Rdkafka::RdkafkaError)
         end
       end
 

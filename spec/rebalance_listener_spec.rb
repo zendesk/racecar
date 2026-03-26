@@ -10,7 +10,7 @@ RSpec.describe Racecar::RebalanceListener do
   let(:partitions_by_topic_hash) {
     { "topic_name" => [double(:partition, partition: 0, offset: 0, err: 0)] }
   }
-  let(:partition_processors) { { "topic_name/0": double(:processor) } }
+  let(:partition_processors) { { "topic_name/0" => double(:processor, :rebalancing= => true) } }
   let(:runner_mutex) { double(:runner_mutex) }
   let(:config) do
     c = Racecar::Config.new

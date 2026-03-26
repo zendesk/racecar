@@ -50,7 +50,7 @@ module Racecar
       # thread-safety
       maybe_synchronize(should_synchronize: !with_synchronization) do
         if @delivery_handles
-          thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY] || "main"
+          thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY_IDENTIFIER] || Thread.current.object_id
           @delivery_handles[thread_key] ||= []
         else
           @delivery_handles = {}
@@ -71,7 +71,7 @@ module Racecar
     # (e.g. downtime, configuration issue) or specific to the message being sent. The
     # caller must handle the latter cases or run into head of line blocking.
     def deliver!
-      thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY] || "main"
+      thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY_IDENTIFIER] || Thread.current.object_id
       current_handles = maybe_synchronize do
         @delivery_handles ||= {}
         @delivery_handles[thread_key] ||= []
@@ -109,11 +109,18 @@ module Racecar
       current_handles&.clear
     end
 
+    def cleanup_delivery_handles
+      thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY_IDENTIFIER] || Thread.current.object_id
+      maybe_synchronize do
+        @delivery_handles&.delete(thread_key)
+      end
+    end
+
     protected
 
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
     def produce(payload, topic:, key: nil, partition: nil, partition_key: nil, headers: nil, create_time: nil)
-      thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY] || "main"
+      thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY_IDENTIFIER] || Thread.current.object_id
       current_handles = maybe_synchronize do
         @delivery_handles ||= {}
         @delivery_handles[thread_key] ||= []

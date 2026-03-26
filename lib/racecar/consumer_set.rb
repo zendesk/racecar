@@ -52,7 +52,14 @@ module Racecar
 
     def store_offset(message)
       @runner_mutex.synchronize do
-        current.store_offset(message)
+        topic = message.topic
+        partition = message.partition
+        found_consumer, _ = find_consumer_by(topic, partition)
+        if found_consumer
+          found_consumer.store_offset(message)
+        else
+          current.store_offset(message)
+        end
       rescue Rdkafka::RdkafkaError => e
         if e.code == :state # -172
           @logger.warn "Attempted to store_offset, but we're not subscribed to it: #{ErroneousStateError.new(e)}"
@@ -96,7 +103,7 @@ module Racecar
       end
     end
 
-    def pause(topic, partition, offset)
+    def pause(topic, partition, offset = nil)
       consumer, filtered_tpl = find_consumer_by(topic, partition)
       if !consumer
         @logger.info "Attempted to pause #{topic}/#{partition}, but we're not subscribed to it"
@@ -104,8 +111,10 @@ module Racecar
       end
 
       consumer.pause(filtered_tpl)
-      fake_msg = OpenStruct.new(topic: topic, partition: partition, offset: offset)
-      consumer.seek(fake_msg)
+      if offset
+        fake_msg = OpenStruct.new(topic: topic, partition: partition, offset: offset)
+        consumer.seek(fake_msg)
+      end
 
       @paused_tpls[topic][partition] = [consumer, filtered_tpl]
     end

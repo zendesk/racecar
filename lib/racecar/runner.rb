@@ -55,7 +55,7 @@ module Racecar
       }
 
       unless config.multithreaded_processing_enabled
-        Thread.current[AsyncPartitionProcessor::THREAD_KEY] = "main"
+        Thread.current[AsyncPartitionProcessor::THREAD_KEY_IDENTIFIER] = "main"
       end
 
       # Main loop
