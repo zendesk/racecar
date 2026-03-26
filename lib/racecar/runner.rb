@@ -7,8 +7,8 @@ require "racecar/message_delivery_error"
 require "racecar/erroneous_state_error"
 require "racecar/delivery_callback"
 require "racecar/processing"
-require "racecar/processor"
-require "racecar/multi_threaded_processor"
+require "racecar/partition_processor"
+require "racecar/async_partition_processor"
 require "racecar/producer_methods"
 
 module Racecar
@@ -55,7 +55,7 @@ module Racecar
       }
 
       unless config.multithreaded_processing_enabled
-        Thread.current[MultiThreadedProcessor::THREAD_KEY] = "main"
+        Thread.current[AsyncPartitionProcessor::THREAD_KEY] = "main"
       end
 
       # Main loop
@@ -158,10 +158,10 @@ module Racecar
           consumer: consumer,
         }
         processor = if config.multithreaded_processing_enabled
-                      MultiThreadedProcessor.new(**processor_args, topic: topic, partition: partition)
+                      AsyncPartitionProcessor.new(**processor_args, topic: topic, partition: partition)
                     else
                       @single_threaded_pauses ||= Pause.instantiate_pauses(config)
-                      Processor.new(**processor_args, pauses: @single_threaded_pauses)
+                      @single_threaded_processor ||= PartitionProcessor.new(**processor_args, pauses: @single_threaded_pauses)
                     end
 
         partition_processors[key] = processor
@@ -169,11 +169,13 @@ module Racecar
     end
 
     def shutdown_processors_and_wait
-      processors_snapshot = @mutex.synchronize { partition_processors.values }
-      processors_snapshot.each { |processor| processor.shutting_down = true if processor }
-      processors_snapshot.each do |processor|
-        if processor.respond_to?(:thread)
-          processor.thread.join(config.multithreaded_processing_shutdown_timeout)
+      if config.multithreaded_processing_enabled
+        processors_snapshot = @mutex.synchronize { partition_processors.values }
+        processors_snapshot.each { |processor| processor.shutting_down = true if processor }
+        processors_snapshot.each do |processor|
+          if processor.respond_to?(:thread)
+            processor.thread.join(config.multithreaded_processing_shutdown_timeout)
+          end
         end
       end
     end

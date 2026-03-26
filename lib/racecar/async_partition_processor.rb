@@ -3,7 +3,7 @@
 require 'racecar/pause'
 
 module Racecar
-  class MultiThreadedProcessor
+  class AsyncPartitionProcessor
     attr_reader :thread, :queue, :config, :processor, :logger, :consumer, :consumer_class_instance, :instrumenter
 
     THREAD_KEY = 'thread_key'.freeze
@@ -23,7 +23,7 @@ module Racecar
       @instrumenter = instrumenter
       @pauses = Pause.instantiate_pauses(config)
 
-      setup_multi_threaded_processing
+      setup_async_processing
     end
 
     def process(message)
@@ -50,8 +50,8 @@ module Racecar
 
     private
 
-    def setup_multi_threaded_processing
-      @processor  = Processor.new(
+    def setup_async_processing
+      @processor = PartitionProcessor.new(
         config: config,
         logger: logger,
         instrumenter: instrumenter,
@@ -80,7 +80,7 @@ module Racecar
       use_process_batch = consumer_class_instance.respond_to?(:process_batch)
       @thread = Thread.new do
         Thread.current.name = "Racecar thread for #{thread_key}"
-        Thread.current[MultiThreadedProcessor::THREAD_KEY] = thread_key
+        Thread.current[AsyncPartitionProcessor::THREAD_KEY] = thread_key
         loop do
           wait_for_messages_or_exit
           maybe_resume_the_partition
