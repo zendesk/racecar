@@ -238,8 +238,9 @@ RSpec.describe "multithreaded processing", type: :integration do
       topic_key = "#{input_topic}/0"
 
       # Wait until the processing thread is spawned (first message has arrived)
-      wait_until { runner.partition_processors[topic_key].queue.size > 0 }
-      thread_queue = runner.partition_processors[topic_key].queue
+      processor = nil
+      wait_until { (processor = runner.partition_processors[topic_key])&.queue&.size.to_i > 0 }
+      thread_queue = processor.queue
 
       # The partition must be paused once the queue reaches max capacity
       wait_until { runner.consumer.paused?(input_topic, 0) }
