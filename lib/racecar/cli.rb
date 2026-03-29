@@ -65,8 +65,7 @@ module Racecar
         config.install_liveness_probe
       end
 
-      consumer_class_instance = consumer_class.new
-      @runner = Racecar.runner(consumer_class_instance)
+      @runner = Racecar.runner(consumer_class)
       @runner.run
       nil
     end

@@ -216,7 +216,7 @@ module IntegrationHelper
   end
 
   def start_consumer
-    runner = Racecar.runner(consumer_class.new)
+    runner = Racecar.runner(consumer_class)
     Thread.new do
       Thread.current.name = "Racecar MT runner #{consumers.size}"
       runner.run
@@ -260,7 +260,7 @@ module IntegrationHelper
     config.consumer_class   = consumer_class
     config.subscriptions    = [Racecar::Consumer::Subscription.new(topic, true, 1048576, {})]
     runner = Racecar::Runner.new(
-      consumer_class.new,
+      consumer_class,
       config:       config,
       logger:       config.logger,
       instrumenter: config.instrumenter

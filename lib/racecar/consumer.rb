@@ -43,22 +43,10 @@ module Racecar
       def on_partitions_revoked(rebalance_event); end
     end
 
-    def configure(producer:, consumer:, instrumenter: NullInstrumenter, config: Racecar.config, runner_mutex: nil, with_synchronization: false)
+    def configure(producer:, consumer:, instrumenter: NullInstrumenter, config: Racecar.config)
       @producer = producer
-      @runner_mutex = runner_mutex
-
-      # thread-safety
-      maybe_synchronize(should_synchronize: !with_synchronization) do
-        if @delivery_handles
-          thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY_IDENTIFIER] || Thread.current.object_id
-          @delivery_handles[thread_key] ||= []
-        else
-          @delivery_handles = {}
-        end
-      end
-
+      @delivery_handles = []
       @consumer = consumer
-
       @instrumenter = instrumenter
       @config = config
     end
@@ -71,11 +59,7 @@ module Racecar
     # (e.g. downtime, configuration issue) or specific to the message being sent. The
     # caller must handle the latter cases or run into head of line blocking.
     def deliver!
-      thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY_IDENTIFIER] || Thread.current.object_id
-      current_handles = maybe_synchronize do
-        @delivery_handles ||= {}
-        @delivery_handles[thread_key] ||= []
-      end
+      current_handles = @delivery_handles ||= []
       if current_handles.any?
         instrumentation_payload = { delivered_message_count: current_handles.size }
 
@@ -109,23 +93,11 @@ module Racecar
       current_handles&.clear
     end
 
-    def cleanup_delivery_handles
-      thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY_IDENTIFIER] || Thread.current.object_id
-      maybe_synchronize do
-        @delivery_handles&.delete(thread_key)
-      end
-    end
-
     protected
 
     # https://github.com/appsignal/rdkafka-ruby#producing-messages
     def produce(payload, topic:, key: nil, partition: nil, partition_key: nil, headers: nil, create_time: nil)
-      thread_key = Thread.current[AsyncPartitionProcessor::THREAD_KEY_IDENTIFIER] || Thread.current.object_id
-      current_handles = maybe_synchronize do
-        @delivery_handles ||= {}
-        @delivery_handles[thread_key] ||= []
-        @delivery_handles[thread_key]
-      end
+      @delivery_handles ||= []
       message_size = payload.respond_to?(:bytesize) ? payload.bytesize : 0
       instrumentation_payload = {
         value: payload,
@@ -136,34 +108,24 @@ module Racecar
         topic: topic,
         message_size: message_size,
         create_time: Time.now,
-        buffer_size: current_handles.size,
+        buffer_size: @delivery_handles.size,
       }
 
       @instrumenter.instrument("produce_message", instrumentation_payload) do
-        maybe_synchronize do
-          @delivery_handles[thread_key] << @producer.produce(
-            topic: topic,
-            payload: payload,
-            key: key,
-            partition: partition,
-            partition_key: partition_key,
-            timestamp: create_time,
-            headers: headers,
-            )
-        end
+        @delivery_handles << @producer.produce(
+          topic: topic,
+          payload: payload,
+          key: key,
+          partition: partition,
+          partition_key: partition_key,
+          timestamp: create_time,
+          headers: headers,
+        )
       end
     end
 
     def heartbeat
-      warn "DEPRECATION WARNING: Manual heartbeats are not supported and not needed with librdkafka."
-    end
-
-    def maybe_synchronize(should_synchronize: true, &block)
-      if @runner_mutex && should_synchronize
-        @runner_mutex.synchronize(&block)
-      else
-        block.call
-      end
+      warn "DEPRECATION WARNING: Manual heartbeats are not needed with librdkafka."
     end
   end
 end

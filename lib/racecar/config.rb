@@ -200,10 +200,6 @@ module Racecar
     desc "Max size of the queue of messages waiting to be processed when multithreaded processing is enabled"
     integer :multithreaded_processing_max_queue_size, default: 1000
 
-    desc "Decides if queue size should be determined by total number of messages or by total number of batches stored in the queue when multithreaded processing is enabled.
-          If true, the queue size is determined by the total number of messages, if false, it's determined by the total number of batches. Defaults to true."
-    boolean :multithreaded_processing_queue_size_by_message_count, default: true
-
     desc "Timeout in seconds for the main thread to wait for a processing thread to finish when shutting down the consumer with multithreaded processing enabled"
     integer :multithreaded_processing_shutdown_timeout, default: 300
 

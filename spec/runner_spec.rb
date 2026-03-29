@@ -340,12 +340,12 @@ RSpec.shared_examples "pause handling" do
 
     # expect no op
     topic_key = "greetings/0"
-    runner.partition_processors[topic_key].resume_all_paused_partitions
+    runner.partition_processors[topic_key].send(:resume_all_paused_partitions)
     expect(kafka.consumers.first._paused).to eq true
 
     # expect to resume
     Timecop.freeze(later)
-    runner.partition_processors[topic_key].resume_all_paused_partitions
+    runner.partition_processors[topic_key].send(:resume_all_paused_partitions)
     expect(kafka.consumers.first._paused).to eq false
   end
 
@@ -363,7 +363,7 @@ RSpec.shared_examples "pause handling" do
     Timecop.freeze(later)
 
     topic_key = "greetings/0"
-    runner.partition_processors[topic_key].resume_all_paused_partitions
+    runner.partition_processors[topic_key].send(:resume_all_paused_partitions)
     expect(kafka.consumers.first._paused).to eq false
 
     runner.run
@@ -400,11 +400,12 @@ RSpec.describe Racecar::Runner do
   let(:instrumenter) { FakeInstrumenter.new }
 
   let(:runner) do
-    Racecar::Runner.new(consumer_class_instance, config: config, logger: logger, instrumenter: instrumenter)
+    Racecar::Runner.new(consumer_class_instance.class, config: config, logger: logger, instrumenter: instrumenter)
   end
 
   before do
     allow(Rdkafka::Config).to receive(:new) { kafka }
+    allow(consumer_class_instance.class).to receive(:new).and_return(consumer_class_instance)
 
     config.load_consumer_class(consumer_class_instance.class)
   end
@@ -417,6 +418,7 @@ RSpec.describe Racecar::Runner do
 
     it "builds producer with all config options" do
       config.producer = ["hello=world", "hi=all"]
+      kafka.deliver_message("hello world", topic: "greetings")
 
       runner.run
 

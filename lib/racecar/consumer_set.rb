@@ -9,6 +9,7 @@ module Racecar
       @instrumenter = instrumenter
       @partition_processors = partition_processors
       @runner_mutex = runner_mutex
+      @mutex = Mutex.new
       raise ArgumentError, "Subscriptions must not be empty when subscribing" if @config.subscriptions.empty?
 
       @consumers = []
@@ -51,22 +52,14 @@ module Racecar
     end
 
     def store_offset(message)
-      @runner_mutex.synchronize do
-        topic = message.topic
-        partition = message.partition
-        found_consumer, _ = find_consumer_by(topic, partition)
-        if found_consumer
-          found_consumer.store_offset(message)
-        else
-          current.store_offset(message)
-        end
-      rescue Rdkafka::RdkafkaError => e
-        if e.code == :state # -172
-          @logger.warn "Attempted to store_offset, but we're not subscribed to it: #{ErroneousStateError.new(e)}"
-          return
-        end
-        raise e
+      found_consumer, _ = find_consumer_by(message.topic, message.partition)
+      found_consumer.store_offset(message)
+    rescue Rdkafka::RdkafkaError => e
+      if e.code == :state # -172
+        @logger.warn "Attempted to store_offset, but we're not subscribed to it: #{ErroneousStateError.new(e)}"
+        return
       end
+      raise e
     end
 
     def commit
@@ -105,7 +98,7 @@ module Racecar
 
     def pause(topic, partition, offset = nil)
       consumer, filtered_tpl = find_consumer_by(topic, partition)
-      if !consumer
+      unless consumer
         @logger.info "Attempted to pause #{topic}/#{partition}, but we're not subscribed to it"
         return
       end
@@ -116,28 +109,31 @@ module Racecar
         consumer.seek(fake_msg)
       end
 
-      @paused_tpls[topic][partition] = [consumer, filtered_tpl]
+      @mutex.synchronize { @paused_tpls[topic][partition] = [consumer, filtered_tpl] }
     end
 
     def resume(topic, partition)
       consumer, filtered_tpl = find_consumer_by(topic, partition)
 
-      if !consumer && @paused_tpls[topic][partition]
-        consumer, filtered_tpl = @paused_tpls[topic][partition]
+      @mutex.synchronize do
+        consumer, filtered_tpl = @paused_tpls[topic][partition] if !consumer && @paused_tpls[topic][partition]
       end
 
-      if !consumer
+      unless consumer
         @logger.info "Attempted to resume #{topic}/#{partition}, but we're not subscribed to it"
         return
       end
 
       consumer.resume(filtered_tpl)
-      @paused_tpls[topic].delete(partition)
-      @paused_tpls.delete(topic) if @paused_tpls[topic].empty?
+
+      @mutex.synchronize do
+        @paused_tpls[topic].delete(partition)
+        @paused_tpls.delete(topic) if @paused_tpls[topic].empty?
+      end
     end
 
     def paused?(topic, partition)
-      @paused_tpls[topic].key?(partition)
+      @mutex.synchronize { @paused_tpls[topic].key?(partition) }
     end
 
   alias :each :each_subscribed
