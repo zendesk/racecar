@@ -19,6 +19,10 @@ module Racecar
       @stop_requested = false
       @partition_processors = {}
       @mutex = Mutex.new
+      @consumer_class_instance = consumer_class.new
+      if @consumer_class_instance.respond_to?(:statistics_callback) && Rdkafka::Config.statistics_callback.nil?
+        Rdkafka::Config.statistics_callback = @consumer_class_instance.method(:statistics_callback).to_proc
+      end
       Rdkafka::Config.logger = logger
     end
 
@@ -34,13 +38,6 @@ module Racecar
         consumer_class: consumer_class.to_s,
         consumer_set: consumer
       }
-      unless config.multithreaded_processing_enabled
-        @single_threaded_processor = PartitionProcessor.new(
-          **common_processor_params,
-          pauses: Pause.instantiate_pauses(config)
-        )
-      end
-
       # Main loop
       begin
         loop do
@@ -48,6 +45,8 @@ module Racecar
 
           @instrumenter.instrument("start_main_loop", loop_payload)
           @instrumenter.instrument("main_loop", loop_payload) do
+            resume_all_paused_partitions unless config.multithreaded_processing_enabled
+
             case process_method
             when :batch then
               msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
@@ -135,11 +134,18 @@ module Racecar
         processor = if config.multithreaded_processing_enabled
                       AsyncPartitionProcessor.new(
                         **common_processor_params,
+                        consumer_class: consumer_class,
                         topic: topic,
                         partition: partition,
                       )
                     else
-                      @single_threaded_processor
+                      PartitionProcessor.new(
+                        **common_processor_params,
+                        consumer_class_instance: @consumer_class_instance,
+                        topic: topic,
+                        partition: partition,
+                        pause: Pause.new_from_config(config),
+                      )
                     end
 
         partition_processors[key] = processor
@@ -152,13 +158,23 @@ module Racecar
         processors_snapshot.each { |processor| processor.shutting_down = true if processor }
         processors_snapshot.each do |processor|
           if processor.respond_to?(:thread)
-            processor.thread.join(config.multithreaded_processing_shutdown_timeout)
+            begin
+              processor.thread.join(config.multithreaded_processing_shutdown_timeout)
+            rescue => e
+              logger.error "Error while waiting for processor thread to finish: #{e}"
+            end
           end
         end
       end
-      @single_threaded_processor&.teardown
-    ensure
-      @single_threaded_processor&.close
+      begin
+        @consumer_class_instance.deliver!
+      ensure
+        @consumer_class_instance.teardown
+      end
+    end
+
+    def resume_all_paused_partitions
+      partition_processors.values.each(&:resume_paused_partition)
     end
 
     def common_processor_params
@@ -166,7 +182,6 @@ module Racecar
         config: config,
         logger: logger,
         instrumenter: @instrumenter,
-        consumer_class: consumer_class,
         consumer: consumer,
       }
     end

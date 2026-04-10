@@ -6,23 +6,21 @@ require "racecar/delivery_callback"
 
 module Racecar
   class PartitionProcessor
-    attr_reader :consumer_class_instance, :config, :logger, :instrumenter, :consumer, :pauses
+    attr_reader :consumer_class_instance, :config, :logger, :instrumenter, :consumer, :topic, :partition, :pause
     attr_accessor :rebalancing, :shutting_down
 
-    def initialize(config:, logger:, instrumenter:, consumer_class:, consumer:, pauses:)
+    def initialize(config:, logger:, instrumenter:, consumer_class_instance:, consumer:, topic:, partition:, pause:)
       @config = config
       @logger = logger
       @instrumenter = instrumenter
-      @consumer_class_instance = consumer_class.new
-      @pauses = pauses
+      @consumer_class_instance = consumer_class_instance
+      @pause = pause
+      @topic = topic
+      @partition = partition
       @consumer = consumer
 
-      if consumer_class.method_defined?(:statistics_callback) && Rdkafka::Config.statistics_callback.nil?
-        Rdkafka::Config.statistics_callback = @consumer_class_instance.method(:statistics_callback).to_proc
-      end
-
-      @consumer_class_instance.configure(
-        producer:     producer,
+      consumer_class_instance.configure(
+        producer:     consumer.producer,
         consumer:     @consumer,
         instrumenter: @instrumenter,
         config:       @config,
@@ -44,6 +42,7 @@ module Racecar
 
       with_error_handling(message, payload) do |pause|
         @instrumenter.instrument("process_message", payload) do
+          reconfigure_consumer_class_instance! if consumer_class_instance.instance_variable_get(:@producer)&.closed?
           consumer_class_instance.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
           consumer_class_instance.deliver!
           consumer.store_offset(message)
@@ -69,16 +68,11 @@ module Racecar
           racecar_messages = messages.map do |message|
             Racecar::Message.new(message, retries_count: pause.pauses_count)
           end
+          reconfigure_consumer_class_instance! if consumer_class_instance.instance_variable_get(:@producer)&.closed?
           consumer_class_instance.process_batch(racecar_messages)
           consumer_class_instance.deliver!
           consumer.store_offset(messages.last)
         end
-      end
-    end
-
-    def producer
-      @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |p|
-        p.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
       end
     end
 
@@ -88,45 +82,24 @@ module Racecar
       consumer_class_instance.teardown unless rebalancing
     end
 
-    def close
-      producer.close
-    end
-
-    private
-
-    def resume_all_paused_partitions
+    def resume_paused_partition
       return if config.pause_timeout == 0
 
-      pauses.each do |topic, partitions|
-        partitions.each do |partition, pause|
-          @instrumenter.instrument("pause_status", {
-            topic:          topic,
-            partition:      partition,
-            duration:       pause.pause_duration,
-            consumer_class: consumer_class_instance.class.to_s,
-          })
+      @instrumenter.instrument("pause_status", {
+        topic:          topic,
+        partition:      partition,
+        duration:       pause.pause_duration,
+        consumer_class: consumer_class_instance.class.to_s,
+      })
 
-          if pause.paused? && pause.expired?
-            logger.info "Automatically resuming partition #{topic}/#{partition}, pause timeout expired"
-            consumer.resume(topic, partition)
-            pause.resume!
-          end
-        end
+      if pause.paused? && pause.expired?
+        logger.info "Automatically resuming partition #{topic}/#{partition}, pause timeout expired"
+        consumer.resume(topic, partition)
+        pause.resume!
       end
     end
 
-    def producer_config
-      cfg = {
-        "bootstrap.servers"      => config.brokers.join(","),
-        "client.id"              => config.client_id,
-        "statistics.interval.ms" => config.statistics_interval_ms,
-        "message.timeout.ms"     => config.message_timeout * 1000,
-        "partitioner"            => config.partitioner.to_s,
-      }
-      cfg["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
-      cfg.merge!(config.rdkafka_producer)
-      cfg
-    end
+    private
 
     def with_error_handling(messages, payload)
       if config.multithreaded_processing_enabled
@@ -139,8 +112,6 @@ module Racecar
     def with_multi_threaded_error_handling(messages, payload)
       loop do
         begin
-          topic, partition = topic_and_partition(messages)
-          pause = pauses[topic][partition]
           yield(pause)
           pause.reset!
           break
@@ -148,7 +119,6 @@ module Racecar
           if rebalancing
             Thread.exit
           elsif !shutting_down
-            pause = pauses[topic][partition]
             handle_processing_error(e, payload, pause: pause)
             pause.pause!
             sleep(pause.backoff_interval) unless config.pause_timeout <= 0
@@ -160,25 +130,21 @@ module Racecar
     end
 
     def with_single_threaded_error_handling(messages, payload)
-      topic, partition = topic_and_partition(messages)
       offsets = messages.is_a?(Array) ? messages.first.offset..messages.last.offset : messages.offset..messages.offset
-      with_pause(topic, partition, offsets) do |pause|
+      with_pause(offsets) do
         yield(pause)
       rescue => e
         handle_processing_error(e, payload, pause: pause)
         raise e
       end
-
-      resume_all_paused_partitions
     end
 
-    def with_pause(topic, partition, offsets)
-      pause = pauses[topic][partition]
-      return yield pause if config.pause_timeout == 0
+    def with_pause(offsets)
+      return yield if config.pause_timeout == 0
 
       begin
-        yield pause
-        pauses[topic][partition].reset!
+        yield
+        pause.reset!
       rescue => e
         desc = "#{topic}/#{partition}"
         logger.error "Failed to process #{desc} at #{offsets}: #{e}"
@@ -202,20 +168,17 @@ module Racecar
     end
 
     def reset_producer!
-      producer.close
-      @producer = nil
+      consumer.reset_producer!
+      reconfigure_consumer_class_instance!
+    end
+
+    def reconfigure_consumer_class_instance!
       consumer_class_instance.configure(
-        producer:     producer,
+        producer:     consumer.producer,
         consumer:     consumer,
         instrumenter: @instrumenter,
         config:       @config,
       )
-    end
-
-    def topic_and_partition(messages)
-      topic     = messages.is_a?(Array) ? messages.first.topic     : messages.topic
-      partition = messages.is_a?(Array) ? messages.first.partition : messages.partition
-      [topic, partition]
     end
   end
 end

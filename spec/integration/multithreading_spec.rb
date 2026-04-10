@@ -242,13 +242,13 @@ RSpec.describe "multithreaded processing", type: :integration do
       wait_until { (processor = runner.partition_processors[topic_key])&.queue&.size.to_i > 0 }
 
       # The partition must be paused once the queue reaches max capacity
-      wait_until { runner.consumer.paused?(input_topic, 0) }
-      expect(runner.consumer.paused?(input_topic, 0)).to be true
+      wait_until { processor.backpressure_paused.true? }
+      expect(processor.backpressure_paused.true?).to be true
       expect(processor.queue.size).to be >= max_queue_size / 2
 
       # Once the queue drains below half capacity, the partition is automatically resumed
-      wait_until(timeout: 30) { !runner.consumer.paused?(input_topic, 0) }
-      expect(runner.consumer.paused?(input_topic, 0)).to be false
+      wait_until(timeout: 30) { !processor.backpressure_paused.true? }
+      expect(processor.backpressure_paused.true?).to be false
       expect(processor.queue.size).to be < max_queue_size / 2
 
       wait_for_messages

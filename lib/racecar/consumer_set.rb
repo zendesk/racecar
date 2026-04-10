@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "racecar/delivery_callback"
+
 module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10
@@ -9,7 +11,6 @@ module Racecar
       @instrumenter = instrumenter
       @partition_processors = partition_processors
       @runner_mutex = runner_mutex
-      @mutex = Mutex.new
       raise ArgumentError, "Subscriptions must not be empty when subscribing" if @config.subscriptions.empty?
 
       @consumers = []
@@ -18,7 +19,6 @@ module Racecar
       @previous_retries = 0
 
       @last_poll_read_nil_message = false
-      @paused_tpls = Hash.new { |h, k| h[k] = {} }
     end
 
     def poll(max_wait_time_ms = @config.max_wait_time_ms)
@@ -70,7 +70,22 @@ module Racecar
 
     def close
       each_subscribed(&:close)
-      @paused_tpls.clear
+      @producer&.close
+      @producer = nil
+    end
+
+    def producer
+      @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |p|
+        p.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
+      end
+    end
+
+    def reset_producer!
+      @runner_mutex.synchronize do
+        @producer&.close
+        @producer = nil
+        producer
+      end
     end
 
     def current
@@ -108,16 +123,10 @@ module Racecar
         fake_msg = OpenStruct.new(topic: topic, partition: partition, offset: offset)
         consumer.seek(fake_msg)
       end
-
-      @mutex.synchronize { @paused_tpls[topic][partition] = [consumer, filtered_tpl] }
     end
 
     def resume(topic, partition)
       consumer, filtered_tpl = find_consumer_by(topic, partition)
-
-      @mutex.synchronize do
-        consumer, filtered_tpl = @paused_tpls[topic][partition] if !consumer && @paused_tpls[topic][partition]
-      end
 
       unless consumer
         @logger.info "Attempted to resume #{topic}/#{partition}, but we're not subscribed to it"
@@ -125,15 +134,6 @@ module Racecar
       end
 
       consumer.resume(filtered_tpl)
-
-      @mutex.synchronize do
-        @paused_tpls[topic].delete(partition)
-        @paused_tpls.delete(topic) if @paused_tpls[topic].empty?
-      end
-    end
-
-    def paused?(topic, partition)
-      @mutex.synchronize { @paused_tpls[topic].key?(partition) }
     end
 
   alias :each :each_subscribed
@@ -281,6 +281,19 @@ module Racecar
     def remaining_time_ms(limit_ms, started_at_time)
       r = limit_ms - ((Time.now - started_at_time)*1000).round
       r <= 0 ? 0 : r
+    end
+
+    def producer_config
+      cfg = {
+        "bootstrap.servers"      => @config.brokers.join(","),
+        "client.id"              => @config.client_id,
+        "statistics.interval.ms" => @config.statistics_interval_ms,
+        "message.timeout.ms"     => @config.message_timeout * 1000,
+        "partitioner"            => @config.partitioner.to_s,
+      }
+      cfg["compression.codec"] = @config.producer_compression_codec.to_s unless @config.producer_compression_codec.nil?
+      cfg.merge!(@config.rdkafka_producer)
+      cfg
     end
   end
 end

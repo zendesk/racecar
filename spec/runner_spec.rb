@@ -179,6 +179,9 @@ class FakeProducer
 
   def close
   end
+
+  def closed?
+  end
 end
 
 FakeDeliveryReport = Struct.new(:partition, :offset, :error, :topic_name)
@@ -340,12 +343,12 @@ RSpec.shared_examples "pause handling" do
 
     # expect no op
     topic_key = "greetings/0"
-    runner.partition_processors[topic_key].send(:resume_all_paused_partitions)
+    runner.partition_processors[topic_key].send(:resume_paused_partition)
     expect(kafka.consumers.first._paused).to eq true
 
     # expect to resume
     Timecop.freeze(later)
-    runner.partition_processors[topic_key].send(:resume_all_paused_partitions)
+    runner.partition_processors[topic_key].send(:resume_paused_partition)
     expect(kafka.consumers.first._paused).to eq false
   end
 
@@ -363,7 +366,7 @@ RSpec.shared_examples "pause handling" do
     Timecop.freeze(later)
 
     topic_key = "greetings/0"
-    runner.partition_processors[topic_key].send(:resume_all_paused_partitions)
+    runner.partition_processors[topic_key].send(:resume_paused_partition)
     expect(kafka.consumers.first._paused).to eq false
 
     runner.run
@@ -734,11 +737,34 @@ RSpec.describe Racecar::Runner do
     include_examples "delivery error handling"
   end
 
+  context "resume_all_paused_partitions in single-threaded mode" do
+    let(:consumer_class_instance) { TestConsumer.new }
+
+    after { Timecop.return }
+
+    it "resumes all paused partitions when pause timeout expires" do
+      now = Time.local(2019, 6, 18, 14, 0, 0)
+      later = Time.local(2019, 6, 18, 14, 0, 30)
+
+      Timecop.freeze(now)
+      kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+      runner.run
+      expect(kafka.consumers.first._paused).to eq true
+
+      # Calling the runner's resume method iterates all partition processors
+      Timecop.freeze(later)
+      runner.send(:resume_all_paused_partitions)
+
+      expect(kafka.consumers.first._paused).to eq false
+    end
+  end
+
   context "#stop" do
     let(:consumer_class_instance) { TestConsumer.new }
     let(:datadog) { double("Racecar::Datadog", close: nil) }
 
     it "allows the consumer_class_instance to tear down resources" do
+      kafka.deliver_message("hello world", topic: "greetings")
       runner.run
 
       expect(consumer_class_instance.torn_down?).to eq true

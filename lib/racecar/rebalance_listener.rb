@@ -31,8 +31,11 @@ module Racecar
           partitions_metadata.flatten.map(&:partition).each do |partition|
             key = Runner.topic_partition_key(topic, partition)
             @runner_mutex.synchronize do
-              @partition_processors[key]&.rebalancing = true
+              processor = @partition_processors[key]
+              processor&.rebalancing = true
+              processor&.resume_paused_partition if processor.respond_to?(:resume_paused_partition)
               @partition_processors.delete(key)
+
             end
           end
         end

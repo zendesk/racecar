@@ -1,10 +1,11 @@
 # frozen_string_literal: true
 
 require 'racecar/pause'
+require 'concurrent-ruby'
 
 module Racecar
   class AsyncPartitionProcessor
-    attr_reader :thread, :queue, :config, :processor, :logger, :consumer, :consumer_class, :instrumenter
+    attr_reader :thread, :queue, :config, :processor, :logger, :consumer, :consumer_class, :instrumenter, :backpressure_paused
 
     THREAD_KEY_IDENTIFIER = 'racecar_topic_partition_identifier'.freeze
 
@@ -20,8 +21,7 @@ module Racecar
       @consumer   = consumer
       @consumer_class = consumer_class
       @instrumenter = instrumenter
-      @pauses = Pause.instantiate_pauses(config)
-
+      @backpressure_paused = Concurrent::AtomicBoolean.new
       setup_async_processing
     end
 
@@ -35,6 +35,7 @@ module Racecar
 
     def rebalancing=(value)
       processor.rebalancing = value
+      processor.resume_paused_partition
       @queue << nil
     end
 
@@ -50,9 +51,11 @@ module Racecar
         config: config,
         logger: logger,
         instrumenter: instrumenter,
-        consumer_class: consumer_class,
+        consumer_class_instance: consumer_class.new,
         consumer: consumer,
-        pauses: @pauses
+        topic: @topic,
+        partition: @partition,
+        pause: Pause.new_from_config(config),
       )
       @queue  = Queue.new
       @thread = nil
@@ -87,14 +90,15 @@ module Racecar
 
     def maybe_apply_backpressure
       if @queue.size >= config.multithreaded_processing_max_queue_size
+        @backpressure_paused.make_true
         consumer.pause(@topic, @partition)
         logger.debug "Paused partition #{@topic}/#{@partition}: queue reached capacity (#{@queue.size}/#{config.multithreaded_processing_max_queue_size})"
       end
     end
 
     def maybe_resume_the_partition
-      if @queue.size < config.multithreaded_processing_resume_threshold * config.multithreaded_processing_max_queue_size
-        return unless consumer.paused?(@topic, @partition)
+      if @backpressure_paused.true? && @queue.size < config.multithreaded_processing_resume_threshold * config.multithreaded_processing_max_queue_size
+        @backpressure_paused.make_false
         consumer.resume(@topic, @partition)
       end
     end
@@ -114,11 +118,7 @@ module Racecar
         logger.error "Error in processing thread for #{thread_key}: #{e.class} - #{e.message}"
       end
     ensure
-      begin
-        @processor.teardown
-      ensure
-        @processor.close
-      end
+      @processor.teardown
     end
   end
 end
