@@ -165,11 +165,12 @@ module Racecar
             end
           end
         end
-      end
-      begin
-        @consumer_class_instance.deliver!
-      ensure
-        @consumer_class_instance.teardown
+      else
+        begin
+          @consumer_class_instance.deliver!
+        ensure
+          @consumer_class_instance.teardown
+        end
       end
     end
 

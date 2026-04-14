@@ -46,7 +46,9 @@ module Racecar
     def configure(producer:, consumer:, instrumenter: NullInstrumenter, config: Racecar.config)
       @producer = producer
       @delivery_handles = []
+
       @consumer = consumer
+
       @instrumenter = instrumenter
       @config = config
     end
@@ -59,12 +61,12 @@ module Racecar
     # (e.g. downtime, configuration issue) or specific to the message being sent. The
     # caller must handle the latter cases or run into head of line blocking.
     def deliver!
-      current_handles = @delivery_handles ||= []
-      if current_handles.any?
-        instrumentation_payload = { delivered_message_count: current_handles.size }
+      @delivery_handles ||= []
+      if @delivery_handles.any?
+        instrumentation_payload = { delivered_message_count: @delivery_handles.size }
 
         @instrumenter.instrument('deliver_messages', instrumentation_payload) do
-          current_handles.each do |handle|
+          @delivery_handles.each do |handle|
             begin
               # rdkafka-ruby checks with exponential backoff starting at 0 seconds wait
               # if the message was successfully delivered, up to max_wait_timeout seconds
@@ -89,8 +91,7 @@ module Racecar
           end
         end
       end
-    ensure
-      current_handles&.clear
+      @delivery_handles.clear
     end
 
     protected
@@ -125,7 +126,7 @@ module Racecar
     end
 
     def heartbeat
-      warn "DEPRECATION WARNING: Manual heartbeats are not needed with librdkafka."
+      warn "DEPRECATION WARNING: Manual heartbeats are not supported and not needed with librdkafka."
     end
   end
 end

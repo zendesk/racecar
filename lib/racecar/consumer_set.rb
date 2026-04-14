@@ -53,6 +53,10 @@ module Racecar
 
     def store_offset(message)
       found_consumer, _ = find_consumer_by(message.topic, message.partition)
+      unless found_consumer
+        @logger.warn "Attempted to store_offset for unassigned topic/partition #{message.topic}/#{message.partition}"
+        return
+      end
       found_consumer.store_offset(message)
     rescue Rdkafka::RdkafkaError => e
       if e.code == :state # -172
@@ -105,9 +109,9 @@ module Racecar
 
     def each_subscribed
       if block_given?
-        @consumers.each { |c| yield c }
+        @consumers.compact.each { |c| yield c }
       else
-        @consumers.each
+        @consumers.compact.each
       end
     end
 
