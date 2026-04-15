@@ -79,7 +79,7 @@ module Racecar
     def teardown
       consumer_class_instance.deliver! unless rebalancing
     ensure
-      consumer_class_instance.teardown unless rebalancing
+      consumer_class_instance.teardown
     end
 
     def resume_paused_partition
