@@ -51,10 +51,8 @@ module Racecar
             when :batch then
               msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
               msg_per_part.each_value do |messages_per_partition|
-                messages_per_partition.group_by(&:topic).each_value do |messages_per_topic_and_partition|
-                  processor = assign_and_get_processor(messages_per_topic_and_partition)
-                  processor.process_batch(messages_per_topic_and_partition)
-                end
+                processor = assign_and_get_processor(messages_per_partition)
+                processor.process_batch(messages_per_partition)
               end
             when :single then
               message = consumer.poll(config.max_wait_time_ms)
@@ -128,9 +126,9 @@ module Racecar
       topic     = messages.is_a?(Array) ? messages.first.topic     : messages.topic
       partition = messages.is_a?(Array) ? messages.first.partition : messages.partition
       key = Runner.topic_partition_key(topic, partition)
-      @mutex.synchronize do
-        return partition_processors[key] if partition_processors[key]
+      return partition_processors[key] if partition_processors[key]
 
+      @mutex.synchronize do
         processor = if config.multithreaded_processing_enabled
                       AsyncPartitionProcessor.new(
                         **common_processor_params,
@@ -155,7 +153,7 @@ module Racecar
     def shutdown_processors_and_wait
       if config.multithreaded_processing_enabled
         processors_snapshot = @mutex.synchronize { partition_processors.values }
-        processors_snapshot.each { |processor| processor.shutting_down = true if processor }
+        processors_snapshot.each { |processor| processor.shut_down! if processor }
         processors_snapshot.each do |processor|
           if processor.respond_to?(:thread)
             begin

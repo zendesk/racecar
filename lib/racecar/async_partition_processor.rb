@@ -33,15 +33,18 @@ module Racecar
       push(messages)
     end
 
-    def rebalancing=(value)
-      processor.rebalancing = value
-      processor.resume_paused_partition
+    def rebalance!
+      processor.rebalance!
       @queue << nil
     end
 
-    def shutting_down=(value)
-      processor.shutting_down = value
+    def shut_down!
+      processor.shut_down!
       @queue << nil
+    end
+
+    def resume_paused_partition
+      processor.resume_paused_partition
     end
 
     private

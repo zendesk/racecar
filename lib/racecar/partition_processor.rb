@@ -99,6 +99,16 @@ module Racecar
       end
     end
 
+    def rebalance!
+      @rebalancing = true
+      resume_paused_partition
+    end
+
+    def shut_down!
+      @shutting_down = true
+      resume_paused_partition
+    end
+
     private
 
     def with_error_handling(messages, payload)

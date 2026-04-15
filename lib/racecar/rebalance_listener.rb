@@ -32,10 +32,8 @@ module Racecar
             key = Runner.topic_partition_key(topic, partition)
             @runner_mutex.synchronize do
               processor = @partition_processors[key]
-              processor&.rebalancing = true
-              processor&.resume_paused_partition if processor.respond_to?(:resume_paused_partition)
+              processor&.rebalance!
               @partition_processors.delete(key)
-
             end
           end
         end
