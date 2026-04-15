@@ -33,7 +33,6 @@ module Racecar
             @runner_mutex.synchronize do
               processor = @partition_processors[key]
               processor&.rebalance!
-              @partition_processors.delete(key)
             end
           end
         end

@@ -43,6 +43,10 @@ module Racecar
       @queue << nil
     end
 
+    def rebalancing_or_shutting_down?
+      processor.rebalancing_or_shutting_down?
+    end
+
     def resume_paused_partition
       processor.resume_paused_partition
     end
@@ -118,7 +122,7 @@ module Racecar
         maybe_resume_the_partition
         block.call(msgs)
       rescue => e
-        logger.error "Error in processing thread for #{thread_key}: #{e.class} - #{e.message}"
+        logger.error "Error in processing thread for #{thread_key}: #{e.class} - #{e.full_message}. backtrace: #{e.backtrace&.first(10)&.join("\n")}"
       end
     ensure
       @processor.teardown

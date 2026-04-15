@@ -19,12 +19,17 @@ module Racecar
       @partition = partition
       @consumer = consumer
 
-      consumer_class_instance.configure(
-        producer:     consumer.producer,
-        consumer:     @consumer,
-        instrumenter: @instrumenter,
-        config:       @config,
-      )
+      if config.multithreaded_processing_enabled
+        consumer_class_instance.configure(
+          producer:     consumer.producer,
+          consumer:     @consumer,
+          instrumenter: @instrumenter,
+          config:       @config,
+        )
+      end
+
+      @sleep_mutex = Mutex.new
+      @sleep_cv = ConditionVariable.new
     end
 
     def process(message)
@@ -45,7 +50,7 @@ module Racecar
           reconfigure_consumer_class_instance! if consumer_class_instance.instance_variable_get(:@producer)&.closed?
           consumer_class_instance.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
           consumer_class_instance.deliver!
-          consumer.store_offset(message)
+          consumer.store_offset(message) unless rebalancing
         end
       end
     end
@@ -71,7 +76,7 @@ module Racecar
           reconfigure_consumer_class_instance! if consumer_class_instance.instance_variable_get(:@producer)&.closed?
           consumer_class_instance.process_batch(racecar_messages)
           consumer_class_instance.deliver!
-          consumer.store_offset(messages.last)
+          consumer.store_offset(messages.last) unless rebalancing
         end
       end
     end
@@ -101,12 +106,17 @@ module Racecar
 
     def rebalance!
       @rebalancing = true
-      resume_paused_partition
+      @sleep_mutex.synchronize { @sleep_cv.signal }
     end
 
     def shut_down!
       @shutting_down = true
+      @sleep_mutex.synchronize { @sleep_cv.signal }
       resume_paused_partition
+    end
+
+    def rebalancing_or_shutting_down?
+      rebalancing || shutting_down
     end
 
     private
@@ -131,7 +141,13 @@ module Racecar
           elsif !shutting_down
             handle_processing_error(e, payload, pause: pause)
             pause.pause!
-            sleep(pause.backoff_interval) unless config.pause_timeout <= 0
+            unless config.pause_timeout <= 0
+              @sleep_mutex.synchronize do
+                @sleep_cv.wait(@sleep_mutex, pause.backoff_interval)
+              end
+            end
+            Thread.exit if rebalancing
+            break if shutting_down
           else
             break
           end

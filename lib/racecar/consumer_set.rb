@@ -15,6 +15,7 @@ module Racecar
 
       @consumers = []
       @consumer_id_iterator = (0...@config.subscriptions.size).cycle
+      @producer_mutex = Mutex.new
 
       @previous_retries = 0
 
@@ -79,16 +80,17 @@ module Racecar
     end
 
     def producer
-      @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |p|
-        p.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
+      @producer_mutex.synchronize do
+        @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |p|
+          p.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
+        end
       end
     end
 
     def reset_producer!
-      @runner_mutex.synchronize do
+      @producer_mutex.synchronize do
         @producer&.close
         @producer = nil
-        producer
       end
     end
 

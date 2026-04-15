@@ -207,9 +207,11 @@ RSpec.describe Racecar::ConsumerSet do
         end
 
         it "forwards to Rdkafka (as poll)" do
-          config.fetch_messages = 3
-          expect(rdconsumer).to receive(:poll).exactly(3).times.with(100).and_return(:msg1, :msg2, :msg3)
-          expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2, :msg3]
+          Timecop.freeze do
+            config.fetch_messages = 3
+            expect(rdconsumer).to receive(:poll).exactly(3).times.with(100).and_return(:msg1, :msg2, :msg3)
+            expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2, :msg3]
+          end
         end
 
         it "returns remaining messages of current partition" do

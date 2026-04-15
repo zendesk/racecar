@@ -17,7 +17,7 @@ module Racecar
       @consumer_class, @config, @logger = consumer_class, config, logger
       @instrumenter = instrumenter
       @stop_requested = false
-      @partition_processors = {}
+      @partition_processors = Concurrent::Hash.new
       @mutex = Mutex.new
       @consumer_class_instance = consumer_class.new
       if @consumer_class_instance.respond_to?(:statistics_callback) && Rdkafka::Config.statistics_callback.nil?
@@ -33,6 +33,15 @@ module Racecar
     def run
       install_signal_handlers
       @stop_requested = false
+
+      unless config.multithreaded_processing_enabled
+        @consumer_class_instance.configure(
+          producer:     consumer.producer,
+          consumer:     consumer,
+          instrumenter: @instrumenter,
+          config:       config,
+        )
+      end
 
       loop_payload = {
         consumer_class: consumer_class.to_s,
@@ -52,13 +61,13 @@ module Racecar
               msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
               msg_per_part.each_value do |messages_per_partition|
                 processor = assign_and_get_processor(messages_per_partition)
-                processor.process_batch(messages_per_partition)
+                processor&.process_batch(messages_per_partition) unless processor&.rebalancing_or_shutting_down?
               end
             when :single then
               message = consumer.poll(config.max_wait_time_ms)
               if message
                 processor = assign_and_get_processor(message)
-                processor.process(message)
+                processor&.process(message) unless processor&.rebalancing_or_shutting_down?
               end
             end
           end
@@ -126,26 +135,27 @@ module Racecar
       topic     = messages.is_a?(Array) ? messages.first.topic     : messages.topic
       partition = messages.is_a?(Array) ? messages.first.partition : messages.partition
       key = Runner.topic_partition_key(topic, partition)
+      partition_processors.delete(key) if partition_processors[key]&.rebalancing_or_shutting_down?
       return partition_processors[key] if partition_processors[key]
 
-      @mutex.synchronize do
-        processor = if config.multithreaded_processing_enabled
-                      AsyncPartitionProcessor.new(
-                        **common_processor_params,
-                        consumer_class: consumer_class,
-                        topic: topic,
-                        partition: partition,
-                      )
-                    else
-                      PartitionProcessor.new(
-                        **common_processor_params,
-                        consumer_class_instance: @consumer_class_instance,
-                        topic: topic,
-                        partition: partition,
-                        pause: Pause.new_from_config(config),
-                      )
-                    end
-
+      if config.multithreaded_processing_enabled
+        @mutex.synchronize do
+          processor = AsyncPartitionProcessor.new(
+            **common_processor_params,
+            consumer_class: consumer_class,
+            topic: topic,
+            partition: partition,
+          )
+          partition_processors[key] = processor
+        end
+      else
+        processor = PartitionProcessor.new(
+          **common_processor_params,
+          consumer_class_instance: @consumer_class_instance,
+          topic: topic,
+          partition: partition,
+          pause: Pause.new_from_config(config),
+        )
         partition_processors[key] = processor
       end
     end
