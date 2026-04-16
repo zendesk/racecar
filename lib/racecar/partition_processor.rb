@@ -144,11 +144,12 @@ module Racecar
             pause.pause!
             unless config.pause_timeout <= 0
               @sleep_mutex.synchronize do
+                next if rebalancing || shutting_down
                 @sleep_cv.wait(@sleep_mutex, pause.backoff_interval)
               end
             end
             Thread.exit if rebalancing
-            break if shutting_down
+            break if shutting_down || config.pause_timeout <= 0
           else
             break
           end
