@@ -9,7 +9,7 @@ module Racecar
     attr_reader :consumer_class_instance, :config, :logger, :instrumenter, :consumer, :topic, :partition, :pause
     attr_accessor :rebalancing, :shutting_down
 
-    def initialize(config:, logger:, instrumenter:, consumer_class_instance:, consumer:, topic:, partition:, pause:)
+    def initialize(config:, logger:, instrumenter:, consumer_class_instance:, consumer:, topic:, partition:, pause:, rdkafka_consumer: nil)
       @config = config
       @logger = logger
       @instrumenter = instrumenter
@@ -18,6 +18,7 @@ module Racecar
       @topic = topic
       @partition = partition
       @consumer = consumer
+      @rdkafka_consumer = rdkafka_consumer
 
       if config.multithreaded_processing_enabled
         consumer_class_instance.configure(
@@ -50,7 +51,7 @@ module Racecar
           reconfigure_consumer_class_instance! if consumer_class_instance.instance_variable_get(:@producer)&.closed?
           consumer_class_instance.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
           consumer_class_instance.deliver!
-          consumer.store_offset(message) unless rebalancing
+          consumer.store_offset(message, @rdkafka_consumer) unless rebalancing
         end
       end
     end
@@ -76,7 +77,7 @@ module Racecar
           reconfigure_consumer_class_instance! if consumer_class_instance.instance_variable_get(:@producer)&.closed?
           consumer_class_instance.process_batch(racecar_messages)
           consumer_class_instance.deliver!
-          consumer.store_offset(messages.last) unless rebalancing
+          consumer.store_offset(messages.last, @rdkafka_consumer) unless rebalancing
         end
       end
     end

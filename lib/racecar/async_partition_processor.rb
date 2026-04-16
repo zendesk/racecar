@@ -13,7 +13,7 @@ module Racecar
       "#{topic}/#{partition}"
     end
 
-    def initialize(topic:, partition:, logger:, config:, consumer:, consumer_class:, instrumenter:)
+    def initialize(topic:, partition:, logger:, config:, consumer:, consumer_class:, instrumenter:, rdkafka_consumer:)
       @topic      = topic
       @partition  = partition
       @logger     = logger
@@ -21,7 +21,9 @@ module Racecar
       @consumer   = consumer
       @consumer_class = consumer_class
       @instrumenter = instrumenter
+      @rdkafka_consumer = rdkafka_consumer
       @backpressure_paused = Concurrent::AtomicBoolean.new
+      @tpl = build_tpl(topic, partition)
       setup_async_processing
     end
 
@@ -63,6 +65,7 @@ module Racecar
         topic: @topic,
         partition: @partition,
         pause: Pause.new_from_config(config),
+        rdkafka_consumer: @rdkafka_consumer,
       )
       @queue  = Queue.new
       @thread = nil
@@ -98,7 +101,7 @@ module Racecar
     def maybe_apply_backpressure
       if @queue.size >= config.multithreaded_processing_max_queue_size
         @backpressure_paused.make_true
-        consumer.pause(@topic, @partition)
+        @rdkafka_consumer.pause(@tpl)
         logger.debug "Paused partition #{@topic}/#{@partition}: queue reached capacity (#{@queue.size}/#{config.multithreaded_processing_max_queue_size})"
       end
     end
@@ -106,7 +109,13 @@ module Racecar
     def maybe_resume_the_partition
       if @backpressure_paused.true? && @queue.size < config.multithreaded_processing_resume_threshold * config.multithreaded_processing_max_queue_size
         @backpressure_paused.make_false
-        consumer.resume(@topic, @partition)
+        @rdkafka_consumer.resume(@tpl)
+      end
+    end
+
+    def build_tpl(topic, partition)
+      Rdkafka::Consumer::TopicPartitionList.new.tap do |tpl|
+        tpl.add_topic_and_partitions_with_offsets(topic, partition => -1001)
       end
     end
 

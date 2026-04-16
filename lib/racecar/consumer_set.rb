@@ -52,7 +52,11 @@ module Racecar
       messages
     end
 
-    def store_offset(message)
+    def store_offset(message, raw_consumer = nil)
+      if raw_consumer
+        raw_consumer.store_offset(message)
+        return
+      end
       found_consumer, _ = find_consumer_by(message.topic, message.partition)
       unless found_consumer
         @logger.warn "Attempted to store_offset for unassigned topic/partition #{message.topic}/#{message.partition}"

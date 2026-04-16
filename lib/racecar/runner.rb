@@ -138,31 +138,29 @@ module Racecar
       partition_processors.delete(key) if partition_processors[key]&.rebalancing_or_shutting_down?
       return partition_processors[key] if partition_processors[key]
 
-      if config.multithreaded_processing_enabled
-        @mutex.synchronize do
-          processor = AsyncPartitionProcessor.new(
-            **common_processor_params,
-            consumer_class: consumer_class,
-            topic: topic,
-            partition: partition,
-          )
-          partition_processors[key] = processor
-        end
+      processor = if config.multithreaded_processing_enabled
+        AsyncPartitionProcessor.new(
+          **common_processor_params,
+          consumer_class: consumer_class,
+          topic: topic,
+          partition: partition,
+          rdkafka_consumer: consumer.current,
+        )
       else
-        processor = PartitionProcessor.new(
+        PartitionProcessor.new(
           **common_processor_params,
           consumer_class_instance: @consumer_class_instance,
           topic: topic,
           partition: partition,
           pause: Pause.new_from_config(config),
         )
-        partition_processors[key] = processor
       end
+      partition_processors[key] = processor
     end
 
     def shutdown_processors_and_wait
       if config.multithreaded_processing_enabled
-        processors_snapshot = @mutex.synchronize { partition_processors.values }
+        processors_snapshot = partition_processors.values
         processors_snapshot.each { |processor| processor.shut_down! if processor }
         processors_snapshot.each do |processor|
           if processor.respond_to?(:thread)
