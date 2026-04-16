@@ -5,7 +5,7 @@ require 'concurrent-ruby'
 
 module Racecar
   class AsyncPartitionProcessor
-    attr_reader :thread, :queue, :config, :processor, :logger, :consumer, :consumer_class, :instrumenter, :backpressure_paused
+    attr_reader :thread
 
     THREAD_KEY_IDENTIFIER = 'racecar_topic_partition_identifier'.freeze
 
@@ -55,6 +55,8 @@ module Racecar
 
     private
 
+    attr_reader :backpressure_paused, :instrumenter, :consumer_class, :consumer, :queue, :config, :processor, :logger
+
     def setup_async_processing
       @processor = PartitionProcessor.new(
         config: config,
@@ -99,7 +101,7 @@ module Racecar
     end
 
     def maybe_apply_backpressure
-      if @queue.size >= config.multithreaded_processing_max_queue_size
+      if @backpressure_paused.false? && @queue.size >= config.multithreaded_processing_max_queue_size
         @backpressure_paused.make_true
         @rdkafka_consumer.pause(@tpl)
         logger.debug "Paused partition #{@topic}/#{@partition}: queue reached capacity (#{@queue.size}/#{config.multithreaded_processing_max_queue_size})"

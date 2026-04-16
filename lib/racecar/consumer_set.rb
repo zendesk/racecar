@@ -6,11 +6,10 @@ module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10
 
-    def initialize(config, logger, partition_processors, runner_mutex, instrumenter = NullInstrumenter)
+    def initialize(config, logger, partition_processors, instrumenter = NullInstrumenter)
       @config, @logger = config, logger
       @instrumenter = instrumenter
       @partition_processors = partition_processors
-      @runner_mutex = runner_mutex
       raise ArgumentError, "Subscriptions must not be empty when subscribing" if @config.subscriptions.empty?
 
       @consumers = []
@@ -79,8 +78,7 @@ module Racecar
 
     def close
       each_subscribed(&:close)
-      @producer&.close
-      @producer = nil
+      reset_producer!
     end
 
     def producer
@@ -101,7 +99,7 @@ module Racecar
     def current
       @consumers[@consumer_id_iterator.peek] ||= begin
         consumer_config = Rdkafka::Config.new(rdkafka_config(current_subscription))
-        listener = RebalanceListener.new(@config, @instrumenter, @partition_processors, @runner_mutex)
+        listener = RebalanceListener.new(@config, @instrumenter, @partition_processors)
         consumer_config.consumer_rebalance_listener = listener
         consumer = consumer_config.consumer
         listener.rdkafka_consumer = consumer

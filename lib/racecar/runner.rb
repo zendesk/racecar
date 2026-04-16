@@ -18,7 +18,6 @@ module Racecar
       @instrumenter = instrumenter
       @stop_requested = false
       @partition_processors = Concurrent::Hash.new
-      @mutex = Mutex.new
       @consumer_class_instance = consumer_class.new
       if @consumer_class_instance.respond_to?(:statistics_callback) && Rdkafka::Config.statistics_callback.nil?
         Rdkafka::Config.statistics_callback = @consumer_class_instance.method(:statistics_callback).to_proc
@@ -94,7 +93,7 @@ module Racecar
 
     def consumer
       @consumer ||= begin
-        ConsumerSet.new(config, logger, @partition_processors, @mutex, @instrumenter)
+        ConsumerSet.new(config, logger, @partition_processors, @instrumenter)
       end
     end
 
