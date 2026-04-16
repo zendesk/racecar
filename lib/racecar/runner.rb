@@ -134,7 +134,6 @@ module Racecar
       topic     = messages.is_a?(Array) ? messages.first.topic     : messages.topic
       partition = messages.is_a?(Array) ? messages.first.partition : messages.partition
       key = Runner.topic_partition_key(topic, partition)
-      partition_processors.delete(key) if partition_processors[key]&.rebalancing_or_shutting_down?
       return partition_processors[key] if partition_processors[key]
 
       processor = if config.multithreaded_processing_enabled
@@ -180,7 +179,7 @@ module Racecar
     end
 
     def resume_all_paused_partitions
-      partition_processors.values.each(&:resume_paused_partition)
+      partition_processors.values.reject(&:rebalancing_or_shutting_down?).each(&:resume_paused_partition)
     end
 
     def common_processor_params

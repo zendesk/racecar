@@ -52,16 +52,8 @@ module Racecar
     end
 
     def store_offset(message, raw_consumer = nil)
-      if raw_consumer
-        raw_consumer.store_offset(message)
-        return
-      end
-      found_consumer, _ = find_consumer_by(message.topic, message.partition)
-      unless found_consumer
-        @logger.warn "Attempted to store_offset for unassigned topic/partition #{message.topic}/#{message.partition}"
-        return
-      end
-      found_consumer.store_offset(message)
+      consumer = raw_consumer || current
+      consumer.store_offset(message)
     rescue Rdkafka::RdkafkaError => e
       if e.code == :state # -172
         @logger.warn "Attempted to store_offset, but we're not subscribed to it: #{ErroneousStateError.new(e)}"

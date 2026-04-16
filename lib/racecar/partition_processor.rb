@@ -48,7 +48,9 @@ module Racecar
 
       with_error_handling(message, payload) do |pause|
         @instrumenter.instrument("process_message", payload) do
-          reconfigure_consumer_class_instance! if consumer_class_instance.instance_variable_get(:@producer)&.closed?
+          if @config.multithreaded_processing_enabled && consumer_class_instance.instance_variable_get(:@producer)&.closed?
+            reconfigure_consumer_class_instance!
+          end
           consumer_class_instance.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
           consumer_class_instance.deliver!
           consumer.store_offset(message, @rdkafka_consumer) unless rebalancing
@@ -74,7 +76,9 @@ module Racecar
           racecar_messages = messages.map do |message|
             Racecar::Message.new(message, retries_count: pause.pauses_count)
           end
-          reconfigure_consumer_class_instance! if consumer_class_instance.instance_variable_get(:@producer)&.closed?
+          if @config.multithreaded_processing_enabled && consumer_class_instance.instance_variable_get(:@producer)&.closed?
+            reconfigure_consumer_class_instance!
+          end
           consumer_class_instance.process_batch(racecar_messages)
           consumer_class_instance.deliver!
           consumer.store_offset(messages.last, @rdkafka_consumer) unless rebalancing
@@ -89,7 +93,7 @@ module Racecar
     end
 
     def resume_paused_partition
-      return if config.pause_timeout == 0
+      return if config.pause_timeout == 0 || !pause.paused?
 
       @instrumenter.instrument("pause_status", {
         topic:          topic,
@@ -151,6 +155,7 @@ module Racecar
             Thread.exit if rebalancing
             break if shutting_down || config.pause_timeout <= 0
           else
+            handle_processing_error(e, payload, pause: pause)
             break
           end
         end

@@ -31,6 +31,7 @@ module Racecar
             key = Runner.topic_partition_key(topic, partition)
             processor = @partition_processors[key]
             processor&.rebalance!
+            @partition_processors.delete(key)
           end
         end
       end
