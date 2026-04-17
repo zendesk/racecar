@@ -70,6 +70,7 @@ module Racecar
 
     def close
       each_subscribed(&:close)
+    ensure
       reset_producer!
     end
 
