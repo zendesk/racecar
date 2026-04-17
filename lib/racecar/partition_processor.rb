@@ -93,7 +93,7 @@ module Racecar
     end
 
     def resume_paused_partition
-      return if config.pause_timeout == 0 || !pause.paused?
+      return if config.pause_timeout == 0
 
       @instrumenter.instrument("pause_status", {
         topic:          topic,
