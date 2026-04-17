@@ -13,6 +13,11 @@ module Racecar
   class Runner
     attr_reader :consumer_class, :config, :logger, :partition_processors
 
+    # Kept for backward compatibility — external code calls `processor`.
+    def processor
+      @consumer_class_instance
+    end
+
     def initialize(consumer_class, config:, logger:, instrumenter: NullInstrumenter)
       @consumer_class, @config, @logger = consumer_class, config, logger
       @instrumenter = instrumenter
