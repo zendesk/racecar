@@ -8,7 +8,7 @@ RSpec.describe "multithreaded processing", type: :integration do
   let(:group_id)     { generate_group_id }
 
   before do
-    Racecar.config.multithreaded_processing_enabled = true
+    consumer_class.multithreaded_processing_enabled = true
     Racecar.config.multithreaded_processing_max_queue_size = 100
     Racecar.config.max_wait_time = 0.1
   end

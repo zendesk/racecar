@@ -38,7 +38,7 @@ module Racecar
       install_signal_handlers
       @stop_requested = false
 
-      unless config.multithreaded_processing_enabled
+      unless @consumer_class_instance.class.multithreaded_processing_enabled
         @consumer_class_instance.configure(
           producer:     consumer.producer,
           consumer:     consumer,
@@ -58,7 +58,7 @@ module Racecar
 
           @instrumenter.instrument("start_main_loop", loop_payload)
           @instrumenter.instrument("main_loop", loop_payload) do
-            resume_all_paused_partitions unless config.multithreaded_processing_enabled
+            resume_all_paused_partitions unless @consumer_class_instance.class.multithreaded_processing_enabled
 
             case process_method
             when :batch then
@@ -141,7 +141,7 @@ module Racecar
       key = Runner.topic_partition_key(topic, partition)
       return partition_processors[key] if partition_processors[key]
 
-      processor = if config.multithreaded_processing_enabled
+      processor = if @consumer_class_instance.class.multithreaded_processing_enabled
         AsyncPartitionProcessor.new(
           **common_processor_params,
           consumer_class: consumer_class,
@@ -162,7 +162,7 @@ module Racecar
     end
 
     def shutdown_processors_and_wait
-      if config.multithreaded_processing_enabled
+      if @consumer_class_instance.class.multithreaded_processing_enabled
         processors_snapshot = partition_processors.values
         processors_snapshot.each { |processor| processor.shut_down! if processor }
         processors_snapshot.each do |processor|

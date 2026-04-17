@@ -253,7 +253,7 @@ module IntegrationHelper
 
   def start_consumer_for(topic, g_id)
     config = Racecar::Config.new
-    config.multithreaded_processing_enabled        = true
+    consumer_class.multithreaded_processing_enabled = true
     config.multithreaded_processing_max_queue_size = 100
     config.max_wait_time    = 0.1
     config.group_id         = g_id

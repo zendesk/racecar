@@ -194,9 +194,6 @@ module Racecar
     desc "Strategy for switching topics when there are multiple subscriptions. `exhaust-topic` will only switch when the consumer poll returns no messages. `round-robin` will switch after each poll regardless.\nWarning: `round-robin` will be the default in Racecar 3.x"
     string :multi_subscription_strategy, allowed_values: %w(round-robin exhaust-topic), default: "exhaust-topic"
 
-    desc "Whether multithreaded processing is enabled"
-    boolean :multithreaded_processing_enabled, default: false
-
     desc "Max size of the queue of messages waiting to be processed when multithreaded processing is enabled"
     integer :multithreaded_processing_max_queue_size, default: 1000
 

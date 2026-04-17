@@ -20,7 +20,7 @@ module Racecar
       @consumer = consumer
       @rdkafka_consumer = rdkafka_consumer
 
-      if config.multithreaded_processing_enabled
+      if @consumer_class_instance.class.multithreaded_processing_enabled
         consumer_class_instance.configure(
           producer:     consumer.producer,
           consumer:     @consumer,
@@ -48,7 +48,7 @@ module Racecar
 
       with_error_handling(message, payload) do |pause|
         @instrumenter.instrument("process_message", payload) do
-          if @config.multithreaded_processing_enabled && consumer_class_instance.instance_variable_get(:@producer)&.closed?
+          if @consumer_class_instance.class.multithreaded_processing_enabled && consumer_class_instance.instance_variable_get(:@producer)&.closed?
             reconfigure_consumer_class_instance!
           end
           consumer_class_instance.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
@@ -76,7 +76,7 @@ module Racecar
           racecar_messages = messages.map do |message|
             Racecar::Message.new(message, retries_count: pause.pauses_count)
           end
-          if @config.multithreaded_processing_enabled && consumer_class_instance.instance_variable_get(:@producer)&.closed?
+          if @consumer_class_instance.class.multithreaded_processing_enabled && consumer_class_instance.instance_variable_get(:@producer)&.closed?
             reconfigure_consumer_class_instance!
           end
           consumer_class_instance.process_batch(racecar_messages)
@@ -127,7 +127,7 @@ module Racecar
     private
 
     def with_error_handling(messages, payload)
-      if config.multithreaded_processing_enabled
+      if @consumer_class_instance.class.multithreaded_processing_enabled
         with_multi_threaded_error_handling(messages, payload) { |pause| yield(pause) }
       else
         with_single_threaded_error_handling(messages, payload) { |pause| yield(pause) }
