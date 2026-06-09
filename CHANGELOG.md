@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 3.0.0
+
+* Introduce multithreaded processing: when enabled, Racecar processes each assigned partition on its own dedicated thread. Disabled by default and gated behind the `multithreaded_processing_enabled` config.
+* Refactor of the Racecar architecture: introduction of `PartitionProcessor` and `AsyncPartitionProcessor` handling the processing of messages.
+* [Racecar::Config] Add `multithreaded_processing_enabled` (default `false`) to enable multithreaded processing. Can be set via `RACECAR_MULTITHREADED_PROCESSING_ENABLED=1`.
+* [Racecar::Config] Add `multithreaded_processing_max_queue_size` (default `1000`) to cap the number of messages queued per partition before backpressure is applied.
+* [Racecar::Config] Add `multithreaded_processing_resume_threshold` (default `0.5`) controlling the queue fill ratio at which a paused partition is resumed.
+* [Racecar::Config] Add `multithreaded_processing_shutdown_timeout` (default `300`) for how long the main thread waits on each processing thread during graceful shutdown.
+* Apply backpressure when multithreaded processing is enabled: a partition is paused once its queue reaches `multithreaded_processing_max_queue_size` and resumed once it drains below `multithreaded_processing_resume_threshold` of that size.
+* Gracefully drain queued messages and exit per-partition threads on rebalance and shutdown.
+
 ## 2.12.0
 
 * Add tests against Ruby 3.4
