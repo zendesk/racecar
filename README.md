@@ -134,6 +134,42 @@ end
 
 This is useful to do any one-off work that you wouldn't want to do for each and every message.
 
+#### Multithreaded message processing (experimental)
+
+Warning - limited battle testing in production environments; use at your own risk!
+
+By default a Racecar consumer processes all of its assigned partitions on a single thread. When `multithreaded_processing_enabled` is set, the consumer instead spins up one dedicated thread per assigned partition, so partitions are processed concurrently within a single process. This is an alternative to [parallel workers](#running-consumers-in-parallel-experimental) that avoids forking extra processes (and the associated memory overhead), at the cost of running your consumer code on multiple threads.
+
+Each partition thread gets its own instance of your consumer class, so **your consumer code does not need to be thread-safe** - a thread never shares its instance (or its instance state) with another partition. The main thread keeps polling Kafka and hands each partition's messages off to the relevant thread via a bounded queue; if a thread falls behind and its queue fills up, the partition is paused until the queue drains, applying backpressure rather than growing memory without bound.
+
+**Warning:** the number of threads scales with the number of assigned partitions, which can be large. Since each thread runs its own consumer instance, every resource that instance acquires (database connections, file handles, network sockets, HTTP clients, etc.) is multiplied by the number of partition threads. Make sure your consumer releases any resource it grabs and that any connection pools or other shared limits are sized to accommodate the resulting concurrency.
+
+Enable it via config (or the `RACECAR_MULTITHREADED_PROCESSING_ENABLED=1` environment variable):
+
+```ruby
+Racecar.configure do |config|
+  config.multithreaded_processing_enabled = true
+end
+
+class ResizeImagesConsumer < Racecar::Consumer
+  subscribes_to "images"
+
+  def process(message)
+    # This runs on a thread dedicated to message.partition.
+    # @state below is private to this partition's thread.
+    @state ||= {}
+    Image.resize(message.value)
+  end
+end
+```
+
+The behaviour can be tuned with the following options:
+
+- `multithreaded_processing_enabled` – Enable per-partition threads. Default is `false`.
+- `multithreaded_processing_max_queue_size` – Maximum number of queued message batches per partition before the partition is paused to apply backpressure. Default is `1000`.
+- `multithreaded_processing_resume_threshold` – A paused partition is resumed once its queue drains below this fraction of `multithreaded_processing_max_queue_size`. Default is `0.5` (50%).
+- `multithreaded_processing_shutdown_timeout` – How many seconds to wait for each partition thread to finish during graceful shutdown. Default is `300`.
+
 #### Setting the starting position
 
 When a consumer is started for the first time, it needs to decide where in each partition to start. By default, it will start at the _beginning_, meaning that all past messages will be processed. If you want to instead start at the _end_ of each partition, change your `subscribes_to` like this:
