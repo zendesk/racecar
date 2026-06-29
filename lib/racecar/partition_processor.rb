@@ -19,6 +19,18 @@ module Racecar
       @partition = partition
       @consumer = consumer
       @rdkafka_consumer = rdkafka_consumer
+
+      if @config.multithreaded_processing_enabled
+        consumer_class_instance.configure(
+          producer:     consumer.producer,
+          consumer:     @consumer,
+          instrumenter: @instrumenter,
+          config:       @config,
+        )
+      end
+
+      @sleep_mutex = Mutex.new
+      @sleep_cv = ConditionVariable.new
     end
 
     def process(message)
@@ -36,6 +48,8 @@ module Racecar
 
       with_error_handling(message, payload) do |pause|
         @instrumenter.instrument("process_message", payload) do
+          reconfigure_if_producer_closed!
+          exit_if_rebalancing!
           consumer_class_instance.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
           consumer_class_instance.deliver!
           consumer.store_offset(message, @rdkafka_consumer) unless rebalancing
@@ -61,6 +75,8 @@ module Racecar
           racecar_messages = messages.map do |message|
             Racecar::Message.new(message, retries_count: pause.pauses_count)
           end
+          reconfigure_if_producer_closed!
+          exit_if_rebalancing!
           consumer_class_instance.process_batch(racecar_messages)
           consumer_class_instance.deliver!
           consumer.store_offset(messages.last, @rdkafka_consumer) unless rebalancing
@@ -93,10 +109,12 @@ module Racecar
 
     def rebalance!
       @rebalancing = true
+      @sleep_mutex.synchronize { @sleep_cv.signal }
     end
 
     def shut_down!
       @shutting_down = true
+      @sleep_mutex.synchronize { @sleep_cv.signal }
       resume_paused_partition
     end
 
@@ -107,7 +125,45 @@ module Racecar
     private
 
     def with_error_handling(messages, payload)
-      with_single_threaded_error_handling(messages, payload) { |pause| yield(pause) }
+      if @config.multithreaded_processing_enabled
+        with_multi_threaded_error_handling(messages, payload) { |pause| yield(pause) }
+      else
+        with_single_threaded_error_handling(messages, payload) { |pause| yield(pause) }
+      end
+    end
+
+    def with_multi_threaded_error_handling(messages, payload)
+      loop do
+        begin
+          yield(pause)
+          pause.reset!
+          break
+        rescue => e
+          if rebalancing
+            Thread.exit
+          elsif !shutting_down
+            handle_processing_error(e, payload, pause: pause)
+            pause.pause!
+
+            break if config.pause_timeout == 0
+
+            @sleep_mutex.synchronize do
+              next if rebalancing || shutting_down
+              if config.pause_timeout == -1
+                # Pause indefinitely. backoff_interval is Float::INFINITY here,
+                @sleep_cv.wait(@sleep_mutex)
+              else
+                @sleep_cv.wait(@sleep_mutex, pause.backoff_interval)
+              end
+            end
+            Thread.exit if rebalancing
+            break if shutting_down
+          else
+            handle_processing_error(e, payload, pause: pause)
+            break
+          end
+        end
+      end
     end
 
     def with_single_threaded_error_handling(messages, payload)
@@ -151,6 +207,21 @@ module Racecar
     def reset_producer!
       consumer.reset_producer!
       reconfigure_consumer_class_instance!
+    end
+
+    def reconfigure_if_producer_closed!
+      return unless @config.multithreaded_processing_enabled
+      return unless consumer_class_instance.instance_variable_get(:@producer)&.closed?
+
+      reconfigure_consumer_class_instance!
+    end
+
+    def exit_if_rebalancing!
+      return unless @config.multithreaded_processing_enabled
+      if rebalancing
+        logger.info "Exiting processing thread for #{topic}/#{partition} due to rebalancing"
+        Thread.exit
+      end
     end
 
     def reconfigure_consumer_class_instance!

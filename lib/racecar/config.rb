@@ -194,6 +194,18 @@ module Racecar
     desc "Strategy for switching topics when there are multiple subscriptions. `exhaust-topic` will only switch when the consumer poll returns no messages. `round-robin` will switch after each poll regardless.\nWarning: `round-robin` will be the default in Racecar 3.x"
     string :multi_subscription_strategy, allowed_values: %w(round-robin exhaust-topic), default: "exhaust-topic"
 
+    desc "Enable multithreaded processing (one thread per partition). Set `RACECAR_MULTITHREADED_PROCESSING_ENABLED=1` to enable."
+    boolean :multithreaded_processing_enabled, default: false
+
+    desc "Max size of the queue of messages waiting to be processed when multithreaded processing is enabled"
+    integer :multithreaded_processing_max_queue_size, default: 1000
+
+    desc "Timeout in seconds for the main thread to wait for a processing thread to finish when shutting down the consumer with multithreaded processing enabled"
+    integer :multithreaded_processing_shutdown_timeout, default: 300
+
+    desc "Multi threaded queue resume threshold as a percentage of `multithreaded_processing_max_queue_size`. Defaults to 0.5, meaning that the consumer will attempt to resume a paused partition when the queue size drops below 50% of the max queue size."
+    float :multithreaded_processing_resume_threshold, default: 0.5
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 

@@ -8,6 +8,7 @@ require "racecar/message_delivery_error"
 require "racecar/erroneous_state_error"
 require "racecar/delivery_callback"
 require "racecar/partition_processor"
+require "racecar/async_partition_processor"
 
 module Racecar
   class Runner
@@ -22,7 +23,7 @@ module Racecar
       @consumer_class, @config, @logger = consumer_class, config, logger
       @instrumenter = instrumenter
       @stop_requested = false
-      @partition_processors = Hash.new
+      @partition_processors = Concurrent::Hash.new
       @consumer_class_instance = consumer_class.new
       if @consumer_class_instance.respond_to?(:statistics_callback) && Rdkafka::Config.statistics_callback.nil?
         Rdkafka::Config.statistics_callback = @consumer_class_instance.method(:statistics_callback).to_proc
@@ -38,12 +39,14 @@ module Racecar
       install_signal_handlers
       @stop_requested = false
 
-      @consumer_class_instance.configure(
-        producer:     consumer.producer,
-        consumer:     consumer,
-        instrumenter: @instrumenter,
-        config:       config,
-      )
+      unless config.multithreaded_processing_enabled
+        @consumer_class_instance.configure(
+          producer:     consumer.producer,
+          consumer:     consumer,
+          instrumenter: @instrumenter,
+          config:       config,
+        )
+      end
 
       loop_payload = {
         consumer_class: consumer_class.to_s,
@@ -56,7 +59,7 @@ module Racecar
 
           @instrumenter.instrument("start_main_loop", loop_payload)
           @instrumenter.instrument("main_loop", loop_payload) do
-            resume_all_paused_partitions
+            resume_all_paused_partitions unless config.multithreaded_processing_enabled
 
             case process_method
             when :batch then
@@ -139,21 +142,47 @@ module Racecar
       key = Runner.topic_partition_key(topic, partition)
       return partition_processors[key] if partition_processors[key]
 
-      processor = PartitionProcessor.new(
-        **common_processor_params,
-        consumer_class_instance: @consumer_class_instance,
-        topic: topic,
-        partition: partition,
-        pause: Pause.new_from_config(config),
-      )
+      processor = if config.multithreaded_processing_enabled
+        AsyncPartitionProcessor.new(
+          **common_processor_params,
+          consumer_class: consumer_class,
+          topic: topic,
+          partition: partition,
+          rdkafka_consumer: consumer.current,
+        )
+      else
+        PartitionProcessor.new(
+          **common_processor_params,
+          consumer_class_instance: @consumer_class_instance,
+          topic: topic,
+          partition: partition,
+          pause: Pause.new_from_config(config),
+        )
+      end
       partition_processors[key] = processor
     end
 
     def shutdown_processors_and_wait
-      begin
-        @consumer_class_instance.deliver!
-      ensure
-        @consumer_class_instance.teardown
+      if config.multithreaded_processing_enabled
+        processors_snapshot = partition_processors.values
+        processors_snapshot.each { |processor| processor.shut_down! if processor }
+        processors_snapshot.each do |processor|
+          if processor.respond_to?(:thread)
+            begin
+              raise Timeout::Error unless processor.thread.join(config.multithreaded_processing_shutdown_timeout)
+            rescue Timeout::Error
+              logger.error "Processor thread for #{processor.thread_key} did not finish within #{config.multithreaded_processing_shutdown_timeout} seconds. It may be stuck in a long-running process or blocked on I/O."
+            rescue => e
+              logger.error "Error while waiting for processor thread to finish: #{e}"
+            end
+          end
+        end
+      else
+        begin
+          @consumer_class_instance.deliver!
+        ensure
+          @consumer_class_instance.teardown
+        end
       end
     end
 

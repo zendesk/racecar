@@ -179,6 +179,9 @@ class FakeProducer
 
   def close
   end
+
+  def closed?
+  end
 end
 
 FakeDeliveryReport = Struct.new(:partition, :offset, :error, :topic_name)
