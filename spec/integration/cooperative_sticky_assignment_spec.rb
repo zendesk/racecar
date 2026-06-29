@@ -41,12 +41,13 @@ RSpec.describe "cooperative-sticky assignment", type: :integration do
       publish_messages
       wait_for_a_few_messages
 
+      revocations_before_termination = revocation_events.dup
       terminate_consumer1
 
       wait_for_all_messages
 
       aggregate_failures do
-        expect_consumer0_did_not_have_partitions_revoked_but_consumer1_did
+        expect_consumer0_did_not_have_partitions_revoked_but_consumer1_did(revocations_before_termination)
         expect_consumer0_took_over_processing_from_consumer1
       end
     end
@@ -61,10 +62,11 @@ RSpec.describe "cooperative-sticky assignment", type: :integration do
       expect(consumer0_partitions).to include(consumer1_partition)
     end
 
-    def expect_consumer0_did_not_have_partitions_revoked_but_consumer1_did
-      revocations_by_consumer_thread_id = revocation_events.group_by { |e| e.fetch("consumer_id") }
+    def expect_consumer0_did_not_have_partitions_revoked_but_consumer1_did(revocations_before_termination)
+      revocations_after_termination = revocation_events - revocations_before_termination
 
-      revocations_by_consumer_index = revocations_by_consumer_thread_id
+      revocations_by_consumer_index = revocations_after_termination
+        .group_by { |e| e.fetch("consumer_id") }
         .transform_keys { |consumer_id| consumer_index_by_id.fetch(consumer_id) }
 
       expect(revocations_by_consumer_index.keys).to eq([1])
