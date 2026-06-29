@@ -78,7 +78,7 @@ RSpec.describe "cooperative-sticky assignment", type: :integration do
     end
 
     def start_consumer
-      runner = Racecar.runner(consumer_class.new)
+      runner = Racecar.runner(consumer_class)
 
       thread = Thread.new do
         Thread.current.name = "Racecar runner #{consumers.size}"

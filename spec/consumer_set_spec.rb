@@ -15,7 +15,8 @@ end
 RSpec.describe Racecar::ConsumerSet do
   let(:config)              { Racecar::Config.new }
   let(:rdconsumer)          { double("rdconsumer", subscribe: true) }
-  let(:rdconfig)            { double("rdconfig", consumer: rdconsumer, "consumer_rebalance_listener=": nil) }
+  let(:rdproducer)          { double("rdproducer", "delivery_callback=": nil, close: nil) }
+  let(:rdconfig)            { double("rdconfig", consumer: rdconsumer, producer: rdproducer, "consumer_rebalance_listener=": nil) }
   let(:logger)              { Logger.new(StringIO.new) }
   let(:instrumenter)        { Racecar::NullInstrumenter }
   let(:consumer_set)        { Racecar::ConsumerSet.new(config, logger, instrumenter) }
@@ -100,6 +101,7 @@ RSpec.describe Racecar::ConsumerSet do
           expect(rdconsumer).not_to receive(:resume)
           consumer_set.resume("greetings", 1)
         end
+
       end
 
       describe "#poll" do
@@ -203,9 +205,11 @@ RSpec.describe Racecar::ConsumerSet do
         end
 
         it "forwards to Rdkafka (as poll)" do
-          config.fetch_messages = 3
-          expect(rdconsumer).to receive(:poll).exactly(3).times.with(100).and_return(:msg1, :msg2, :msg3)
-          expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2, :msg3]
+          Timecop.freeze do
+            config.fetch_messages = 3
+            expect(rdconsumer).to receive(:poll).exactly(3).times.with(100).and_return(:msg1, :msg2, :msg3)
+            expect(consumer_set.batch_poll(100)).to eq [:msg1, :msg2, :msg3]
+          end
         end
 
         it "returns remaining messages of current partition" do
@@ -272,6 +276,43 @@ RSpec.describe Racecar::ConsumerSet do
         it "forwards to Rdkafka" do
           expect(rdconsumer).to receive(:close).once
           consumer_set.close
+        end
+
+        it "closes the producer if one was created" do
+          allow(rdconsumer).to receive(:close)
+          consumer_set.producer # trigger creation
+          expect(rdproducer).to receive(:close)
+          consumer_set.close
+        end
+      end
+
+      describe "#producer" do
+        it "returns a producer instance" do
+          expect(consumer_set.producer).to be rdproducer
+        end
+
+        it "returns the same producer on subsequent calls" do
+          first  = consumer_set.producer
+          second = consumer_set.producer
+          expect(first).to be second
+        end
+
+        it "sets a delivery callback on the producer" do
+          expect(rdproducer).to receive(:delivery_callback=).with(instance_of(Racecar::DeliveryCallback))
+          consumer_set.producer
+        end
+      end
+
+      describe "#reset_producer!" do
+        it "closes the old producer and returns a new one" do
+          consumer_set.producer # trigger creation
+          expect(rdproducer).to receive(:close).once
+
+          new_rdproducer = double("new_rdproducer", "delivery_callback=": nil)
+          allow(rdconfig).to receive(:producer).and_return(new_rdproducer)
+
+          consumer_set.reset_producer!
+          expect(consumer_set.producer).to be new_rdproducer
         end
       end
 
@@ -398,6 +439,7 @@ RSpec.describe Racecar::ConsumerSet do
         expect(rdconsumer3).not_to receive(:resume)
         consumer_set.resume("unknowntopic", 0)
       end
+
     end
 
     it "#poll retries upon max poll exceeded" do

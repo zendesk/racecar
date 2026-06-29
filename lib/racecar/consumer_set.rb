@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "racecar/delivery_callback"
+
 module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10
@@ -65,6 +67,19 @@ module Racecar
 
     def close
       each_subscribed(&:close)
+    ensure
+      reset_producer!
+    end
+
+    def producer
+      @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |p|
+        p.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
+      end
+    end
+
+    def reset_producer!
+      @producer&.close
+      @producer = nil
     end
 
     def current
@@ -84,9 +99,9 @@ module Racecar
 
     def each_subscribed
       if block_given?
-        @consumers.each { |c| yield c }
+        @consumers.compact.each { |c| yield c }
       else
-        @consumers.each
+        @consumers.compact.each
       end
     end
 
@@ -115,7 +130,7 @@ module Racecar
       consumer.resume(filtered_tpl)
     end
 
-    alias :each :each_subscribed
+  alias :each :each_subscribed
 
     # Subscribe to all topics eagerly, even if there's still messages elsewhere. Usually
     # that's not needed and Kafka might rebalance if topics are not polled frequently
@@ -260,6 +275,19 @@ module Racecar
     def remaining_time_ms(limit_ms, started_at_time)
       r = limit_ms - ((Time.now - started_at_time)*1000).round
       r <= 0 ? 0 : r
+    end
+
+    def producer_config
+      cfg = {
+        "bootstrap.servers"      => @config.brokers.join(","),
+        "client.id"              => @config.client_id,
+        "statistics.interval.ms" => @config.statistics_interval_ms,
+        "message.timeout.ms"     => @config.message_timeout * 1000,
+        "partitioner"            => @config.partitioner.to_s,
+      }
+      cfg["compression.codec"] = @config.producer_compression_codec.to_s unless @config.producer_compression_codec.nil?
+      cfg.merge!(@config.rdkafka_producer)
+      cfg
     end
   end
 end

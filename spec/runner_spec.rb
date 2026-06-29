@@ -9,12 +9,12 @@ class TestConsumer < Racecar::Consumer
 
   def initialize
     @messages = []
-    @processor_queue = []
+    @callbacks = []
     @torn_down = false
   end
 
   def on_message(&block)
-    @processor_queue << block
+    @callbacks << block
     self
   end
 
@@ -22,8 +22,8 @@ class TestConsumer < Racecar::Consumer
     raise message.value if message.value.is_a?(StandardError)
     @messages << message
 
-    processor = @processor_queue.shift || proc {}
-    processor.call(message)
+    callback = @callbacks.shift || proc {}
+    callback.call(message)
   end
 
   def teardown
@@ -42,11 +42,11 @@ class TestBatchConsumer < Racecar::Consumer
 
   def initialize
     @messages = []
-    @processor_queue = []
+    @callbacks = []
   end
 
   def on_message(&block)
-    @processor_queue << block
+    @callbacks << block
     self
   end
 
@@ -54,9 +54,9 @@ class TestBatchConsumer < Racecar::Consumer
     @messages += messages
 
     messages.each do |message|
-      processor = @processor_queue.shift || proc {}
+      callback = @callbacks.shift || proc {}
       raise message.value if message.value.is_a?(StandardError)
-      processor.call(message)
+      callback.call(message)
     end
   end
 end
@@ -305,7 +305,8 @@ RSpec.shared_examples "delivery error handling" do
         instance_of(Racecar::MessageDeliveryError),
         hash_including({unrecoverable_delivery_error: true})
       )
-    expect(processor).to receive(:configure)
+
+    expect(consumer_class_instance).to receive(:configure)
       .at_least(:twice)
       .and_call_original
 
@@ -338,12 +339,13 @@ RSpec.shared_examples "pause handling" do
     runner.run
 
     # expect no op
-    runner.send(:resume_paused_partitions)
+    topic_key = "greetings/0"
+    runner.partition_processors[topic_key].send(:resume_paused_partition)
     expect(kafka.consumers.first._paused).to eq true
 
     # expect to resume
     Timecop.freeze(later)
-    runner.send(:resume_paused_partitions)
+    runner.partition_processors[topic_key].send(:resume_paused_partition)
     expect(kafka.consumers.first._paused).to eq false
   end
 
@@ -359,7 +361,9 @@ RSpec.shared_examples "pause handling" do
     expect(kafka.consumers.first._paused).to eq true
 
     Timecop.freeze(later)
-    runner.send(:resume_paused_partitions)
+
+    topic_key = "greetings/0"
+    runner.partition_processors[topic_key].send(:resume_paused_partition)
     expect(kafka.consumers.first._paused).to eq false
 
     runner.run
@@ -396,23 +400,25 @@ RSpec.describe Racecar::Runner do
   let(:instrumenter) { FakeInstrumenter.new }
 
   let(:runner) do
-    Racecar::Runner.new(processor, config: config, logger: logger, instrumenter: instrumenter)
+    Racecar::Runner.new(consumer_class_instance.class, config: config, logger: logger, instrumenter: instrumenter)
   end
 
   before do
     allow(Rdkafka::Config).to receive(:new) { kafka }
+    allow(consumer_class_instance.class).to receive(:new).and_return(consumer_class_instance)
 
-    config.load_consumer_class(processor.class)
+    config.load_consumer_class(consumer_class_instance.class)
   end
 
   context "with a consumer class with a #process method" do
-    let(:processor) { TestConsumer.new }
+    let(:consumer_class_instance) { TestConsumer.new }
 
     include_examples "offset handling", "greetings"
     include_examples "pause handling"
 
     it "builds producer with all config options" do
       config.producer = ["hello=world", "hi=all"]
+      kafka.deliver_message("hello world", topic: "greetings")
 
       runner.run
 
@@ -424,7 +430,7 @@ RSpec.describe Racecar::Runner do
 
       runner.run
 
-      expect(processor.messages.map(&:value)).to eq ["hello world"]
+      expect(consumer_class_instance.messages.map(&:value)).to eq ["hello world"]
     end
 
     it "calls error handler when an exception is raised" do
@@ -524,7 +530,7 @@ RSpec.describe Racecar::Runner do
   end
 
   context "with a consumer class with multiple subscriptions" do
-    let(:processor) { TestMultiConsumer.new }
+    let(:consumer_class_instance) { TestMultiConsumer.new }
 
     include_examples "offset handling", "greetings"
     include_examples "pause handling"
@@ -535,7 +541,7 @@ RSpec.describe Racecar::Runner do
 
       runner.run
 
-      expect(processor.messages.map(&:value)).to eq ["to_greet", "to_second"]
+      expect(consumer_class_instance.messages.map(&:value)).to eq ["to_greet", "to_second"]
     end
 
     it "stores offset on correct consumer" do
@@ -553,7 +559,7 @@ RSpec.describe Racecar::Runner do
   end
 
   context "with a consumer class with a #process_batch method" do
-    let(:processor) { TestBatchConsumer.new }
+    let(:consumer_class_instance) { TestBatchConsumer.new }
 
     include_examples "offset handling", "greetings"
     include_examples "pause handling"
@@ -563,7 +569,7 @@ RSpec.describe Racecar::Runner do
 
       runner.run
 
-      expect(processor.messages.map(&:value)).to eq ["hello world"]
+      expect(consumer_class_instance.messages.map(&:value)).to eq ["hello world"]
     end
 
     it "calls error handler when an exception is raised" do
@@ -656,7 +662,7 @@ RSpec.describe Racecar::Runner do
   end
 
   context "with a consumer class with neither a #process or a #process_batch method" do
-    let(:processor) { TestNilConsumer.new }
+    let(:consumer_class_instance) { TestNilConsumer.new }
 
     it "raises NotImplementedError" do
       kafka.deliver_message("hello world", topic: "greetings")
@@ -672,7 +678,7 @@ RSpec.describe Racecar::Runner do
       def process_batch(batch, hello); end
     end
 
-    let(:processor) { TestInvalidConsumer.new }
+    let(:consumer_class_instance) { TestInvalidConsumer.new }
 
     it "raises NotImplementedError" do
       kafka.deliver_message("hello world", topic: "greetings")
@@ -682,7 +688,7 @@ RSpec.describe Racecar::Runner do
   end
 
   context "with a consumer that produces messages" do
-    let(:processor) { TestProducingConsumer.new }
+    let(:consumer_class_instance) { TestProducingConsumer.new }
 
     include_examples "offset handling", "numbers"
     include_examples "delivery error handling"
@@ -724,18 +730,41 @@ RSpec.describe Racecar::Runner do
   end
 
   context "with a batch consumer that produces messages" do
-    let(:processor) { TestProducingBatchConsumer.new }
+    let(:consumer_class_instance) { TestProducingBatchConsumer.new }
     include_examples "delivery error handling"
   end
 
+  context "resume_all_paused_partitions in single-threaded mode" do
+    let(:consumer_class_instance) { TestConsumer.new }
+
+    after { Timecop.return }
+
+    it "resumes all paused partitions when pause timeout expires" do
+      now = Time.local(2019, 6, 18, 14, 0, 0)
+      later = Time.local(2019, 6, 18, 14, 0, 30)
+
+      Timecop.freeze(now)
+      kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
+      runner.run
+      expect(kafka.consumers.first._paused).to eq true
+
+      # Calling the runner's resume method iterates all partition processors
+      Timecop.freeze(later)
+      runner.send(:resume_all_paused_partitions)
+
+      expect(kafka.consumers.first._paused).to eq false
+    end
+  end
+
   context "#stop" do
-    let(:processor) { TestConsumer.new }
+    let(:consumer_class_instance) { TestConsumer.new }
     let(:datadog) { double("Racecar::Datadog", close: nil) }
 
-    it "allows the processor to tear down resources" do
+    it "allows the consumer_class_instance to tear down resources" do
+      kafka.deliver_message("hello world", topic: "greetings")
       runner.run
 
-      expect(processor.torn_down?).to eq true
+      expect(consumer_class_instance.torn_down?).to eq true
     end
 
     context "when DataDog metrics are disabled" do
