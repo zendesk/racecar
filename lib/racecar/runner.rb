@@ -31,23 +31,9 @@ module Racecar
     end
 
     def setup_pauses
-      timeout = if config.pause_timeout == -1
-        nil
-      elsif config.pause_timeout == 0
-        # no op, handled elsewhere
-      elsif config.pause_timeout > 0
-        config.pause_timeout
-      else
-        raise ArgumentError, "Invalid value for pause_timeout: must be integer greater or equal -1"
-      end
-
       @pauses = Hash.new {|h, k|
         h[k] = Hash.new {|h2, k2|
-          h2[k2] = ::Racecar::Pause.new(
-            timeout:             timeout,
-            max_timeout:         config.max_pause_timeout,
-            exponential_backoff: config.pause_with_exponential_backoff
-          )
+          h2[k2] = ::Racecar::Pause.new_from_config(config)
         }
       }
     end
