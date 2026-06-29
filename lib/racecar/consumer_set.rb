@@ -6,9 +6,10 @@ module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10
 
-    def initialize(config, logger, instrumenter = NullInstrumenter)
+    def initialize(config, logger, partition_processors, instrumenter = NullInstrumenter)
       @config, @logger = config, logger
       @instrumenter = instrumenter
+      @partition_processors = partition_processors
       raise ArgumentError, "Subscriptions must not be empty when subscribing" if @config.subscriptions.empty?
 
       @consumers = []
@@ -49,8 +50,9 @@ module Racecar
       messages
     end
 
-    def store_offset(message)
-      current.store_offset(message)
+    def store_offset(message, raw_consumer = nil)
+      consumer = raw_consumer || current
+      consumer.store_offset(message)
     rescue Rdkafka::RdkafkaError => e
       if e.code == :state # -172
         @logger.warn "Attempted to store_offset, but we're not subscribed to it: #{ErroneousStateError.new(e)}"
@@ -85,7 +87,7 @@ module Racecar
     def current
       @consumers[@consumer_id_iterator.peek] ||= begin
         consumer_config = Rdkafka::Config.new(rdkafka_config(current_subscription))
-        listener = RebalanceListener.new(@config.consumer_class, @instrumenter)
+        listener = RebalanceListener.new(@config, @instrumenter, @partition_processors)
         consumer_config.consumer_rebalance_listener = listener
         consumer = consumer_config.consumer
         listener.rdkafka_consumer = consumer

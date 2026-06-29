@@ -7,6 +7,7 @@ require "racecar/delivery_callback"
 module Racecar
   class PartitionProcessor
     attr_reader :consumer_class_instance, :config, :logger, :instrumenter, :consumer, :topic, :partition, :pause
+    attr_accessor :rebalancing, :shutting_down
 
     def initialize(config:, logger:, instrumenter:, consumer_class_instance:, consumer:, topic:, partition:, pause:, rdkafka_consumer: nil)
       @config = config
@@ -37,7 +38,7 @@ module Racecar
         @instrumenter.instrument("process_message", payload) do
           consumer_class_instance.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
           consumer_class_instance.deliver!
-          consumer.store_offset(message)
+          consumer.store_offset(message, @rdkafka_consumer) unless rebalancing
         end
       end
     end
@@ -62,13 +63,13 @@ module Racecar
           end
           consumer_class_instance.process_batch(racecar_messages)
           consumer_class_instance.deliver!
-          consumer.store_offset(messages.last)
+          consumer.store_offset(messages.last, @rdkafka_consumer) unless rebalancing
         end
       end
     end
 
     def teardown
-      consumer_class_instance.deliver!
+      consumer_class_instance.deliver! unless rebalancing
     ensure
       consumer_class_instance.teardown
     end
@@ -90,9 +91,26 @@ module Racecar
       end
     end
 
+    def rebalance!
+      @rebalancing = true
+    end
+
+    def shut_down!
+      @shutting_down = true
+      resume_paused_partition
+    end
+
+    def rebalancing_or_shutting_down?
+      rebalancing || shutting_down
+    end
+
     private
 
     def with_error_handling(messages, payload)
+      with_single_threaded_error_handling(messages, payload) { |pause| yield(pause) }
+    end
+
+    def with_single_threaded_error_handling(messages, payload)
       offsets = messages.is_a?(Array) ? messages.first.offset..messages.last.offset : messages.offset..messages.offset
       with_pause(offsets) do
         yield(pause)

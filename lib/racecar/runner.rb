@@ -63,13 +63,13 @@ module Racecar
               msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
               msg_per_part.each_value do |messages_per_partition|
                 processor = assign_and_get_processor(messages_per_partition)
-                processor&.process_batch(messages_per_partition)
+                processor&.process_batch(messages_per_partition) unless processor&.rebalancing_or_shutting_down?
               end
             when :single then
               message = consumer.poll(config.max_wait_time_ms)
               if message
                 processor = assign_and_get_processor(message)
-                processor&.process(message)
+                processor&.process(message) unless processor&.rebalancing_or_shutting_down?
               end
             end
           end
@@ -96,7 +96,7 @@ module Racecar
 
     def consumer
       @consumer ||= begin
-        ConsumerSet.new(config, logger, @instrumenter)
+        ConsumerSet.new(config, logger, @partition_processors, @instrumenter)
       end
     end
 
@@ -158,7 +158,7 @@ module Racecar
     end
 
     def resume_all_paused_partitions
-      partition_processors.values.each(&:resume_paused_partition)
+      partition_processors.values.reject(&:rebalancing_or_shutting_down?).each(&:resume_paused_partition)
     end
 
     def common_processor_params
