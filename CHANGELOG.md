@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+# 2.13.0
+* Move the per-message/per-batch processing and its instrumentation out of Runner and into a dedicated PartitionProcessor
+
 ## 2.12.0
 
 * Add tests against Ruby 3.4

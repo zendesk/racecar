@@ -6,6 +6,7 @@ require "racecar/message"
 require "racecar/message_delivery_error"
 require "racecar/erroneous_state_error"
 require "racecar/delivery_callback"
+require "racecar/partition_processor"
 
 module Racecar
   class Runner
@@ -15,6 +16,7 @@ module Racecar
       @processor, @config, @logger = processor, config, logger
       @instrumenter = instrumenter
       @stop_requested = false
+      @partition_processors = Hash.new
       Rdkafka::Config.logger = logger
 
       if processor.respond_to?(:statistics_callback)
@@ -22,6 +24,10 @@ module Racecar
       end
 
       setup_pauses
+    end
+
+    def self.topic_partition_key(topic, partition)
+      "#{topic}/#{partition}"
     end
 
     def setup_pauses
@@ -135,6 +141,15 @@ module Racecar
       end
     end
 
+    def assign_and_get_processor(messages)
+      topic     = messages.is_a?(Array) ? messages.first.topic     : messages.topic
+      partition = messages.is_a?(Array) ? messages.first.partition : messages.partition
+      key = Runner.topic_partition_key(topic, partition)
+      return @partition_processors[key] if @partition_processors[key]
+
+      @partition_processors[key] = PartitionProcessor.new(processor: processor, consumer: consumer, instrumenter: @instrumenter)
+    end
+
     def producer
       @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |producer|
         producer.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
@@ -167,25 +182,13 @@ module Racecar
     end
 
     def process(message)
-      instrumentation_payload = {
-        consumer_class: processor.class.to_s,
-        topic:          message.topic,
-        partition:      message.partition,
-        offset:         message.offset,
-        create_time:    message.timestamp,
-        key:            message.key,
-        value:          message.payload,
-        headers:        message.headers
-      }
+      processor = assign_and_get_processor(message)
+      instrumentation_payload = processor.message_payload(message)
 
       @instrumenter.instrument("start_process_message", instrumentation_payload)
       with_pause(message.topic, message.partition, message.offset..message.offset) do |pause|
         begin
-          @instrumenter.instrument("process_message", instrumentation_payload) do
-            processor.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
-            processor.deliver!
-            consumer.store_offset(message)
-          end
+          processor.process(message, pause.pauses_count, instrumentation_payload)
         rescue => e
           instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
           instrumentation_payload[:retries_count] = pause.pauses_count
@@ -196,28 +199,14 @@ module Racecar
     end
 
     def process_batch(messages)
-      first, last = messages.first, messages.last
-      instrumentation_payload = {
-        consumer_class: processor.class.to_s,
-        topic:          first.topic,
-        partition:      first.partition,
-        first_offset:   first.offset,
-        last_offset:    last.offset,
-        last_create_time: last.timestamp,
-        message_count:  messages.size
-      }
+      processor = assign_and_get_processor(messages)
+      instrumentation_payload = processor.batch_payload(messages)
 
       @instrumenter.instrument("start_process_batch", instrumentation_payload)
-      with_pause(first.topic, first.partition, first.offset..last.offset) do |pause|
+      first = messages.first
+      with_pause(first.topic, first.partition, first.offset..messages.last.offset) do |pause|
         begin
-          @instrumenter.instrument("process_batch", instrumentation_payload) do
-            racecar_messages = messages.map do |message|
-              Racecar::Message.new(message, retries_count: pause.pauses_count)
-            end
-            processor.process_batch(racecar_messages)
-            processor.deliver!
-            consumer.store_offset(messages.last)
-          end
+          processor.process_batch(messages, pause.pauses_count, instrumentation_payload)
         rescue => e
           instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
           instrumentation_payload[:retries_count] = pause.pauses_count
