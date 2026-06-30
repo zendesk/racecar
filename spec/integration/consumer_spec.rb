@@ -127,7 +127,7 @@ RSpec.describe "running a Racecar consumer", type: :integration do
         it "assigns all the consumers that it can, up to the total number of partitions" do
           start_racecar
 
-          wait_for_assignments(parallelism)
+          wait_for_assignments(topic_partitions)
           publish_messages
           wait_for_messages
 
