@@ -10,7 +10,8 @@ module Racecar
       raise ArgumentError, "Subscriptions must not be empty when subscribing" if @config.subscriptions.empty?
 
       @consumers = []
-      @consumer_id_iterator = (0...@config.subscriptions.size).cycle
+      @subscriptions_by_consumer = subscriptions_by_consumer
+      @consumer_id_iterator = (0...@subscriptions_by_consumer.size).cycle
 
       @previous_retries = 0
 
@@ -71,14 +72,15 @@ module Racecar
 
     def current
       @consumers[@consumer_id_iterator.peek] ||= begin
-        consumer_config = Rdkafka::Config.new(rdkafka_config(current_subscription))
+        subscriptions = current_subscriptions
+        consumer_config = Rdkafka::Config.new(rdkafka_config(subscriptions.first))
         listener = RebalanceListener.new(@config.consumer_class, @instrumenter)
         consumer_config.consumer_rebalance_listener = listener
         consumer = consumer_config.consumer
         listener.rdkafka_consumer = consumer
 
         @instrumenter.instrument('join_group') do
-          consumer.subscribe current_subscription.topic
+          consumer.subscribe(*subscriptions.map(&:topic))
         end
         consumer
       end
@@ -129,7 +131,7 @@ module Racecar
     # that's not needed and Kafka might rebalance if topics are not polled frequently
     # enough.
     def subscribe_all
-      @config.subscriptions.size.times do
+      @subscriptions_by_consumer.size.times do
         current
         select_next_consumer
       end
@@ -168,7 +170,7 @@ module Racecar
     rescue Rdkafka::RdkafkaError => e
       try += 1
       @instrumenter.instrument("poll_retry", try: try, rdkafka_time_limit: remain_ms, exception: e)
-      @logger.error "(try #{try}/#{MAX_POLL_TRIES}): Error for topic subscription #{current_subscription}: #{e}"
+      @logger.error "(try #{try}/#{MAX_POLL_TRIES}): Error for topic subscription(s) #{current_subscriptions.map(&:topic).join(", ")}: #{e}"
       raise if try >= MAX_POLL_TRIES
       retry
     end
@@ -199,8 +201,23 @@ module Racecar
       return nil, nil
     end
 
-    def current_subscription
-      @config.subscriptions[@consumer_id_iterator.peek]
+    # One entry per rdkafka consumer to create. With single_consumer enabled all
+    # subscriptions share one consumer; otherwise each subscription gets its own.
+    def subscriptions_by_consumer
+      return @config.subscriptions.map { |subscription| [subscription] } unless @config.single_consumer
+
+      settings = @config.subscriptions.map do |subscription|
+        [subscription.start_from_beginning, subscription.max_bytes_per_partition, subscription.additional_config]
+      end
+      if settings.uniq.size > 1
+        raise ArgumentError, "single_consumer requires all subscriptions to use the same start_from_beginning, max_bytes_per_partition and additional_config"
+      end
+
+      [@config.subscriptions]
+    end
+
+    def current_subscriptions
+      @subscriptions_by_consumer[@consumer_id_iterator.peek]
     end
 
     def reset_current_consumer

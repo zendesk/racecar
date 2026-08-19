@@ -194,6 +194,9 @@ module Racecar
     desc "Strategy for switching topics when there are multiple subscriptions. `exhaust-topic` will only switch when the consumer poll returns no messages. `round-robin` will switch after each poll regardless.\nWarning: `round-robin` will be the default in Racecar 3.x"
     string :multi_subscription_strategy, allowed_values: %w(round-robin exhaust-topic), default: "exhaust-topic"
 
+    desc "Whether to subscribe to all topics from a single Kafka consumer, rather than one consumer per subscription. Aligns partition assignment across co-partitioned topics. Requires all subscriptions to use the same start_from_beginning, max_bytes_per_partition and additional_config"
+    boolean :single_consumer, default: false
+
     # The error handler must be set directly on the object.
     attr_reader :error_handler
 

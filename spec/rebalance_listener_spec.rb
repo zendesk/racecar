@@ -31,6 +31,23 @@ RSpec.describe Racecar::RebalanceListener do
     end
   end
 
+  describe "#topic_partition_numbers" do
+    let(:partitions_by_topic_hash) do
+      {
+        "topic_a" => [double(:partition, partition: 0), double(:partition, partition: 1)],
+        "topic_b" => [double(:partition, partition: 2)],
+      }
+    end
+
+    it "exposes the partitions of every topic in the event" do
+      listener.on_partitions_assigned(rdkafka_topic_partition_list)
+
+      expect(consumer_class).to have_received(:on_partitions_assigned) do |rebalance_event|
+        expect(rebalance_event.topic_partition_numbers).to eq("topic_a" => [0, 1], "topic_b" => [2])
+      end
+    end
+  end
+
   describe "#on_partitions_revoked" do
     it "calls the consumer class' callback passing the rebalance event" do
       listener.on_partitions_revoked(rdkafka_topic_partition_list)

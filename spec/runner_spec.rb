@@ -99,25 +99,35 @@ class FakeConsumer
     @kafka = kafka
     @runner = runner
 
-    @topic = nil
-    @committed_offset = "not set yet"
-    @internal_offset = 0
+    @topics = nil
+    @committed_offsets = {}
+    @internal_offsets = Hash.new(0)
     @_paused = false
     @previous_messages = []
 
     @poll_count = 0
   end
 
-  attr_reader :topic, :committed_offset, :_paused
+  attr_reader :_paused, :committed_offsets
 
-  def subscribe(topic, **)
-    @topic ||= topic
-    raise "cannot handle more than one topic per consumer" if @topic != topic
+  def topic
+    @topics&.first
+  end
+
+  # Single-topic view used by the offset handling shared examples.
+  def committed_offset
+    @committed_offsets.fetch(topic, "not set yet")
+  end
+
+  def subscribe(*topics, **)
+    @topics ||= topics
+    raise "cannot change the subscription of a consumer" if @topics != topics
+    @poll_topic_iterator = @topics.cycle
   end
 
   def assignment
     Rdkafka::Consumer::TopicPartitionList.new.tap do |tpl|
-      tpl.add_topic(topic, 1)
+      (@topics || []).each { |topic| tpl.add_topic(topic, 1) }
     end
   end
 
@@ -126,9 +136,16 @@ class FakeConsumer
     # exactly stop when reading from multiple topics
     @runner.stop if (@poll_count += 1) >= 10
 
-    msg = @kafka.received_messages[@topic][@internal_offset]
-    @internal_offset += 1
-    msg
+    # round-robin across subscribed topics so no topic starves
+    @topics.size.times do
+      topic = @poll_topic_iterator.next
+      msg = @kafka.received_messages[topic][@internal_offsets[topic]]
+      next unless msg
+
+      @internal_offsets[topic] += 1
+      return msg
+    end
+    nil
   end
 
   def commit(partitions, async)
@@ -138,9 +155,9 @@ class FakeConsumer
   end
 
   def store_offset(message)
-    raise "storing offset on wrong consumer. own topic: #{@topic} vs #{message.topic}" if @topic != message.topic
+    raise "storing offset on wrong consumer. own topics: #{@topics} vs #{message.topic}" unless @topics.include?(message.topic)
     # + 1 as per: https://github.com/edenhill/librdkafka/wiki/Consumer-offset-management#terminology
-    @internal_offset = @committed_offset = message.offset + 1
+    @internal_offsets[message.topic] = @committed_offsets[message.topic] = message.offset + 1
   end
 
   def pause(tpl)
@@ -154,8 +171,8 @@ class FakeConsumer
   end
 
   def seek(message)
-    raise "seeking on wrong consumer. own topic: #{@topic} vs #{message.topic}" if @topic != message.topic
-    @internal_offset = message.offset
+    raise "seeking on wrong consumer. own topics: #{@topics} vs #{message.topic}" unless @topics.include?(message.topic)
+    @internal_offsets[message.topic] = message.offset
   end
 end
 
@@ -652,6 +669,45 @@ RSpec.describe Racecar::Runner do
         kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
         expect { runner.run }.to change { instrumenter.event_raised_errors?("process_batch") }.to(true)
       end
+    end
+  end
+
+  context "with single_consumer mode and a consumer with multiple subscriptions" do
+    let(:processor) { TestMultiConsumer.new }
+
+    before { config.single_consumer = true }
+
+    it "processes messages from all topics through one consumer" do
+      kafka.deliver_message("hello", topic: "greetings")
+      kafka.deliver_message("world", topic: "second")
+
+      runner.run
+
+      expect(kafka.consumers.size).to eq 1
+      expect(processor.messages.map(&:value)).to contain_exactly("hello", "world")
+    end
+
+    it "stores offsets per topic on the shared consumer" do
+      kafka.deliver_message("hello", topic: "greetings")
+      kafka.deliver_message("world", topic: "second")
+
+      runner.run
+
+      expect(kafka.consumers.first.committed_offsets).to eq("greetings" => 1, "second" => 1)
+    end
+
+    it "splits a poll spanning topics into one batch per topic and partition" do
+      kafka.deliver_message("hello", topic: "greetings")
+      kafka.deliver_message("world", topic: "second")
+
+      allow(instrumenter).to receive(:instrument).and_call_original
+
+      runner.run
+
+      expect(instrumenter).to have_received(:instrument)
+        .with("process_batch", hash_including(topic: "greetings", message_count: 1))
+      expect(instrumenter).to have_received(:instrument)
+        .with("process_batch", hash_including(topic: "second", message_count: 1))
     end
   end
 

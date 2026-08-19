@@ -47,6 +47,14 @@ module Racecar
         __rdkafka_topic_partition_list.to_h.values.flatten.map(&:partition)
       end
 
+      # {topic name => [partition numbers]} for every topic in the event. Prefer
+      # this over topic_name/partition_numbers when subscriptions share a single
+      # consumer (see the single_consumer config), where one rebalance event may
+      # span several topics.
+      def topic_partition_numbers
+        __rdkafka_topic_partition_list.to_h.transform_values { |partitions| partitions.map(&:partition) }
+      end
+
       def empty?
         __rdkafka_topic_partition_list.empty?
       end

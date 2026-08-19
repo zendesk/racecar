@@ -335,6 +335,46 @@ RSpec.describe Racecar::ConsumerSet do
     end
   end
 
+  context "A consumer with multiple subscriptions in single consumer mode" do
+    let(:subscriptions) { [ subscription("feature"), subscription("profile") ] }
+
+    before { config.single_consumer = true }
+
+    it "subscribes a single consumer to all topics upon first use" do
+      consumer_set.current
+
+      expect(rdconsumer).to have_received(:subscribe).with("feature", "profile")
+      expect(Rdkafka::Config).to have_received(:new).once
+    end
+
+    it "creates only one consumer for all subscriptions" do
+      consumer_set.subscribe_all
+
+      expect(Rdkafka::Config).to have_received(:new).once
+    end
+
+    it "keeps polling the same consumer" do
+      config.multi_subscription_strategy = "round-robin"
+      allow(rdconsumer).to receive(:poll).and_return(:msg1, :msg2)
+
+      consumer_set.poll(100)
+      consumer_set.poll(100)
+
+      expect(Rdkafka::Config).to have_received(:new).once
+      expect(rdconsumer).to have_received(:poll).twice
+    end
+
+    context "when subscriptions differ in their settings" do
+      let(:subscriptions) do
+        [ subscription("feature"), Racecar::Consumer::Subscription.new("profile", false, 1048576, {}) ]
+      end
+
+      it "raises an exception" do
+        expect { consumer_set }.to raise_error(ArgumentError, /single_consumer/)
+      end
+    end
+  end
+
   context "A consumer with multiple subscriptions" do
     let(:subscriptions) { [ subscription("feature"), subscription("profile"), subscription("account") ] }
     let(:rdconsumer1)   { double("rdconsumer_feature", subscribe: true, assignment: tpl(subscriptions[0])) }
