@@ -14,7 +14,7 @@ module Racecar
     def on_partitions_assigned(rdkafka_topic_partition_list)
       event = Event.new(rdkafka_consumer: rdkafka_consumer, rdkafka_topic_partition_list: rdkafka_topic_partition_list)
 
-      instrument("partitions_assigned", partitions: event.partition_numbers) do
+      instrument("partitions_assigned", partitions: event.topic_partition_numbers.values.flatten) do
         consumer_class.on_partitions_assigned(event)
       end
     end
@@ -22,7 +22,7 @@ module Racecar
     def on_partitions_revoked(rdkafka_topic_partition_list)
       event = Event.new(rdkafka_consumer: rdkafka_consumer, rdkafka_topic_partition_list: rdkafka_topic_partition_list)
 
-      instrument("partitions_revoked", partitions: event.partition_numbers) do
+      instrument("partitions_revoked", partitions: event.topic_partition_numbers.values.flatten) do
         consumer_class.on_partitions_revoked(event)
       end
     end
@@ -40,11 +40,18 @@ module Racecar
       end
 
       def topic_name
+        ensure_single_topic!("topic_name")
         __rdkafka_topic_partition_list.to_h.keys.first
       end
 
       def partition_numbers
+        ensure_single_topic!("partition_numbers")
         __rdkafka_topic_partition_list.to_h.values.flatten.map(&:partition)
+      end
+
+      # {topic name => [partition numbers]} for every topic in the event.
+      def topic_partition_numbers
+        __rdkafka_topic_partition_list.to_h.transform_values { |partitions| partitions.map(&:partition) }
       end
 
       def empty?
@@ -53,6 +60,14 @@ module Racecar
 
       # API private and not guaranteed stable
       attr_reader :__rdkafka_topic_partition_list, :__rdkafka_consumer
+
+      private
+
+      def ensure_single_topic!(method_name)
+        return if __rdkafka_topic_partition_list.to_h.size <= 1
+
+        raise Racecar::Error, "##{method_name} is ambiguous for a rebalance event spanning multiple topics; use #topic_partition_numbers"
+      end
     end
   end
 end
