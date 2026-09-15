@@ -2,9 +2,10 @@
 
 ## Unreleased
 
-* Commit stored offsets on a timer while idle so consumer groups stay visible to
-  lag monitors (e.g. Burrow) even when no messages are processed. Enabled by
-  default; set `offset_commit_on_idle=false` to disable.
+* Commit stored offsets on a timer while idle to refresh their retention, so an
+  idle consumer group doesn't lose its position in the topics after
+  `offsets.retention.ms` expires. Enabled by default; set
+  `offset_commit_on_idle=false` to disable.
 
 ## 2.12.0
 

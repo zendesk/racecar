@@ -299,12 +299,15 @@ module Racecar
 
     # librdkafka's auto-commit only writes an OffsetCommit when the stored
     # offset has changed, so a consumer that never advances its stored offset
-    # -- whether idle or stuck on failing messages -- never commits, and its
-    # group eventually falls out of lag monitoring. Re-committing the already
-    # stored position on a timer keeps the group visible. This only fires when
-    # the stored offset wasn't advanced this iteration, so it never duplicates
-    # the normal commit path, and it never advances past a stored offset, so
-    # at-least-once semantics are unchanged.
+    # -- whether idle or stuck on failing messages -- never commits. Kafka
+    # retains committed offsets for only a finite period (offsets.retention.ms,
+    # default 7 days); once they expire the group loses its position and a
+    # restart falls back to auto.offset.reset, causing reprocessing or skipped
+    # messages. Re-committing the already stored position on a timer refreshes
+    # its retention. This only fires when the stored offset wasn't advanced
+    # this iteration, so it never duplicates the normal commit path, and it
+    # never advances past a stored offset, so at-least-once semantics are
+    # unchanged.
     def maybe_keep_alive_commit(offset_stale)
       return unless offset_stale
       return unless config.offset_commit_on_idle
