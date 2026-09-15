@@ -563,6 +563,18 @@ RSpec.describe Racecar::Runner do
       # never elapses, so no keep-alive commit fires.
       expect(consumers.first.commit_count).to eq 1
     end
+
+    it "keep-alive commits when messages are received but none advance the offset" do
+      config.offset_commit_interval = 0
+      10.times { kafka.deliver_message(StandardError.new("boom"), topic: "greetings") }
+
+      runner.run
+
+      # Every message failed, so store_offset was never called and the stored
+      # offset is unchanged -- the group would fall out of lag monitoring
+      # without a keep-alive commit, even though the consumer was "active".
+      expect(consumers.first.commit_count).to be > 1
+    end
   end
 
   context "with a consumer class with multiple subscriptions" do

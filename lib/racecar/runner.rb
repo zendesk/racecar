@@ -69,6 +69,7 @@ module Racecar
       loop do
         break if @stop_requested
         resume_paused_partitions
+        @offset_advanced_this_loop = false
 
         @instrumenter.instrument("start_main_loop", instrumentation_payload)
         @instrumenter.instrument("main_loop", instrumentation_payload) do
@@ -79,11 +80,11 @@ module Racecar
             msg_per_part.each_value do |batch|
               process_batch(batch)
             end
-            maybe_keep_alive_commit(messages.empty?)
+            maybe_keep_alive_commit(!@offset_advanced_this_loop)
           when :single then
             message = consumer.poll(config.max_wait_time_ms)
             process(message) if message
-            maybe_keep_alive_commit(message.nil?)
+            maybe_keep_alive_commit(!@offset_advanced_this_loop)
           end
         end
       end
@@ -189,6 +190,7 @@ module Racecar
             processor.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
             processor.deliver!
             consumer.store_offset(message)
+            @offset_advanced_this_loop = true
           end
         rescue => e
           instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
@@ -221,6 +223,7 @@ module Racecar
             processor.process_batch(racecar_messages)
             processor.deliver!
             consumer.store_offset(messages.last)
+            @offset_advanced_this_loop = true
           end
         rescue => e
           instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
@@ -295,19 +298,20 @@ module Racecar
     end
 
     # librdkafka's auto-commit only writes an OffsetCommit when the stored
-    # offset has changed, so a consumer with no messages never commits and its
+    # offset has changed, so a consumer that never advances its stored offset
+    # -- whether idle or stuck on failing messages -- never commits, and its
     # group eventually falls out of lag monitoring. Re-committing the already
-    # stored position on a timer keeps the group visible while idle. This only
-    # fires on idle iterations (no messages processed) so it never duplicates
+    # stored position on a timer keeps the group visible. This only fires when
+    # the stored offset wasn't advanced this iteration, so it never duplicates
     # the normal commit path, and it never advances past a stored offset, so
     # at-least-once semantics are unchanged.
-    def maybe_keep_alive_commit(idle)
-      return unless idle
+    def maybe_keep_alive_commit(offset_stale)
+      return unless offset_stale
       return unless config.offset_commit_on_idle
       return if monotonic_time - @last_keep_alive_commit_at < config.offset_commit_interval
 
-      @last_keep_alive_commit_at = monotonic_time
       consumer.commit
+      @last_keep_alive_commit_at = monotonic_time
     rescue Rdkafka::RdkafkaError => e
       logger.warn "Keep-alive offset commit failed: #{e}"
     end
