@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* Commit stored offsets on a timer while idle so consumer groups stay visible to
+  lag monitors (e.g. Burrow) even when no messages are processed. Enabled by
+  default; set `offset_commit_on_idle=false` to disable.
+
 ## 2.12.0
 
 * Add tests against Ruby 3.4

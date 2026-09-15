@@ -23,6 +23,9 @@ module Racecar
     desc "How frequently to commit offset positions"
     float :offset_commit_interval, default: 10
 
+    desc "Commit stored offsets on a timer even when no messages have been processed, keeping the consumer group visible to lag monitors while idle"
+    boolean :offset_commit_on_idle, default: true
+
     desc "How often to send a heartbeat message to Kafka"
     float :heartbeat_interval, default: 10
 

@@ -49,6 +49,7 @@ module Racecar
     def run
       install_signal_handlers
       @stop_requested = false
+      @last_keep_alive_commit_at = monotonic_time
 
       # Configure the consumer with a producer so it can produce messages and
       # with a consumer so that it can support advanced use-cases.
@@ -73,13 +74,16 @@ module Racecar
         @instrumenter.instrument("main_loop", instrumentation_payload) do
           case process_method
           when :batch then
-            msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
-            msg_per_part.each_value do |messages|
-              process_batch(messages)
+            messages = consumer.batch_poll(config.max_wait_time_ms)
+            msg_per_part = messages.group_by(&:partition)
+            msg_per_part.each_value do |batch|
+              process_batch(batch)
             end
+            maybe_keep_alive_commit(messages.empty?)
           when :single then
             message = consumer.poll(config.max_wait_time_ms)
             process(message) if message
+            maybe_keep_alive_commit(message.nil?)
           end
         end
       end
@@ -288,6 +292,28 @@ module Racecar
           end
         end
       end
+    end
+
+    # librdkafka's auto-commit only writes an OffsetCommit when the stored
+    # offset has changed, so a consumer with no messages never commits and its
+    # group eventually falls out of lag monitoring. Re-committing the already
+    # stored position on a timer keeps the group visible while idle. This only
+    # fires on idle iterations (no messages processed) so it never duplicates
+    # the normal commit path, and it never advances past a stored offset, so
+    # at-least-once semantics are unchanged.
+    def maybe_keep_alive_commit(idle)
+      return unless idle
+      return unless config.offset_commit_on_idle
+      return if monotonic_time - @last_keep_alive_commit_at < config.offset_commit_interval
+
+      @last_keep_alive_commit_at = monotonic_time
+      consumer.commit
+    rescue Rdkafka::RdkafkaError => e
+      logger.warn "Keep-alive offset commit failed: #{e}"
+    end
+
+    def monotonic_time
+      Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
   end
 end

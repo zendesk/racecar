@@ -106,9 +106,10 @@ class FakeConsumer
     @previous_messages = []
 
     @poll_count = 0
+    @commit_count = 0
   end
 
-  attr_reader :topic, :committed_offset, :_paused
+  attr_reader :topic, :committed_offset, :_paused, :commit_count
 
   def subscribe(topic, **)
     @topic ||= topic
@@ -132,6 +133,7 @@ class FakeConsumer
   end
 
   def commit(partitions, async)
+    @commit_count += 1
   end
 
   def close
@@ -520,6 +522,46 @@ RSpec.describe Racecar::Runner do
         kafka.deliver_message(StandardError.new("surprise"), topic: "greetings")
         expect { runner.run }.to change { instrumenter.event_raised_errors?("process_message") }.to(true)
       end
+    end
+  end
+
+  context "keep-alive offset commits while idle" do
+    let(:processor) { TestConsumer.new }
+    let(:consumers) do
+      runner.send(:consumer).instance_variable_get(:@consumers)
+    end
+
+    # The FakeConsumer stops the runner after 10 polls. With no messages
+    # delivered, every poll returns nil, so the consumer is idle for the
+    # entire run.
+    it "commits offsets on a timer even when no messages have been processed" do
+      config.offset_commit_interval = 0
+
+      runner.run
+
+      # One commit per idle iteration plus the shutdown commit.
+      expect(consumers.first.commit_count).to be > 1
+    end
+
+    it "does not keep-alive commit when offset_commit_on_idle is disabled" do
+      config.offset_commit_interval = 0
+      config.offset_commit_on_idle = false
+
+      runner.run
+
+      # Only the shutdown commit.
+      expect(consumers.first.commit_count).to eq 1
+    end
+
+    it "does not commit while active before the interval has elapsed" do
+      config.offset_commit_interval = 10
+
+      kafka.deliver_message("hello world", topic: "greetings")
+      runner.run
+
+      # Only the shutdown commit; the run is fast enough that the interval
+      # never elapses, so no keep-alive commit fires.
+      expect(consumers.first.commit_count).to eq 1
     end
   end
 
