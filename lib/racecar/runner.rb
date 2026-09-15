@@ -316,7 +316,14 @@ module Racecar
       consumer.commit
       @last_keep_alive_commit_at = monotonic_time
     rescue Rdkafka::RdkafkaError => e
-      logger.warn "Keep-alive offset commit failed: #{e}"
+      # Retry on the next idle iteration (the timer isn't advanced on failure),
+      # but throttle the warning so a persistent failure doesn't spam the log
+      # every iteration.
+      now = monotonic_time
+      unless @last_keep_alive_commit_error_at && now - @last_keep_alive_commit_error_at < config.offset_commit_interval
+        @last_keep_alive_commit_error_at = now
+        logger.warn "Keep-alive offset commit failed: #{e}"
+      end
     end
 
     def monotonic_time
