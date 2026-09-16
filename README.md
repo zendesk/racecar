@@ -349,6 +349,7 @@ end
 The consumers will checkpoint their positions from time to time in order to be able to recover from failures. This is called _committing offsets_, since it's done by tracking the offset reached in each partition being processed, and committing those offset numbers to the Kafka offset storage API. If you can tolerate more double-processing after a failure, you can increase the interval between commits in order to better performance. You can also do the opposite if you prefer less chance of double-processing.
 
 - `offset_commit_interval` – How often to save the consumer's position in Kafka. Default is every 10 seconds.
+- `offset_commit_on_idle` – Whether to keep committing the stored position on a timer even when no messages are being processed. Kafka retains committed offsets for only a finite period (`offsets.retention.ms`); without these keep-alive commits, an idle consumer group can lose its position and fall back to `auto.offset.reset` on the next restart, causing reprocessing or skipped messages. Default is `true`.
 
 #### Timeouts & intervals
 

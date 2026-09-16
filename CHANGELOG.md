@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+* Commit stored offsets on a timer while idle to refresh their retention, so an
+  idle consumer group doesn't lose its position in the topics after
+  `offsets.retention.ms` expires. Enabled by default; set
+  `offset_commit_on_idle=false` to disable.
+
 ## 2.12.0
 
 * Add tests against Ruby 3.4

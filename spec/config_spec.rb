@@ -8,6 +8,7 @@ RSpec.describe Racecar::Config do
 
   it "uses the default config if no explicit value has been set" do
     expect(config.offset_commit_interval).to eq 10
+    expect(config.offset_commit_on_idle).to eq true
   end
 
   it "requires `sasl_mechanism` to be a valid mechanism" do

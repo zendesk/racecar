@@ -49,6 +49,7 @@ module Racecar
     def run
       install_signal_handlers
       @stop_requested = false
+      @last_keep_alive_commit_at = monotonic_time
 
       # Configure the consumer with a producer so it can produce messages and
       # with a consumer so that it can support advanced use-cases.
@@ -68,18 +69,22 @@ module Racecar
       loop do
         break if @stop_requested
         resume_paused_partitions
+        @offset_advanced_this_loop = false
 
         @instrumenter.instrument("start_main_loop", instrumentation_payload)
         @instrumenter.instrument("main_loop", instrumentation_payload) do
           case process_method
           when :batch then
-            msg_per_part = consumer.batch_poll(config.max_wait_time_ms).group_by(&:partition)
-            msg_per_part.each_value do |messages|
-              process_batch(messages)
+            messages = consumer.batch_poll(config.max_wait_time_ms)
+            msg_per_part = messages.group_by(&:partition)
+            msg_per_part.each_value do |batch|
+              process_batch(batch)
             end
+            maybe_keep_alive_commit(!@offset_advanced_this_loop)
           when :single then
             message = consumer.poll(config.max_wait_time_ms)
             process(message) if message
+            maybe_keep_alive_commit(!@offset_advanced_this_loop)
           end
         end
       end
@@ -185,6 +190,7 @@ module Racecar
             processor.process(Racecar::Message.new(message, retries_count: pause.pauses_count))
             processor.deliver!
             consumer.store_offset(message)
+            @offset_advanced_this_loop = true
           end
         rescue => e
           instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
@@ -217,6 +223,7 @@ module Racecar
             processor.process_batch(racecar_messages)
             processor.deliver!
             consumer.store_offset(messages.last)
+            @offset_advanced_this_loop = true
           end
         rescue => e
           instrumentation_payload[:unrecoverable_delivery_error] = reset_producer_on_unrecoverable_delivery_errors(e)
@@ -288,6 +295,39 @@ module Racecar
           end
         end
       end
+    end
+
+    # librdkafka's auto-commit only writes an OffsetCommit when the stored
+    # offset has changed, so a consumer that never advances its stored offset
+    # -- whether idle or stuck on failing messages -- never commits. Kafka
+    # retains committed offsets for only a finite period (offsets.retention.ms,
+    # default 7 days); once they expire the group loses its position and a
+    # restart falls back to auto.offset.reset, causing reprocessing or skipped
+    # messages. Re-committing the already stored position on a timer refreshes
+    # its retention. This only fires when the stored offset wasn't advanced
+    # this iteration, so it never duplicates the normal commit path, and it
+    # never advances past a stored offset, so at-least-once semantics are
+    # unchanged.
+    def maybe_keep_alive_commit(offset_stale)
+      return unless offset_stale
+      return unless config.offset_commit_on_idle
+      return if monotonic_time - @last_keep_alive_commit_at < config.offset_commit_interval
+
+      consumer.commit
+      @last_keep_alive_commit_at = monotonic_time
+    rescue Rdkafka::RdkafkaError => e
+      # Retry on the next idle iteration (the timer isn't advanced on failure),
+      # but throttle the warning so a persistent failure doesn't spam the log
+      # every iteration.
+      now = monotonic_time
+      unless @last_keep_alive_commit_error_at && now - @last_keep_alive_commit_error_at < config.offset_commit_interval
+        @last_keep_alive_commit_error_at = now
+        logger.warn "Keep-alive offset commit failed: #{e}"
+      end
+    end
+
+    def monotonic_time
+      Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
   end
 end
