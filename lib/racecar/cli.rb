@@ -39,6 +39,8 @@ module Racecar
 
       config.validate!
 
+      config.configure_datadog
+
       if config.logfile
         $stderr.puts "=> Logging to #{config.logfile}"
         Racecar.logger = Logger.new(config.logfile)
@@ -48,9 +50,6 @@ module Racecar
         Racecar.logger.level = Object.const_get("Logger::#{config.log_level.upcase}")
       end
 
-      if config.datadog_enabled
-        configure_datadog
-      end
 
       $stderr.puts "=> Wrooooom!"
 
@@ -150,18 +149,6 @@ module Racecar
           puts opts
           exit
         end
-      end
-    end
-
-    def configure_datadog
-      require_relative './datadog'
-
-      Datadog.configure do |datadog|
-        datadog.host        = config.datadog_host unless config.datadog_host.nil?
-        datadog.port        = config.datadog_port unless config.datadog_port.nil?
-        datadog.socket_path = config.datadog_socket_path unless config.datadog_socket_path.nil?
-        datadog.namespace   = config.datadog_namespace unless config.datadog_namespace.nil?
-        datadog.tags        = config.datadog_tags unless config.datadog_tags.nil?
       end
     end
   end
