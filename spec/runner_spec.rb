@@ -315,6 +315,17 @@ RSpec.shared_examples "delivery error handling" do
 
     runner.run
   end
+
+  it "closes the reset producer through OAuthBearer" do
+    allow_any_instance_of(FakeDeliveryHandle).to receive(:wait).and_raise(msg_timed_out)
+    allow(Racecar::OAuthBearer).to receive(:close_client).and_call_original
+
+    kafka.deliver_message("3", topic: "numbers")
+
+    runner.run
+
+    expect(Racecar::OAuthBearer).to have_received(:close_client).with(instance_of(FakeProducer)).at_least(:twice)
+  end
 end
 
 RSpec.shared_examples "pause handling" do
@@ -419,6 +430,24 @@ RSpec.describe Racecar::Runner do
       runner.run
 
       expect(Rdkafka::Config).to have_received(:new).with(hash_including("hello" => "world", "hi" => "all"))
+    end
+
+    it "creates the producer through OAuthBearer" do
+      provider = -> { {} }
+      config.oauth_token_provider = provider
+      allow(Racecar::OAuthBearer).to receive(:create_client) { |rdkafka_config, type, _| rdkafka_config.public_send(type) }
+
+      runner.run
+
+      expect(Racecar::OAuthBearer).to have_received(:create_client).with(kafka, :producer, provider)
+    end
+
+    it "closes the producer through OAuthBearer" do
+      allow(Racecar::OAuthBearer).to receive(:close_client).and_call_original
+
+      runner.run
+
+      expect(Racecar::OAuthBearer).to have_received(:close_client).with(instance_of(FakeProducer))
     end
 
     it "processes messages with the specified consumer class" do

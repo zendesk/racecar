@@ -17,6 +17,7 @@ RSpec.describe Racecar::Config do
       config.sasl_mechanism = "PLAIN"
       config.sasl_mechanism = "SCRAM-SHA-256"
       config.sasl_mechanism = "SCRAM-SHA-512"
+      config.sasl_mechanism = "OAUTHBEARER"
     }.not_to raise_exception
 
     expect {
@@ -276,6 +277,19 @@ RSpec.describe Racecar::Config do
 
         config.instrumenter
       end
+    end
+  end
+
+  describe "#oauth_token_provider" do
+    it "defaults to nil" do
+      expect(config.oauth_token_provider).to be_nil
+    end
+
+    it "can be set in Ruby" do
+      provider = -> { {} }
+      config.oauth_token_provider = provider
+
+      expect(config.oauth_token_provider).to be(provider)
     end
   end
 

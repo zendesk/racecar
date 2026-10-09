@@ -56,6 +56,16 @@ RSpec.describe Racecar::ConsumerSet do
       expect(rdconsumer).to have_received(:subscribe).with("greetings")
     end
 
+    it "creates the consumer with the configured token provider" do
+      provider = -> { {} }
+      config.oauth_token_provider = provider
+      allow(Racecar::OAuthBearer).to receive(:create_client).and_return(rdconsumer)
+
+      consumer_set.current
+
+      expect(Racecar::OAuthBearer).to have_received(:create_client).with(rdconfig, :consumer, provider)
+    end
+
     context "which is subscribed" do
       before { consumer_set; consumer_set.current }
 
@@ -316,6 +326,11 @@ RSpec.describe Racecar::ConsumerSet do
           consumer_set.close
         end
 
+        it "closes consumers through OAuthBearer" do
+          expect(Racecar::OAuthBearer).to receive(:close_client).with(rdconsumer).once
+          consumer_set.close
+        end
+
         it "clears paused_tpls" do
           allow(rdconsumer).to receive(:close)
           consumer_set.instance_variable_set(:@paused_tpls, {"topic" => {0 => []}})
@@ -387,6 +402,16 @@ RSpec.describe Racecar::ConsumerSet do
       end
       consumer_set.send(:select_next_consumer)
       expect(rdconsumer2).to receive(:close).once
+      consumer_set.send(:reset_current_consumer)
+    end
+
+    it "#reset_current_consumer closes the consumer through OAuthBearer" do
+      3.times do
+        consumer_set.current
+        consumer_set.send(:select_next_consumer)
+      end
+      consumer_set.send(:select_next_consumer)
+      expect(Racecar::OAuthBearer).to receive(:close_client).with(rdconsumer2).once
       consumer_set.send(:reset_current_consumer)
     end
 

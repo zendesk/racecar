@@ -113,11 +113,11 @@ module Racecar
 
       Racecar.config.validate!
 
-      producer = Rdkafka::Config.new({
+      producer = OAuthBearer.create_client(Rdkafka::Config.new({
         "bootstrap.servers":  Racecar.config.brokers.join(","),
         "client.id":          Racecar.config.client_id,
         "message.timeout.ms": Racecar.config.message_timeout * 1000,
-      }.merge(Racecar.config.rdkafka_producer)).producer
+      }.merge(Racecar.config.rdkafka_producer)), :producer, Racecar.config.oauth_token_provider)
 
       handle = producer.produce(payload: message.value, key: message.key, topic: message.topic)
       begin

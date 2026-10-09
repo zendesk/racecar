@@ -4,6 +4,7 @@ require "logger"
 
 require "racecar/instrumenter"
 require "racecar/null_instrumenter"
+require "racecar/oauth_bearer"
 require "racecar/consumer"
 require "racecar/consumer_set"
 require "racecar/runner"

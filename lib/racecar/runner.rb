@@ -100,7 +100,7 @@ module Racecar
         end
       end
     ensure
-      producer.close
+      OAuthBearer.close_client(producer)
       Racecar::Datadog.close if config.datadog_enabled
       @instrumenter.instrument("shut_down", instrumentation_payload || {})
     end
@@ -141,7 +141,7 @@ module Racecar
     end
 
     def producer
-      @producer ||= Rdkafka::Config.new(producer_config).producer.tap do |producer|
+      @producer ||= OAuthBearer.create_client(Rdkafka::Config.new(producer_config), :producer, config.oauth_token_provider).tap do |producer|
         producer.delivery_callback = Racecar::DeliveryCallback.new(instrumenter: @instrumenter)
       end
     end
@@ -244,7 +244,7 @@ module Racecar
 
       logger.error error.to_s
       logger.error "Racecar will reset the producer to force a new broker connection."
-      @producer.close
+      OAuthBearer.close_client(@producer)
       @producer = nil
       processor.configure(
         producer:     producer,

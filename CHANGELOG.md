@@ -6,6 +6,9 @@
   idle consumer group doesn't lose its position in the topics after
   `offsets.retention.ms` expires. Enabled by default; set
   `offset_commit_on_idle=false` to disable.
+* Support SASL/OAUTHBEARER token refresh, e.g. for AWS MSK IAM authentication.
+  Allow `OAUTHBEARER` as `sasl_mechanism` and set `oauth_token_provider` to a
+  callable that returns the token. Requires rdkafka 0.16.0 or later.
 
 ## 2.12.0
 

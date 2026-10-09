@@ -65,7 +65,7 @@ module Racecar
     end
 
     def close
-      each_subscribed(&:close)
+      each_subscribed { |consumer| OAuthBearer.close_client(consumer) }
       @paused_tpls.clear
     end
 
@@ -74,7 +74,7 @@ module Racecar
         consumer_config = Rdkafka::Config.new(rdkafka_config(current_subscription))
         listener = RebalanceListener.new(@config.consumer_class, @instrumenter)
         consumer_config.consumer_rebalance_listener = listener
-        consumer = consumer_config.consumer
+        consumer = OAuthBearer.create_client(consumer_config, :consumer, @config.oauth_token_provider)
         listener.rdkafka_consumer = consumer
 
         @instrumenter.instrument('join_group') do
@@ -208,7 +208,7 @@ module Racecar
       @logger.info "Resetting consumer with id: #{current_consumer_id}"
 
       consumer = @consumers[current_consumer_id]
-      consumer.close unless consumer.nil?
+      OAuthBearer.close_client(consumer) unless consumer.nil?
       @consumers[current_consumer_id] = nil
     end
 

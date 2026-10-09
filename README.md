@@ -392,7 +392,7 @@ The memory usage limit is roughly estimated as `max_bytes * min_message_queue_si
 Racecar has support for using SASL to authenticate clients using either the GSSAPI or PLAIN mechanism either via plaintext or SSL connection.
 
 - `security_protocol` – Protocol used to communicate with brokers (`:sasl_plaintext` `:sasl_ssl`)
-- `sasl_mechanism` – SASL mechanism to use for authentication (`GSSAPI` `PLAIN` `SCRAM-SHA-256` `SCRAM-SHA-512`)
+- `sasl_mechanism` – SASL mechanism to use for authentication (`GSSAPI` `PLAIN` `SCRAM-SHA-256` `SCRAM-SHA-512` `OAUTHBEARER`)
 
 - `sasl_kerberos_principal` – This client's Kerberos principal name
 - `sasl_kerberos_kinit_cmd` – Full kerberos kinit command string, `%{config.prop.name}` is replaced by corresponding config object value, `%{broker.name}` returns the broker's hostname
@@ -400,6 +400,43 @@ Racecar has support for using SASL to authenticate clients using either the GSSA
 - `sasl_kerberos_min_time_before_relogin` – Minimum time in milliseconds between key refresh attempts
 - `sasl_username` – SASL username for use with the PLAIN and SASL-SCRAM-.. mechanism
 - `sasl_password` – SASL password for use with the PLAIN and SASL-SCRAM-.. mechanism
+
+#### SASL/OAUTHBEARER token refresh
+
+With `sasl_mechanism` set to `OAUTHBEARER`, librdkafka asks for a new token before the current one expires. Racecar passes each request to a token provider you set in Ruby. Racecar applies the token to every Kafka client it creates, both consumers and producers.
+
+- `oauth_token_provider` – An object that responds to `call` and returns a Hash with these keys:
+  - `token` – The token string.
+  - `lifetime_ms` – When the token expires, in milliseconds since the epoch.
+  - `principal_name` – The Kafka principal name for the token.
+  - `extensions` – Optional. A Hash of SASL extensions.
+
+If the provider raises an error, Racecar reports the failure to librdkafka, which retries later.
+
+The token provider needs rdkafka 0.16.0 or later.
+
+##### AWS MSK IAM example
+
+Racecar has no dependency on any token library. For [AWS MSK IAM authentication](https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html), add the [aws-msk-iam-sasl-signer](https://github.com/bruce-szalwinski-he/aws-msk-iam-sasl-signer-ruby) gem to your Gemfile, then configure Racecar:
+
+```ruby
+require "aws_msk_iam_sasl_signer"
+
+Racecar.configure do |config|
+  config.security_protocol = :sasl_ssl
+  config.sasl_mechanism = "OAUTHBEARER"
+
+  signer = AwsMskIamSaslSigner::MSKTokenProvider.new(region: ENV.fetch("AWS_REGION"))
+  config.oauth_token_provider = -> {
+    auth_token = signer.generate_auth_token
+    {
+      token: auth_token.token,
+      lifetime_ms: auth_token.expiration_time_ms,
+      principal_name: "kafka-cluster",
+    }
+  }
+end
+```
 
 #### Producing messages
 

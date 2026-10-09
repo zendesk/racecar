@@ -65,4 +65,22 @@ RSpec.describe Racecar::Producer do
       expect(internal_producer.instance_variable_get("@partitioner_name")).to eq("murmur2_random")
     end
   end
+
+  context "with an oauth token provider" do
+    let(:provider) { -> { {} } }
+    let(:config) do
+      test_config = Racecar::Config.new()
+      test_config.oauth_token_provider = provider
+      test_config
+    end
+
+    it "creates the internal producer through OAuthBearer" do
+      Racecar::Producer.class_variable_set(:@@init_internal_producer, nil)
+      expect(Racecar::OAuthBearer).to receive(:create_client)
+        .with(an_instance_of(Rdkafka::Config), :producer, provider)
+        .and_return(instance_double(Rdkafka::Producer, "delivery_callback=": nil))
+
+      Racecar::Producer.new(config: config)
+    end
+  end
 end

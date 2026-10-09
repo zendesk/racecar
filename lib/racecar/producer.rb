@@ -2,6 +2,7 @@
 
 require "racecar/message_delivery_error"
 require "racecar/delivery_callback"
+require "racecar/oauth_bearer"
 
 at_exit do
   Racecar::Producer.shutdown!
@@ -44,7 +45,7 @@ module Racecar
           }
           producer_config["compression.codec"] = config.producer_compression_codec.to_s unless config.producer_compression_codec.nil?
           producer_config.merge!(config.rdkafka_producer)
-          Rdkafka::Config.new(producer_config).producer.tap do |producer|
+          OAuthBearer.create_client(Rdkafka::Config.new(producer_config), :producer, config.oauth_token_provider).tap do |producer|
             producer.delivery_callback = DeliveryCallback.new(instrumenter: @instrumenter)
           end
         end
