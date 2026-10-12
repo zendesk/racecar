@@ -11,13 +11,26 @@ module Racecar
   class Producer
 
     @@mutex = Mutex.new
+    @@internal_producer = nil
 
     class << self
+      # Close the internal rdkafka producer. Subsequent attempts to
+      # produce messages after shutdown will result in errors.
       def shutdown!
         @@mutex.synchronize do
-          if !@internal_producer.nil?
-            @internal_producer.close
-          end
+          @@internal_producer&.close
+        end
+      end
+
+      # Reset internal state. Subsequent attempts to produce messages will
+      # reinitialize internal resources.
+      #
+      # Before forking a process, it is recommended to call this method. See:
+      # https://github.com/karafka/rdkafka-ruby/blob/main/README.md#forking
+      def reset!
+        @@mutex.synchronize do
+          @@internal_producer&.close
+          @@internal_producer = nil
         end
       end
     end
@@ -28,12 +41,12 @@ module Racecar
       @delivery_handles = []
       @instrumenter = instrumenter
       @batching = false
-      @internal_producer = init_internal_producer(config)
+      init_internal_producer(config)
     end
 
     def init_internal_producer(config)
       @@mutex.synchronize do
-        @@init_internal_producer ||= begin
+        @@internal_producer ||= begin
           # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
           producer_config = {
             "bootstrap.servers"      => config.brokers.join(","),
@@ -109,7 +122,9 @@ module Racecar
 
     private
 
-    attr_reader :internal_producer
+    def internal_producer
+      @@internal_producer || init_internal_producer(@config)
+    end
 
     def deliver_with_error_handling(handle)
       handle.wait
