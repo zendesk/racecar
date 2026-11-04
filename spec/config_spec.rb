@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "ostruct"
 require "racecar/config"
 
 RSpec.describe Racecar::Config do
@@ -106,8 +107,7 @@ RSpec.describe Racecar::Config do
 
   describe "#load_consumer_class" do
     let(:consumer_class) {
-      Struct.new(:group_id, :fetch_messages, :name, :subscriptions, :max_wait_time, :parallel_workers)
-        .new(nil, nil, "DoStuffConsumer", [])
+      OpenStruct.new(group_id: nil, fetch_messages: nil, name: "DoStuffConsumer", subscriptions: [])
     }
 
     it "sets the group id if one has been explicitly defined" do
