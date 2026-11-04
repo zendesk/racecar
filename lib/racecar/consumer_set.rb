@@ -102,8 +102,8 @@ module Racecar
       end
 
       consumer.pause(filtered_tpl)
-      fake_msg = SeekMessage.new(topic: topic, partition: partition, offset: offset)
-      consumer.seek(fake_msg)
+      seek_message = SeekMessage.new(topic: topic, partition: partition, offset: offset)
+      consumer.seek(seek_message)
 
       @paused_tpls[topic][partition] = [consumer, filtered_tpl]
     end
