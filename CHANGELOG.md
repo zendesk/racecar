@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Fix `ConsumerSet#pause` raising `NameError` when `OpenStruct` is not loaded by
+  replacing the seek message with a `Struct`.
 * Commit stored offsets on a timer while idle to refresh their retention, so an
   idle consumer group doesn't lose its position in the topics after
   `offsets.retention.ms` expires. Enabled by default; set

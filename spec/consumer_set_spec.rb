@@ -83,6 +83,8 @@ RSpec.describe Racecar::ConsumerSet do
         it "#pause seeks to given offset" do
           allow(rdconsumer).to receive(:pause)
           expect(rdconsumer).to receive(:seek) do |msg|
+            expect(msg.topic).to eq "greetings"
+            expect(msg.partition).to eq 0
             expect(msg.offset).to eq 123456
           end
           consumer_set.pause("greetings", 0, 123456)

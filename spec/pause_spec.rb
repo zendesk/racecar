@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "ostruct"
-
 RSpec.describe Racecar::Pause do
   let(:pause) { described_class.new(timeout: 10) }
 

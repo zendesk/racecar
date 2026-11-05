@@ -3,6 +3,8 @@
 module Racecar
   class ConsumerSet
     MAX_POLL_TRIES = 10
+    SeekMessage = Struct.new(:topic, :partition, :offset, keyword_init: true)
+    private_constant :SeekMessage
 
     def initialize(config, logger, instrumenter = NullInstrumenter)
       @config, @logger = config, logger
@@ -100,8 +102,8 @@ module Racecar
       end
 
       consumer.pause(filtered_tpl)
-      fake_msg = OpenStruct.new(topic: topic, partition: partition, offset: offset)
-      consumer.seek(fake_msg)
+      seek_message = SeekMessage.new(topic: topic, partition: partition, offset: offset)
+      consumer.seek(seek_message)
 
       @paused_tpls[topic][partition] = [consumer, filtered_tpl]
     end
