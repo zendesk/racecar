@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.13.0
+
 * Fix `ConsumerSet#pause` raising `NameError` when `OpenStruct` is not loaded by
   replacing the seek message with a `Struct`.
 * Commit stored offsets on a timer while idle to refresh their retention, so an
